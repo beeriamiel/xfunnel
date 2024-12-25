@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from "@/components/hooks/use-toast"
+import { useDashboardStore } from "@/app/dashboard/store"
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ export function CompanySelector({ selectedCompany, companies }: CompanySelectorP
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const [isPending, startTransition] = useTransition()
+  const setSelectedCompanyId = useDashboardStore(state => state.setSelectedCompanyId)
 
   // Memoize the current value to prevent unnecessary re-renders
   const currentValue = useMemo(() => 
@@ -48,8 +50,12 @@ export function CompanySelector({ selectedCompany, companies }: CompanySelectorP
         
         if (companyName !== 'all') {
           params.set('company', companyName)
+          // Find the company ID and update the store
+          const selectedCompany = companies.find(c => c.name === companyName)
+          setSelectedCompanyId(selectedCompany?.id ?? null)
         } else {
           params.delete('company')
+          setSelectedCompanyId(null)
         }
 
         router.push(`/dashboard?${params.toString()}`)
@@ -62,7 +68,7 @@ export function CompanySelector({ selectedCompany, companies }: CompanySelectorP
         })
       }
     })
-  }, [router, searchParams, toast, isPending])
+  }, [router, searchParams, toast, isPending, companies, setSelectedCompanyId])
 
   return (
     <Select
