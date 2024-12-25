@@ -1,0 +1,177 @@
+# Comprehensive Dashboard Implementation Plan
+
+### Current State Analysis
+1. **Existing Components to Remove**
+```
+- overview-cards.tsx         // Basic metrics, not matching new design
+- engine-performance.tsx     // Different chart implementation
+- journey-analysis.tsx       // Not matching new hierarchical structure
+- query-performance.tsx      // Different query analysis approach
+- citation-analysis.tsx      // Not part of new design
+```
+
+2. **Database Schema Utilization** (from migration.sql)
+```
+Key Tables:
+- companies           // Base filtering level
+- queries            // Contains journey phases and text
+- responses          // Engine performance data
+- response_analysis  // Core metrics and categorization
+```
+
+### Implementation Phases
+
+#### Phase 0: Preparation
+1. **Repository Setup**
+   - Create feature branch
+   - Remove deprecated components
+   - Clean up unused imports/types
+
+2. **Company Selection Infrastructure**
+   - Company selector component
+   - Company context provider
+   - Company-based filtering utilities
+
+#### Phase 1: Base Infrastructure
+1. **Dashboard Layout**
+   ```
+   - DashboardLayout/
+     ├── CompanySelector
+     ├── MetricsHeader
+     ├── NavigationBreadcrumb
+     └── ContentArea
+   ```
+
+2. **Routing Structure**
+   ```
+   /dashboard/[company]/
+   ├── regions/
+   │   └── [region]/
+   │       ├── industries/
+   │       │   └── [industry]/
+   │       │       ├── personas/
+   │       │       │   └── [persona]/
+   │       │       │       └── queries/
+   │       │       │           └── [query]
+   │       │       └── overview
+   │       └── overview
+   │   └── overview
+   └── overview
+   ```
+
+3. **State Management**
+   ```typescript
+   interface DashboardState {
+     companyId: string;
+     view: {
+       region?: string;
+       industry?: string;
+       persona?: string;
+       query?: string;
+     };
+     metrics: {
+       selected: 'sentiment' | 'position' | 'mentioned' | 'recommendation';
+     };
+   }
+   ```
+
+#### Phase 2: Core Components
+1. **Engine Performance Chart**
+   ```
+   - EnginePerformanceChart/
+     ├── MetricTabs
+     ├── TimeSeriesChart
+     ├── ChartLegend
+     └── types.ts
+   ```
+
+2. **Navigation System**
+   ```
+   - Navigation/
+     ├── Breadcrumb
+     ├── FilterTabs
+     └── StateManager
+   ```
+
+3. **Metrics Display**
+   ```
+   - MetricsDisplay/
+     ├── MetricCard
+     ├── TrendIndicator
+     └── ComparisonView
+   ```
+
+#### Phase 3: Analysis Views
+1. **Regional Analysis**
+   ```
+   - RegionalAnalysis/
+     ├── RegionOverview
+     ├── MetricsBreakdown
+     └── RegionComparison
+   ```
+
+2. **Industry Analysis**
+   ```
+   - IndustryAnalysis/
+     ├── IndustryOverview
+     ├── VerticalMetrics
+     └── CompetitorAnalysis
+   ```
+
+3. **Persona Analysis**
+   ```
+   - PersonaAnalysis/
+     ├── PersonaOverview
+     ├── BuyerJourneyMetrics
+     └── QueryBreakdown
+   ```
+
+4. **Query Analysis**
+   ```
+   - QueryAnalysis/
+     ├── QueryList
+     ├── EngineComparison
+     └── RankingAnalysis
+   ```
+
+#### Phase 4: Data Layer
+1. **Base Queries**
+   ```typescript
+   interface QueryOptions {
+     companyId: string;
+     timeRange: DateRange;
+     filters: FilterState;
+   }
+   ```
+
+2. **Metric Aggregations**
+   ```typescript
+   interface MetricAggregation {
+     byEngine: Record<string, MetricValues>;
+     byRegion: Record<string, MetricValues>;
+     byIndustry: Record<string, MetricValues>;
+     byPersona: Record<string, MetricValues>;
+   }
+   ```
+
+3. **Real-time Updates**
+   - Supabase subscriptions setup
+   - Incremental data updates
+   - Cache invalidation strategy
+
+### Migration Strategy
+1. **Phase Out Plan**
+   - Keep existing components during initial development
+   - Add new components under feature flag
+   - Gradually replace old with new
+   - Remove deprecated components
+
+2. **Data Migration**
+   - Verify all required fields exist
+   - Add any missing indexes
+   - Backfill any required data
+
+3. **Testing Strategy**
+   - Unit tests for aggregations
+   - Integration tests for drill-downs
+   - E2E tests for full journeys

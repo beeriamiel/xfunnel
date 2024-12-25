@@ -1,0 +1,168 @@
+Query: As an IT manager at a mid-sized retail company, I'm dealing with frequent network downtimes and poor connectivity across our stores. What can I do about this?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: I'm an IT manager and our team is struggling with managing multiple networking devices efficiently. What solutions exist for this?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the top solutions in the networking solutions space?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the top networking solutions ranked by ease of management for multiple devices?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the best networking solutions for a mid-sized retail company?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: Compare pricing models between Belkin vs Netgear vs Cisco for networking solutions suitable for mid-sized retail businesses.
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: Based on an equal evaluation of Belkin, Netgear, and Cisco, provide one definitive recommendation for a mid-sized retail company that best handles frequent network downtimes and poor connectivity.
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: Comparing Belkin, Netgear, and Cisco, which networking solution offers the best performance for high-traffic retail environments?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are typical total costs for each, including implementation and ongoing needs, for networking solutions from Belkin, Netgear, and Cisco?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the top efficient fleet management solutions ranked by fuel efficiency?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: As a fleet manager at a medium-sized delivery company, I'm dealing with high vehicle maintenance costs and fuel consumption. What can I do about this?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the best efficient fleet management solutions for reducing fuel consumption and maintenance costs?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the top solutions in the efficient fleet management space?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: I'm a fleet manager and our team is struggling with vehicle downtime affecting our delivery schedules. What solutions exist for this?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: Based on an equal evaluation of Competitor 1, Competitor 2, and Toyota's fleet solutions, provide one definitive recommendation for a medium-sized delivery company that best handles issues of maintenance costs and fuel efficiency.
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: Which efficient fleet management solutions are ranked highest for overall cost savings?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: After thoroughly evaluating each solution equally - Competitor 2, Toyota's fleet solutions, and Competitor 1 - which single solution do you definitively recommend for a fleet manager at a medium-sized delivery company and why?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the top efficient fleet management solutions ranked by vehicle uptime and availability?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are the best efficient fleet management solutions ranked by ease of use/implementation?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: How does Toyota's fleet management solution handle high maintenance costs?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are typical total costs for each, including implementation and ongoing needs?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: What are common implementation/adoption challenges with Toyota's fleet management solution?
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: Compare pricing models between Toyota's fleet solutions vs Competitor 1 vs Competitor 2
+Response Status: 400
+Response: {"error":"Authorization header is correct, but the token seems invalid"}
+
+Query: As a data scientist at a mid-sized tech company, I'm dealing with the challenge of understanding complex datasets quickly. What can I do about this?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the top solutions in the NLP and machine learning space?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the best NLP and machine learning solutions for text analysis and language understanding?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: I'm a data scientist and our team is struggling with creating natural language understanding models efficiently. What solutions exist for this?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the top NLP solutions ranked by ease of model training?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the top machine learning platforms ranked by community and support?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: What are the best AI solutions for natural language processing ranked by ease of use/implementation?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: After thoroughly evaluating each solution equally - OpenAI, Hugging Face, and Google AI - which single solution do you definitively recommend for a data scientist at a mid-sized tech company and why?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: Based on an equal evaluation of OpenAI, Google AI, and Hugging Face, provide one definitive recommendation for a mid-sized tech company that best handles text generation and language modeling.
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: Which NLP and machine learning platforms are ranked highest for scalability?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: What are typical total costs for each, including implementation and ongoing needs for deploying NLP models?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: Compare pricing models between Hugging Face vs OpenAI vs Google AI
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: How does Hugging Face handle natural language processing and model training flexibility?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: What are common implementation/adoption challenges with Hugging Face's solutions?
+Response Status: 503
+Response: {"error":"Model meta-llama/Llama-3.2-1B is currently loading","estimated_time":98.86515045166016}
+
+Query: I'm the head of content and our team is struggling with finding legal, diverse, and affordable music to feature in our online publication. What solutions exist for this?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the best music licensing solutions for online magazines and digital content creators?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: As the head of content at a medium-sized digital magazine, I'm dealing with challenges in music licensing and content creation. What can I do about this?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the top solutions in the music streaming and licensing space?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
+Query: What are the top music licensing solutions ranked by cost-efficiency for digital magazines?
+Response Status: 500
+Response: {"error": "Model too busy, unable to get response in less than 60 second(s)"}
+
