@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { FileText, Menu, ChevronRight, Activity, Route } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
 import { useDashboardStore } from "@/app/dashboard/store"
@@ -14,9 +14,15 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export function AppSidebar({ className }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const { activeView, setActiveView } = useDashboardStore()
   const isDashboard = pathname === "/dashboard"
+
+  const getHref = (basePath: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    return `${basePath}${params.toString() ? `?${params.toString()}` : ''}`
+  }
 
   const nav = [
     {
@@ -29,14 +35,14 @@ export function AppSidebar({ className }: SidebarProps) {
         },
         {
           title: "AI Engine Performance",
-          href: "/dashboard",
+          href: getHref("/dashboard"),
           active: isDashboard && activeView === 'engine',
           icon: <Activity className="h-4 w-4" />,
           onClick: () => setActiveView('engine'),
         },
         {
           title: "Buying Journey Analysis",
-          href: "/dashboard",
+          href: getHref("/dashboard"),
           active: isDashboard && activeView === 'journey',
           icon: <Route className="h-4 w-4" />,
           onClick: () => setActiveView('journey'),

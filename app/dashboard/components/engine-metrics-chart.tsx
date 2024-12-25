@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from '@/app/supabase/client';
 import { Activity, Users, Building2, Globe2, Search, MessageSquare, Brain, Target, Route, FileText, Calendar } from 'lucide-react';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
+import { useDashboardStore } from '@/app/dashboard/store';
 
 interface ResponseAnalysis {
   id: number;
@@ -851,6 +852,8 @@ function isValidMetricValue(value: number | undefined | null): value is number {
 }
 
 export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
+  const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
+  const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeMetric, setActiveMetric] = useState<MetricKey>('company_mentioned');
   const [visibleEngines, setVisibleEngines] = useState<string[]>(Object.keys(ENGINE_NAMES));
   const [rawData, setRawData] = useState<ExtendedResponseAnalysis[]>([]);
@@ -872,7 +875,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Use the custom hook for research data
-  const researchData = useResearchData(companyId);
+  const researchData = useResearchData(effectiveCompanyId);
 
   // Move processDataByMode inside the component as a memoized callback
   const processDataByMode = useCallback((data: ExtendedResponseAnalysis[]) => {
@@ -980,7 +983,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
   // Fetch raw data only when companyId changes
   useEffect(() => {
     async function fetchData() {
-      if (!companyId) {
+      if (!effectiveCompanyId) {
         setIsLoading(false);
         return;
       }
@@ -1002,7 +1005,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
             query_id,
             analysis_batch_id
           `)
-          .eq('company_id', companyId)
+          .eq('company_id', effectiveCompanyId)
           .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: true });
 
@@ -1020,7 +1023,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
     }
 
     fetchData();
-  }, [companyId, processDataByMode]);
+  }, [effectiveCompanyId, processDataByMode]);
 
   // Get current data for chart
   const currentData = useMemo(() => {
@@ -1030,7 +1033,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
   // Get current metric config
   const currentMetric = METRICS[activeMetric];
 
-  if (!companyId) {
+  if (!effectiveCompanyId) {
     return (
       <div className="w-full bg-white rounded-lg border shadow-sm">
         <div className="p-6">
@@ -1056,7 +1059,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
     <div className="w-full bg-white rounded-xl border shadow-lg">
       <div className="p-8">
         <ResearchSummary 
-          companyId={companyId}
+          companyId={effectiveCompanyId}
           data={researchData.data}
           isLoading={researchData.isLoading}
           error={researchData.error}

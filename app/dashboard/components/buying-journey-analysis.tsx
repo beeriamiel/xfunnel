@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useDashboardStore } from '@/app/dashboard/store'
 
 // Remove external imports and keep all interfaces and components in this file
 interface Props {
@@ -2701,10 +2702,12 @@ function useTimeMetrics(companyId: number, segment: TimeSegment, segments: TimeS
 }
 
 export function BuyingJourneyAnalysis({ companyId }: Props) {
+  const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
+  const effectiveCompanyId = companyId ?? selectedCompanyId
   const [viewType, setViewType] = useState<'batch' | 'week' | 'month'>('batch');
-  const { segments, isLoading: segmentsLoading } = useTimeSegments(companyId, viewType);
+  const { segments, isLoading: segmentsLoading } = useTimeSegments(effectiveCompanyId, viewType);
   const [currentSegment, setCurrentSegment] = useState<TimeSegment | null>(null);
-  const { metrics, isLoading: metricsLoading } = useTimeMetrics(companyId, currentSegment!, segments);
+  const { metrics, isLoading: metricsLoading } = useTimeMetrics(effectiveCompanyId, currentSegment!, segments);
 
   // Set initial segment
   useEffect(() => {
@@ -2764,7 +2767,7 @@ export function BuyingJourneyAnalysis({ companyId }: Props) {
 
         <Suspense fallback={<LoadingSkeleton />}>
           <RegionsView 
-            companyId={companyId} 
+            companyId={effectiveCompanyId} 
             currentSegment={currentSegment}
           />
         </Suspense>
