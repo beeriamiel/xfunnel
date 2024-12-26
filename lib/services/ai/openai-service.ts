@@ -21,7 +21,7 @@ export class OpenAIService implements AIService {
       });
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
+        model: "chatgpt-4o-latest",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -48,7 +48,7 @@ export class OpenAIService implements AIService {
   ): Promise<QuestionGenerationResponse> {
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
+        model: "chatgpt-4o-latest",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }

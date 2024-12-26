@@ -1,4 +1,4 @@
-export type AIModelType = "claude-3.5-sonnet" | "gpt-4-turbo-preview";
+export type AIModelType = "claude-3.5-sonnet" | "gpt-4-turbo-preview" | "chatgpt-4o-latest";
 
 export interface ICPGenerationResponse {
   company_information: {

@@ -47,7 +47,7 @@ export async function generateQuestionsForAllPersonas(
   engines: EngineSelection,
   systemPromptName: string,
   userPromptName: string,
-  model: AIModelType = 'gpt-4-turbo-preview',
+  model: AIModelType = 'chatgpt-4o-latest',
   icpBatchId?: string
 ) {
   const adminClient = createAdminClient();

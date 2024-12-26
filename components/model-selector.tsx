@@ -24,7 +24,7 @@ export function ModelSelector({ value, onChange, label, disabled = false }: Mode
           <SelectValue placeholder="Select model" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="gpt-4-turbo-preview">GPT-4 Turbo</SelectItem>
+          <SelectItem value="chatgpt-4o-latest">GPT-4 Latest</SelectItem>
           <SelectItem value="claude-3.5-sonnet">Claude 3.5 Sonnet</SelectItem>
         </SelectContent>
       </Select>

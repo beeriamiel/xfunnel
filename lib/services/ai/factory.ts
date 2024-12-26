@@ -8,7 +8,7 @@ export class AIServiceFactory {
 
   private constructor() {
     this.services = new Map();
-    this.services.set('gpt-4-turbo-preview', new OpenAIService());
+    this.services.set('chatgpt-4o-latest', new OpenAIService());
     this.services.set('claude-3.5-sonnet', new ClaudeService());
   }
 

@@ -60,32 +60,19 @@ ${text}`;
       return null;
     }
 
-    // Parse the numbered list response
+    // Parse the numbered list response without filtering
     const companies = response
       .split('\n')
       .map(line => {
         const match = line.match(/^\d+\.\s*(.+)$/);
         return match ? match[1].trim() : null;
       })
-      .filter((name): name is string => 
-        name !== null &&
-        (name.toLowerCase() === ourCompanyName.toLowerCase() ||
-         competitors.some(comp => name.toLowerCase().includes(comp.toLowerCase())))
-      )
-      .map(name => {
-        // If it's our company name, use it as is
-        if (name.toLowerCase() === ourCompanyName.toLowerCase()) return ourCompanyName;
-        // Otherwise find and use the matching competitor canonical name
-        const matchingCompetitor = competitors.find(comp => 
-          name.toLowerCase().includes(comp.toLowerCase())
-        );
-        return matchingCompetitor || name;
-      });
+      .filter((name): name is string => name !== null);
 
     console.log('Parsed companies:', companies);
 
     if (companies.length < 2) {
-      console.log('Not enough valid companies found in Claude response');
+      console.log('Not enough companies found in Claude response');
       return null;
     }
 
@@ -100,7 +87,7 @@ ${text}`;
     return {
       rank_list,
       ranking_position,
-      confidence: 1.0, // Highest confidence since it's our primary method
+      confidence: 1.0,
       method: 'claude'
     };
 
@@ -352,6 +339,15 @@ function analyzeOurCompanySentiment(text: string, ourCompanyName: string): numbe
     null;
 }
 
+function matchCompanyName(text: string, companyName: string) {
+  const regex = new RegExp(`\\b${companyName}\\b`, 'i');
+  const match = text.match(regex);
+  return {
+    matches: !!match,
+    position: match?.index ?? -1
+  };
+}
+
 function findCompanyMentions(text: string, companyName: string): CompanyMention[] {
   const mentions: CompanyMention[] = [];
   const match = matchCompanyName(text, companyName);
@@ -556,30 +552,23 @@ function findExplicitRankingInText(text: string, ourCompanyName: string, competi
 
   console.log('Found list items:', listItems.map(m => m[1].trim()));
 
-  const validCompanies = listItems
+  const companies = listItems
     .map(match => ({
       name: match[1].trim(),
       position: match.index || 0
-    }))
-    .filter(item => 
-      item.name.toLowerCase() === ourCompanyName.toLowerCase() ||
-      competitors.some(comp => 
-        item.name.toLowerCase().includes(comp.toLowerCase())
-      )
-    );
+    }));
 
-  console.log('Valid companies:', validCompanies);
+  console.log('Companies:', companies);
 
-  if (validCompanies.length > 1) {
-    const rank_list = validCompanies
+  if (companies.length > 1) {
+    const rank_list = companies
       .map((company, index) => `${index + 1}. ${company.name}`)
       .join('\n');
 
-    const ranking_position = validCompanies.findIndex(
+    const ranking_position = companies.findIndex(
       company => company.name.toLowerCase() === ourCompanyName.toLowerCase()
     ) + 1 || null;
 
-    // High confidence since we found a clear ranking section with numbered list
     return {
       rank_list,
       ranking_position,
@@ -589,6 +578,32 @@ function findExplicitRankingInText(text: string, ourCompanyName: string, competi
   }
 
   return null;
+}
+
+function findCompanyNames(
+  text: string, 
+  ourCompanyName: string, 
+  competitors: string[] = []
+): Array<{ name: string, position: number }> {
+  const foundCompanies = new Map<string, number>();
+  
+  // Extract all company names from text that appear to be in a ranking context
+  const companyMatches = text.matchAll(/\b([A-Z][A-Za-z0-9\s&]+(?:Inc\.|LLC|Ltd\.|Corp\.)?)\b/g);
+  
+  for (const match of Array.from(companyMatches)) {
+    if (match[1] && match.index !== undefined) {
+      // Basic filtering to avoid common false positives
+      const name = match[1].trim();
+      if (name.length > 1 && !name.match(/^(The|A|An|In|On|At|By|For|To|And|Or|But)$/)) {
+        foundCompanies.set(name, match.index);
+      }
+    }
+  }
+
+  // Return sorted by position in text
+  return Array.from(foundCompanies.entries())
+    .map(([name, position]) => ({ name, position }))
+    .sort((a, b) => a.position - b.position);
 }
 
 function findSecondaryRanking(text: string, ourCompanyName: string, competitors: string[]): InternalRankingResult | null {
@@ -613,7 +628,7 @@ function findSecondaryRanking(text: string, ourCompanyName: string, competitors:
       return {
         rank_list,
         ranking_position,
-        confidence: 0.7, // Medium confidence
+        confidence: 0.7,
         method: 'secondary'
       };
     }
@@ -1017,118 +1032,6 @@ function checkForRecommendation(text: string, ourCompanyName: string): boolean {
   const context = text.slice(Math.max(0, companyIndex - 100), companyIndex + 100);
   
   return recommendationPatterns.some(pattern => context.toLowerCase().includes(pattern));
-}
-
-function findCompanyNames(
-  text: string, 
-  ourCompanyName: string, 
-  competitors: string[] = []
-): Array<{ name: string, position: number }> {
-  const foundCompanies = new Map<string, number>();
-  
-  // Check for our company first
-  const ourCompanyMatch = matchCompanyName(text, ourCompanyName);
-  if (ourCompanyMatch.matches) {
-    foundCompanies.set(ourCompanyName, ourCompanyMatch.position);
-  }
-
-  // Check for known competitors
-  for (const competitor of competitors) {
-    const match = matchCompanyName(text, competitor);
-    if (match.matches) {
-      foundCompanies.set(competitor, match.position);
-    }
-  }
-
-  // Return sorted by position in text
-  return Array.from(foundCompanies.entries())
-    .map(([name, position]) => ({ name, position }))
-    .sort((a, b) => a.position - b.position);
-}
-
-// Add new types for ranking detection
-type RankingMatch = {
-  position: number;
-  confidence: number;
-  pattern_type: 'explicit_list' | 'comparative' | 'positional';
-  companies?: string[];  // Ordered list of companies when available
-};
-
-function calculateRankingConfidence(section: string, sectionIndex: number, totalSections: number): number {
-  let confidence = 0;
-
-  // Strong final ranking indicators (highest weight)
-  if (/final\s+rank(ing|ed)|overall\s+rank(ing|ed)|in\s+conclusion|to\s+summarize/i.test(section)) {
-    confidence += 0.5;  // Increased from 0.4
-  }
-
-  // Explicit ordering qualifiers
-  if (/most.*to.*least|best.*to.*worst|top.*to.*bottom|highest.*to.*lowest/i.test(section)) {
-    confidence += 0.3;  // New pattern
-  }
-  
-  // Position weight - favor later sections
-  const positionWeight = sectionIndex / totalSections;
-  confidence += positionWeight * 0.3;  // Scale up to 0.3 for last section
-
-  // Section header indicators (lower weight now)
-  if (/^###.*rank/i.test(section)) {
-    confidence += 0.2;  // Reduced from 0.3
-  }
-
-  // Explicit comparison language
-  if (/compar(e|ing|ison)|evaluat(e|ing|ion)/i.test(section)) {
-    confidence += 0.2;
-  }
-
-  // Numbered list with explanations
-  if (/\d+\.\s*[^:\n]+:\s*[^\n]+/m.test(section)) {
-    confidence += 0.2;
-  }
-
-  // Presence of criteria
-  if (/based on|criteria|considering|factors/i.test(section)) {
-    confidence += 0.1;
-  }
-
-  // Normalize to 0-1 range
-  return Math.min(1, confidence);
-}
-
-// Add utility functions for name matching
-function normalizeCompanyName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[-\s]|(inc|ltd|llc|corp|company)\.?$/g, '')
-    .trim();
-}
-
-function matchCompanyName(text: string, companyName: string): { 
-  matches: boolean;
-  position: number;
-} {
-  const normalizedCompany = normalizeCompanyName(companyName);
-  const textLower = text.toLowerCase();
-  
-  // Try variations of the name
-  const variations = [
-    companyName,                          // Exact match
-    normalizedCompany,                    // Normalized
-    companyName.replace(/\s+/g, ''),     // No spaces
-    companyName.replace(/\s+/g, '-'),    // Hyphenated
-    `${companyName} Inc`,
-    `${companyName} Ltd`,
-    `${companyName} LLC`,
-  ];
-
-  for (const variant of variations) {
-    const pos = textLower.indexOf(variant.toLowerCase());
-    if (pos !== -1) {
-      return { matches: true, position: pos };
-    }
-  }
-
-  return { matches: false, position: -1 };
 }
 
 // Add new types

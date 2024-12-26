@@ -93,7 +93,7 @@ export async function generateQuestions(
   personaId?: number,
   systemPromptName?: string,
   userPromptName?: string,
-  model: AIModelType = 'gpt-4-turbo-preview'
+  model: AIModelType = 'chatgpt-4o-latest'
 ): Promise<{ queries: QueryWithId[], batchId: string }> {
   const supabase = await createClient();
   const adminClient = createAdminClient();
