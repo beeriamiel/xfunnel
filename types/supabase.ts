@@ -52,32 +52,63 @@ export type Database = {
       }
       citations: {
         Row: {
-          citation_text: string | null
+          buyer_journey_phase: string | null
+          buyer_persona: string | null
+          citation_order: number
+          citation_url: string
+          company_id: number
+          company_mentioned: boolean | null
           created_at: string | null
+          icp_vertical: string | null
           id: number
-          response_id: number | null
+          mentioned_companies: string[] | null
+          rank_list: string | null
+          ranking_position: number | null
+          recommended: boolean | null
+          region: string | null
+          response_analysis_id: number
+          response_text: string | null
+          updated_at: string | null
         }
         Insert: {
-          citation_text?: string | null
+          buyer_journey_phase?: string | null
+          buyer_persona?: string | null
+          citation_order: number
+          citation_url: string
+          company_id: number
+          company_mentioned?: boolean | null
           created_at?: string | null
+          icp_vertical?: string | null
           id?: never
-          response_id?: number | null
+          mentioned_companies?: string[] | null
+          rank_list?: string | null
+          ranking_position?: number | null
+          recommended?: boolean | null
+          region?: string | null
+          response_analysis_id: number
+          response_text?: string | null
+          updated_at?: string | null
         }
         Update: {
-          citation_text?: string | null
+          buyer_journey_phase?: string | null
+          buyer_persona?: string | null
+          citation_order?: number
+          citation_url?: string
+          company_id?: number
+          company_mentioned?: boolean | null
           created_at?: string | null
+          icp_vertical?: string | null
           id?: never
-          response_id?: number | null
+          mentioned_companies?: string[] | null
+          rank_list?: string | null
+          ranking_position?: number | null
+          recommended?: boolean | null
+          region?: string | null
+          response_analysis_id?: number
+          response_text?: string | null
+          updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "citations_response_id_fkey"
-            columns: ["response_id"]
-            isOneToOne: false
-            referencedRelation: "responses"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       companies: {
         Row: {

@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/app/supabase/server";
 import { analyzeResponse, Response } from "./analysis";
 import { Database } from "@/types/supabase";
+import { processCitationsTransaction } from './citation-processor';
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -130,7 +131,6 @@ export async function processNewResponses() {
   const adminClient = createAdminClient();
   
   try {
-    // Get unprocessed responses with their queries using left join
     const result = await adminClient
       .from('responses')
       .select(`
@@ -171,7 +171,6 @@ export async function processNewResponses() {
 
     console.log(`Processing ${responseData.length} new responses`);
 
-    // Process each response
     for (const rawResponse of responseData) {
       try {
         console.log(`Processing response ${rawResponse.id} with citations:`, rawResponse.citations);
@@ -180,7 +179,6 @@ export async function processNewResponses() {
         const analysis = await analyzeResponse(response);
         console.log(`Analysis citations_parsed:`, analysis.citations_parsed);
         
-        // Get company data from the query
         const queryData = Array.isArray(response.query) ? response.query[0] : response.query;
         if (!queryData?.company) {
           console.error(`Missing company data for response ${rawResponse.id}`);
@@ -197,20 +195,12 @@ export async function processNewResponses() {
                            queryData.company?.ideal_customer_profiles?.[0]?.vertical || 
                            null;
 
-        console.log('ICP Vertical Debug - Value Resolution:', {
-          responseId: response.id,
-          rawValue: icp_vertical,
-          fromPersona: queryData.persona?.icp?.vertical,
-          fromCompany: queryData.company?.ideal_customer_profiles?.[0]?.vertical,
-          personaExists: !!queryData.persona,
-          icpExists: !!queryData.persona?.icp,
-          companyExists: !!queryData.company,
-          companyIcpsExist: !!queryData.company?.ideal_customer_profiles
-        });
+        // Store original citations_parsed before stringifying
+        const originalCitationsParsed = analysis.citations_parsed;
 
         const analysisData: ResponseAnalysisInsert = {
           response_id: response.id,
-          citations_parsed: analysis.citations_parsed ? JSON.stringify(analysis.citations_parsed) : null,
+          citations_parsed: originalCitationsParsed ? JSON.stringify(originalCitationsParsed) : null,
           recommended: analysis.recommended,
           cited: analysis.cited,
           sentiment_score: analysis.sentiment_score,
@@ -228,67 +218,17 @@ export async function processNewResponses() {
           query_text: queryData.query_text,
           query_id: queryData.id,
           company_name: companyData.name,
-          mentioned_companies: analysis.mentioned_companies,  
+          mentioned_companies: analysis.mentioned_companies,
           competitors_list: analysis.competitors_list,
           solution_analysis: analysis.solution_analysis ? 
-            JSON.stringify(analysis.solution_analysis) : null,
+            JSON.stringify(analysis.solution_analysis) : null
         };
-
-        console.log('ICP Vertical Debug - Pre-Insert Object:', {
-          responseId: response.id,
-          hasIcpVertical: 'icp_vertical' in analysisData,
-          icpVerticalValue: analysisData.icp_vertical,
-          icpVerticalType: typeof analysisData.icp_vertical,
-          isNull: analysisData.icp_vertical === null,
-          isUndefined: analysisData.icp_vertical === undefined,
-          stringified: JSON.stringify({ icp_vertical: analysisData.icp_vertical })
-        });
 
         const { data: insertedData, error: insertError } = await adminClient
           .from('response_analysis')
-          .insert({
-            response_id: analysisData.response_id,
-            citations_parsed: analysisData.citations_parsed,
-            recommended: analysisData.recommended,
-            cited: analysisData.cited,
-            sentiment_score: analysisData.sentiment_score,
-            ranking_position: analysisData.ranking_position,
-            company_mentioned: analysisData.company_mentioned,
-            geographic_region: analysisData.geographic_region,
-            industry_vertical: analysisData.industry_vertical,
-            icp_vertical: icp_vertical,
-            buyer_persona: analysisData.buyer_persona,
-            buying_journey_stage: analysisData.buying_journey_stage,
-            response_text: analysisData.response_text,
-            rank_list: analysisData.rank_list,
-            company_id: analysisData.company_id,
-            answer_engine: analysisData.answer_engine,
-            query_text: analysisData.query_text,
-            query_id: analysisData.query_id,
-            company_name: analysisData.company_name,
-            mentioned_companies: analysisData.mentioned_companies,
-            competitors_list: analysisData.competitors_list,
-            solution_analysis: analysisData.solution_analysis
-          })
+          .insert(analysisData)
           .select('*')
           .single();
-
-        console.log('ICP Vertical Debug - Post-Insert:', {
-          responseId: response.id,
-          insertedIcpVertical: insertedData?.icp_vertical,
-          originalIcpVertical: analysisData.icp_vertical,
-          insertError: insertError ? {
-            message: insertError.message,
-            details: insertError.details,
-            hint: insertError.hint,
-            code: insertError.code
-          } : null,
-          rawInsertedData: insertedData ? {
-            ...insertedData,
-            hasIcpVertical: 'icp_vertical' in (insertedData || {}),
-            icpVerticalExists: insertedData.hasOwnProperty('icp_vertical')
-          } : null
-        });
 
         if (insertError) {
           console.error('Insert error details:', {
@@ -302,13 +242,21 @@ export async function processNewResponses() {
           continue;
         }
 
-        console.log('ICP Vertical Flow - Post-Insert:', {
-          responseId: rawResponse.id,
-          insertError: insertError ? 'Yes' : 'No',
-          insertErrorDetails: insertError
-        });
+        try {
+          console.log(`Starting citation processing for response ${rawResponse.id}:`, {
+            hasInsertedData: !!insertedData,
+            citationsParsed: originalCitationsParsed,
+            responseAnalysisId: insertedData?.id
+          });
+          
+          await processCitationsTransaction(insertedData, originalCitationsParsed);
+          
+          console.log(`Completed citation processing for response ${rawResponse.id}`);
+        } catch (citationError) {
+          console.error(`Error processing citations for response ${rawResponse.id}:`, citationError);
+        }
 
-        console.log(`Successfully processed response ${rawResponse.id}`);
+        console.log(`Successfully processed response ${rawResponse.id} with citations`);
       } catch (error) {
         console.error(`Error processing response ${rawResponse.id}:`, error);
         continue;
@@ -408,9 +356,12 @@ export async function processAllResponses() {
           companyIcpsExist: !!queryData.company?.ideal_customer_profiles
         });
 
+        // Store original citations_parsed before stringifying
+        const originalCitationsParsed = analysis.citations_parsed;
+
         const analysisData: ResponseAnalysisInsert = {
           response_id: response.id,
-          citations_parsed: analysis.citations_parsed ? JSON.stringify(analysis.citations_parsed) : null,
+          citations_parsed: originalCitationsParsed ? JSON.stringify(originalCitationsParsed) : null,
           recommended: analysis.recommended,
           cited: analysis.cited,
           sentiment_score: analysis.sentiment_score,
@@ -446,30 +397,7 @@ export async function processAllResponses() {
 
         const { data: insertedData, error: insertError } = await adminClient
           .from('response_analysis')
-          .insert({
-            response_id: analysisData.response_id,
-            citations_parsed: analysisData.citations_parsed,
-            recommended: analysisData.recommended,
-            cited: analysisData.cited,
-            sentiment_score: analysisData.sentiment_score,
-            ranking_position: analysisData.ranking_position,
-            company_mentioned: analysisData.company_mentioned,
-            geographic_region: analysisData.geographic_region,
-            industry_vertical: analysisData.industry_vertical,
-            icp_vertical: icp_vertical,
-            buyer_persona: analysisData.buyer_persona,
-            buying_journey_stage: analysisData.buying_journey_stage,
-            response_text: analysisData.response_text,
-            rank_list: analysisData.rank_list,
-            company_id: analysisData.company_id,
-            answer_engine: analysisData.answer_engine,
-            query_text: analysisData.query_text,
-            query_id: analysisData.query_id,
-            company_name: analysisData.company_name,
-            mentioned_companies: analysisData.mentioned_companies,
-            competitors_list: analysisData.competitors_list,
-            solution_analysis: analysisData.solution_analysis
-          })
+          .insert(analysisData)
           .select('*')
           .single();
 
@@ -502,13 +430,21 @@ export async function processAllResponses() {
           continue;
         }
 
-        console.log('ICP Vertical Flow - Post-Insert:', {
-          responseId: rawResponse.id,
-          insertError: insertError ? 'Yes' : 'No',
-          insertErrorDetails: insertError
-        });
+        try {
+          console.log(`Starting citation processing for response ${rawResponse.id}:`, {
+            hasInsertedData: !!insertedData,
+            citationsParsed: originalCitationsParsed,
+            responseAnalysisId: insertedData?.id
+          });
+          
+          await processCitationsTransaction(insertedData, originalCitationsParsed);
+          
+          console.log(`Completed citation processing for response ${rawResponse.id}`);
+        } catch (citationError) {
+          console.error(`Error processing citations for response ${rawResponse.id}:`, citationError);
+        }
 
-        console.log(`Successfully processed response ${rawResponse.id}`);
+        console.log(`Successfully processed response ${rawResponse.id} with citations`);
       } catch (error) {
         console.error(`Error processing response ${rawResponse.id}:`, error);
         continue;
@@ -624,9 +560,12 @@ export async function testProcessSingleResponse(responseText: string) {
       companyIcpsExist: !!queryData.company?.ideal_customer_profiles
     });
 
+    // Store original citations_parsed before stringifying
+    const originalCitationsParsed = analysis.citations_parsed;
+
     const analysisData: ResponseAnalysisInsert = {
       response_id: response.id,
-      citations_parsed: analysis.citations_parsed ? JSON.stringify(analysis.citations_parsed) : null,
+      citations_parsed: originalCitationsParsed ? JSON.stringify(originalCitationsParsed) : null,
       recommended: analysis.recommended,
       cited: analysis.cited,
       sentiment_score: analysis.sentiment_score,
@@ -662,30 +601,7 @@ export async function testProcessSingleResponse(responseText: string) {
 
     const { data: insertedData, error: insertError } = await adminClient
       .from('response_analysis')
-      .insert({
-        response_id: analysisData.response_id,
-        citations_parsed: analysisData.citations_parsed,
-        recommended: analysisData.recommended,
-        cited: analysisData.cited,
-        sentiment_score: analysisData.sentiment_score,
-        ranking_position: analysisData.ranking_position,
-        company_mentioned: analysisData.company_mentioned,
-        geographic_region: analysisData.geographic_region,
-        industry_vertical: analysisData.industry_vertical,
-        icp_vertical: icp_vertical,
-        buyer_persona: analysisData.buyer_persona,
-        buying_journey_stage: analysisData.buying_journey_stage,
-        response_text: analysisData.response_text,
-        rank_list: analysisData.rank_list,
-        company_id: analysisData.company_id,
-        answer_engine: analysisData.answer_engine,
-        query_text: analysisData.query_text,
-        query_id: analysisData.query_id,
-        company_name: analysisData.company_name,
-        mentioned_companies: analysisData.mentioned_companies,
-        competitors_list: analysisData.competitors_list,
-        solution_analysis: analysisData.solution_analysis
-      })
+      .insert(analysisData)
       .select('*')
       .single();
 
@@ -718,13 +634,21 @@ export async function testProcessSingleResponse(responseText: string) {
       return;
     }
 
-    console.log('ICP Vertical Flow - Post-Insert:', {
-      responseId: rawResponse.id,
-      insertError: insertError ? 'Yes' : 'No',
-      insertErrorDetails: insertError
-    });
+    try {
+      console.log(`Starting citation processing for response ${rawResponse.id}:`, {
+        hasInsertedData: !!insertedData,
+        citationsParsed: originalCitationsParsed,
+        responseAnalysisId: insertedData?.id
+      });
+      
+      await processCitationsTransaction(insertedData, originalCitationsParsed);
+      
+      console.log(`Completed citation processing for response ${rawResponse.id}`);
+    } catch (citationError) {
+      console.error(`Error processing citations for response ${rawResponse.id}:`, citationError);
+    }
 
-    console.log(`Successfully processed response ${rawResponse.id}`);
+    console.log(`Successfully processed response ${rawResponse.id} with citations`);
 
     return analysisData;
   } catch (error) {
@@ -801,9 +725,12 @@ export async function testExistingResponse(responseId: number) {
       companyIcpsExist: !!queryData.company?.ideal_customer_profiles
     });
 
+    // Store original citations_parsed before stringifying
+    const originalCitationsParsed = analysis.citations_parsed;
+
     const analysisData: ResponseAnalysisInsert = {
       response_id: responseData.id,
-      citations_parsed: analysis.citations_parsed ? JSON.stringify(analysis.citations_parsed) : null,
+      citations_parsed: originalCitationsParsed ? JSON.stringify(originalCitationsParsed) : null,
       recommended: analysis.recommended,
       cited: analysis.cited,
       sentiment_score: analysis.sentiment_score,
@@ -839,30 +766,7 @@ export async function testExistingResponse(responseId: number) {
 
     const { data: insertedData, error: insertError } = await adminClient
       .from('response_analysis')
-      .insert({
-        response_id: analysisData.response_id,
-        citations_parsed: analysisData.citations_parsed,
-        recommended: analysisData.recommended,
-        cited: analysisData.cited,
-        sentiment_score: analysisData.sentiment_score,
-        ranking_position: analysisData.ranking_position,
-        company_mentioned: analysisData.company_mentioned,
-        geographic_region: analysisData.geographic_region,
-        industry_vertical: analysisData.industry_vertical,
-        icp_vertical: icp_vertical,
-        buyer_persona: analysisData.buyer_persona,
-        buying_journey_stage: analysisData.buying_journey_stage,
-        response_text: analysisData.response_text,
-        rank_list: analysisData.rank_list,
-        company_id: analysisData.company_id,
-        answer_engine: analysisData.answer_engine,
-        query_text: analysisData.query_text,
-        query_id: analysisData.query_id,
-        company_name: analysisData.company_name,
-        mentioned_companies: analysisData.mentioned_companies,
-        competitors_list: analysisData.competitors_list,
-        solution_analysis: analysisData.solution_analysis
-      })
+      .insert(analysisData)
       .select('*')
       .single();
 
@@ -895,13 +799,21 @@ export async function testExistingResponse(responseId: number) {
       return;
     }
 
-    console.log('ICP Vertical Flow - Post-Insert:', {
-      responseId: responseData.id,
-      insertError: insertError ? 'Yes' : 'No',
-      insertErrorDetails: insertError
-    });
+    try {
+      console.log(`Starting citation processing for response ${responseData.id}:`, {
+        hasInsertedData: !!insertedData,
+        citationsParsed: originalCitationsParsed,
+        responseAnalysisId: insertedData?.id
+      });
+      
+      await processCitationsTransaction(insertedData, originalCitationsParsed);
+      
+      console.log(`Completed citation processing for response ${responseData.id}`);
+    } catch (citationError) {
+      console.error(`Error processing citations for response ${responseData.id}:`, citationError);
+    }
 
-    console.log(`Successfully processed response ${responseData.id}`);
+    console.log(`Successfully processed response ${responseData.id} with citations`);
 
     return analysisData;
   } catch (error) {

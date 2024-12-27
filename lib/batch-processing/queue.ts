@@ -2,6 +2,7 @@ import { createAdminClient } from '@/app/supabase/server'
 import { Database } from "@/types/supabase";
 import { analyzeResponse, Response } from "./analysis";
 import { SupabaseBatchTrackingService } from '@/lib/services/batch-tracking'
+import { processCitationsTransaction } from './citation-processor';
 
 type ResponseAnalysisInsert = Omit<Database['public']['Tables']['response_analysis']['Insert'], 'id'> & {
   citations_parsed: JSON;
@@ -250,6 +251,38 @@ export class ResponseAnalysisQueue {
       if (insertError) {
         console.error('Error inserting analyses:', insertError);
         throw insertError;
+      }
+
+      // Add citation processing for each analysis
+      for (const analysisData of analysisResults) {
+        try {
+          const { data: insertedAnalysis } = await adminClient
+            .from('response_analysis')
+            .select('*')
+            .eq('response_id', analysisData.response_id)
+            .single();
+
+          if (!insertedAnalysis) {
+            console.error(`No analysis found for response ${analysisData.response_id}`);
+            continue;
+          }
+
+          console.log(`Processing citations for response ${analysisData.response_id}:`, {
+            hasAnalysis: !!insertedAnalysis,
+            citationsParsed: analysisData.citations_parsed
+          });
+
+          await processCitationsTransaction(
+            insertedAnalysis,
+            typeof analysisData.citations_parsed === 'string' 
+              ? JSON.parse(analysisData.citations_parsed)
+              : analysisData.citations_parsed
+          );
+
+          console.log(`Successfully processed citations for response ${analysisData.response_id}`);
+        } catch (citationError) {
+          console.error(`Error processing citations for response ${analysisData.response_id}:`, citationError);
+        }
       }
 
       console.log('Successfully updated analyses');
