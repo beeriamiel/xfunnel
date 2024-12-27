@@ -39,6 +39,16 @@
      - Response context
      - Buyer journey mapping
      - Geographic targeting
+     - Domain authority tracking
+     - Source type classification
+     - Query text association
+     - Content analysis storage
+   - Transaction-based processing
+   - Optimized database indexes
+     - Citation order
+     - Response analysis ID
+     - Company ID
+     - Created at (descending)
 
 3. Metrics Aggregation
    - Geographic grouping

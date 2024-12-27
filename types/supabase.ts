@@ -69,6 +69,10 @@ export type Database = {
           response_analysis_id: number
           response_text: string | null
           updated_at: string | null
+          domain_authority: number | null
+          source_type: string | null
+          query_text: string | null
+          content_analysis: string | null
         }
         Insert: {
           buyer_journey_phase?: string | null
@@ -88,6 +92,10 @@ export type Database = {
           response_analysis_id: number
           response_text?: string | null
           updated_at?: string | null
+          domain_authority?: number | null
+          source_type?: string | null
+          query_text?: string | null
+          content_analysis?: string | null
         }
         Update: {
           buyer_journey_phase?: string | null
@@ -107,6 +115,10 @@ export type Database = {
           response_analysis_id?: number
           response_text?: string | null
           updated_at?: string | null
+          domain_authority?: number | null
+          source_type?: string | null
+          query_text?: string | null
+          content_analysis?: string | null
         }
         Relationships: []
       }

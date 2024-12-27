@@ -80,5 +80,21 @@
 3. Data Storage
    - Response analysis records
    - Citation records with metadata
+     - Basic citation data (URL, order)
+     - Analysis context (company, response)
+     - Journey metadata (persona, phase)
+     - Enhanced metadata
+       - Domain authority
+       - Source type
+       - Query text
+       - Content analysis
    - Optimized indexes
-   - Referential integrity 
+     - Citation order (btree)
+     - Response analysis ID (btree)
+     - Company ID (btree)
+     - Created at desc (btree)
+   - Automatic timestamp management
+     - Created at defaulting
+     - Updated at trigger
+   - Referential integrity
+   - Transaction handling 

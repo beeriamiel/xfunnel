@@ -19,6 +19,7 @@ interface CitationMetadata {
   response_text: string;
   region: string | null;
   ranking_position: number | null;
+  query_text: string | null;
 }
 
 interface ParsedCitation {
@@ -60,7 +61,8 @@ export async function processCitations(
       icp_vertical: responseAnalysis.icp_vertical ?? '',
       response_text: responseAnalysis.response_text ?? '',
       region: responseAnalysis.geographic_region ?? '',
-      ranking_position: responseAnalysis.ranking_position
+      ranking_position: responseAnalysis.ranking_position,
+      query_text: responseAnalysis.query_text ?? ''
     };
 
     console.log('Created citation metadata:', {
@@ -113,7 +115,8 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         icp_vertical: citation.icp_vertical,
         response_text: citation.response_text,
         region: citation.region,
-        ranking_position: citation.ranking_position
+        ranking_position: citation.ranking_position,
+        query_text: citation.query_text
       })));
 
     // Log full response details

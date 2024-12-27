@@ -106,7 +106,18 @@
      - Company association
      - Response context
      - Buyer journey data
+     - Domain authority
+     - Source type classification
+     - Query text
+     - Content analysis
+   - Automatic timestamp management
+     - Created at with default
+     - Updated at with trigger
    - Optimized indexes
+     - Citation order (btree)
+     - Response analysis ID (btree)
+     - Company ID (btree)
+     - Created at desc (btree)
 
 4. `batch_metadata`
    - Tracks processing batches
@@ -156,8 +167,13 @@ export async function processCitationsTransaction(
 ) {
   // Validate URLs
   // Extract metadata
-  // Handle transaction
-  // Error handling
+  // Process in transaction
+  // Store enhanced data
+    - Domain authority
+    - Source type
+    - Query text
+    - Content analysis
+  // Error handling and logging
 }
 ```
 
