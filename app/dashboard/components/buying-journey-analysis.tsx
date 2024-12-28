@@ -88,10 +88,11 @@ interface Query {
       citations?: string[];
       solutionAnalysis?: SolutionAnalysis;
       companyMentioned?: boolean;
+      mentioned_companies?: string[];
     }
   };
   companyMentioned: boolean;
-  companyMentionRate: number; // New field for the mention rate across engines
+  companyMentionRate: number;
   companyName?: string;
 }
 
@@ -106,7 +107,7 @@ interface RegionAnalytics {
 }
 
 interface VerticalAnalytics {
-  industry_vertical: string;
+  icp_vertical: string; // Changed from industry_vertical
   total_queries: number;
   avg_sentiment: number;
   avg_position: number | null;
@@ -186,23 +187,72 @@ function formatMetricValue(label: string, value: number | null | undefined): str
   }
 }
 
-function MetricItem({ label, value, change }: { label: string; value: number | null | undefined; change?: string }) {
-  const formattedValue = formatMetricValue(label, value);
-  const isPositive = change?.includes('+') || change?.includes('↑');
+interface MetricStatus {
+  color: 'red' | 'yellow' | 'green';
+  icon: '🔴' | '🟡' | '🟢';
+}
+
+function getMetricStatus(value: number | null, metricType: 'sentiment' | 'position' | 'mentions' | 'features'): MetricStatus {
+  if (value === null) return { color: 'red', icon: '🔴' };
+  
+  switch (metricType) {
+    case 'mentions':
+      return value >= 10 ? { color: 'green', icon: '🟢' } :
+             value >= 5 ? { color: 'yellow', icon: '🟡' } :
+             { color: 'red', icon: '🔴' };
+    case 'position':
+      return value < 3 ? { color: 'green', icon: '🟢' } :
+             value <= 5 ? { color: 'yellow', icon: '🟡' } :
+             { color: 'red', icon: '🔴' };
+    case 'features':
+      return value >= 60 ? { color: 'green', icon: '🟢' } :
+             value >= 40 ? { color: 'yellow', icon: '🟡' } :
+             { color: 'red', icon: '🔴' };
+    case 'sentiment':
+      return value >= 50 ? { color: 'green', icon: '🟢' } :
+             value >= 30 ? { color: 'yellow', icon: '🟡' } :
+             { color: 'red', icon: '🔴' };
+  }
+}
+
+// Update MetricItem for cards
+function MetricItem({ 
+  label, 
+  value, 
+  change, 
+  metricType 
+}: { 
+  label: string;
+  value: number | null | undefined;
+  change?: string;
+  metricType?: 'sentiment' | 'position' | 'mentions' | 'features';
+}) {
+  // Convert undefined to null for consistent handling
+  const normalizedValue = value === undefined ? null : value;
+  const formattedValue = formatMetricValue(label, normalizedValue);
+  
+  // Only show status indicators for card metrics (when metricType is provided)
+  const status = metricType ? getMetricStatus(normalizedValue, metricType) : null;
   
   return (
     <div className="flex items-center justify-between py-1.5">
       <span className="text-sm text-muted-foreground">{label}</span>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{formattedValue}</span>
-        {change && (
-          <span className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+        {status && (
+          <span className="text-sm" title={`Status: ${status.color}`}>
+            {status.icon}
+          </span>
+        )}
+        {/* Only show change if no metricType (top-level metrics) */}
+        {!metricType && change && (
+          <span className={`text-xs ${change.includes('+') ? 'text-green-600' : 'text-red-600'}`}>
             {change}
           </span>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 const cardStyles = {
@@ -253,12 +303,15 @@ function RegionOverview({ region, metrics, competitors }: {
   metrics: Metrics
   competitors?: Competitor[]
 }) {
+  // Use standardized region name for display
+  const displayRegion = standardizeRegionName(region);
+
   return (
     <Card className="p-6">
       <div className="flex items-center gap-3 mb-6">
         <Globe className="h-6 w-6 text-blue-500" />
         <div>
-          <h2 className="text-xl font-semibold">{region}</h2>
+          <h2 className="text-xl font-semibold">{displayRegion}</h2>
           <p className="text-sm text-muted-foreground">Regional Overview</p>
         </div>
       </div>
@@ -317,31 +370,35 @@ function RegionCard({
   region: string
   metrics: Metrics
   isExpanded: boolean
-  onClick: () => void
+  onClick: (region: string) => void
   totalRegionQueries: number
 }) {
-  // Get theme color based on region
+  // Get theme color based on standardized region name
   const getThemeColor = (region: string) => {
-    switch (region.toLowerCase()) {
-      case 'north_america':
+    const standardizedRegion = standardizeRegionName(region);
+    switch (standardizedRegion) {
+      case 'North America':
         return 'bg-purple-100/80';
-      case 'latam':
+      case 'LATAM':
         return 'bg-blue-100/80';
-      case 'emea':
-        return 'bg-blue-100/80';
-      case 'apac':
-        return 'bg-blue-100/80';
+      case 'EMEA':
+        return 'bg-emerald-100/80';
+      case 'Europe':
+        return 'bg-amber-100/80';
       default:
         return 'bg-blue-100/80';
     }
   };
+
+  // Use standardized region name only for display
+  const displayRegion = standardizeRegionName(region);
 
   return (
     <Card 
       className={`${cardStyles.base} ${
         isExpanded ? cardStyles.expanded : cardStyles.hover
       }`}
-      onClick={onClick}
+      onClick={() => onClick(region)}
     >
       <div className="space-y-3">
         <div className={cardStyles.header}>
@@ -349,7 +406,7 @@ function RegionCard({
             <Globe className="h-5 w-5 text-blue-500" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className={cardStyles.title}>{region}</h3>
+            <h3 className={cardStyles.title}>{displayRegion}</h3>
             <p className={cardStyles.subtitle}>Regional Overview</p>
           </div>
         </div>
@@ -376,22 +433,22 @@ function RegionCard({
           <MetricItem 
             label="Average Sentiment" 
             value={metrics.avgSentiment * 100}
-            change="+2.5%"
+            metricType="sentiment"
           />
           <MetricItem 
             label="Average Position" 
             value={metrics.avgPosition}
-            change="+1.5"
+            metricType="position"
           />
           <MetricItem 
             label="Company Mentioned" 
             value={metrics.companyMentioned}
-            change="+5%"
+            metricType="mentions"
           />
           <MetricItem 
             label="Feature Score" 
             value={metrics.featureScore}
-            change="+8%"
+            metricType="features"
           />
         </div>
 
@@ -445,22 +502,22 @@ function VerticalCard({
           <MetricItem 
             label="Average Sentiment" 
             value={vertical.metrics.avgSentiment * 100}
-            change="+4.2%"
+            metricType="sentiment"
           />
           <MetricItem 
             label="Average Position" 
             value={vertical.metrics.avgPosition}
-            change="+1.2"
+            metricType="position"
           />
           <MetricItem 
             label="Company Mentioned" 
             value={vertical.metrics.companyMentioned}
-            change="+7%"
+            metricType="mentions"
           />
           <MetricItem 
             label="Feature Score" 
             value={vertical.metrics.featureScore}
-            change="+12%"
+            metricType="features"
           />
         </div>
 
@@ -663,7 +720,9 @@ interface EngineCardProps {
   companyName?: string;
   className?: string;
   queryText: string;
-  engineResult: Query['engineResults'][string];
+  engineResult: Query['engineResults'][string] & {
+    mentioned_companies?: string[];
+  };
   isEvaluationPhase: boolean;
   phase: string;
   hasData: boolean;
@@ -706,8 +765,16 @@ function EngineCard({
     }
   };
 
-  const CompanyMentionIndicator = ({ isMentioned, hasData }: { isMentioned: boolean, hasData: boolean }) => (
-    <div className="flex flex-col items-center justify-center py-6 space-y-3">
+  const CompanyMentionIndicator = ({ 
+    isMentioned, 
+    hasData,
+    mentionedCompanies
+  }: { 
+    isMentioned: boolean, 
+    hasData: boolean,
+    mentionedCompanies?: string[]
+  }) => (
+    <div className="flex flex-col items-center justify-center py-6 space-y-4">
       <div className={cn(
         "h-12 w-12 rounded-full flex items-center justify-center text-2xl",
         hasData 
@@ -719,7 +786,7 @@ function EngineCard({
         {hasData ? (isMentioned ? '✓' : '×') : '?'}
       </div>
       <div className={cn(
-        "px-4 py-2 rounded-full border text-sm font-medium",
+        "px-5 py-2 rounded-full border text-sm font-medium",
         hasData 
           ? isMentioned 
             ? "bg-green-100 text-green-700 border-green-200" 
@@ -728,6 +795,36 @@ function EngineCard({
       )}>
         {hasData ? (isMentioned ? "Company Mentioned" : "Not Mentioned") : "No Data Available"}
       </div>
+      {hasData && mentionedCompanies && mentionedCompanies.length > 0 && (
+        <div className="w-full space-y-3">
+          <div className="h-px bg-border/50 w-full" />
+          <div className="space-y-2">
+            <div className="text-sm text-muted-foreground text-center font-medium">
+              {mentionedCompanies.length} {mentionedCompanies.length === 1 ? 'Company' : 'Companies'} {isMentioned ? 'Also ' : ''}Detected
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {mentionedCompanies.slice(0, 3).map((company, index) => (
+                <div
+                  key={index}
+                  className="group relative"
+                >
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-muted/30 to-muted/50 hover:from-muted/40 hover:to-muted/60 transition-colors rounded-full">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground/70" />
+                    <span className="text-sm truncate max-w-[120px]" title={company}>
+                      {company}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {mentionedCompanies.length > 3 && (
+                <div className="px-3 py-1.5 bg-primary/5 hover:bg-primary/10 transition-colors text-sm rounded-full font-medium text-primary">
+                  +{mentionedCompanies.length - 3} more
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -784,6 +881,7 @@ function EngineCard({
           <CompanyMentionIndicator 
             isMentioned={engineResult?.companyMentioned || false} 
             hasData={hasData}
+            mentionedCompanies={engineResult?.mentioned_companies}
           />
         ) : showRankingContext ? (
           <>
@@ -849,16 +947,18 @@ function PersonasSection({
   region, 
   vertical, 
   companyId,
-  totalVerticalQueries 
+  totalVerticalQueries,
+  currentSegment 
 }: { 
   region: string, 
   vertical: string, 
   companyId: number,
-  totalVerticalQueries?: number
+  totalVerticalQueries?: number,
+  currentSegment: TimeSegment | null
 }) {
   const [expandedPersona, setExpandedPersona] = useState<string | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const { data: personaData, isLoading, error } = usePersonaAnalytics(companyId, vertical);
+  const { data: personaData, isLoading, error } = usePersonaAnalytics(companyId, vertical, currentSegment);
 
   const handlePersonaClick = (personaName: string) => {
     setExpandedPersona(expandedPersona === personaName ? null : personaName);
@@ -916,6 +1016,39 @@ function PersonasSection({
   );
 }
 
+// Add at the top with other constants
+const REGION_MAPPING: Record<string, string> = {
+  // North America variations
+  'north_america': 'North America',
+  'northamerica': 'North America',
+  'na': 'North America',
+  'n_america': 'North America',
+  'north america': 'North America',
+  
+  // Europe variations
+  'europe': 'Europe',
+  'eu': 'Europe',
+  'eur': 'Europe',
+  
+  // LATAM variations
+  'latam': 'LATAM',
+  'latin_america': 'LATAM',
+  'latinamerica': 'LATAM',
+  'latin america': 'LATAM',
+  'la': 'LATAM',
+  
+  // EMEA variations
+  'emea': 'EMEA',
+  'europe_middle_east_africa': 'EMEA',
+  'europe middle east africa': 'EMEA',
+  'europe_me_africa': 'EMEA'
+};
+
+function standardizeRegionName(region: string): string {
+  const normalizedRegion = region.toLowerCase().trim();
+  return REGION_MAPPING[normalizedRegion] || region;
+}
+
 function useRegionAnalytics(companyId: number, timeSegment: TimeSegment | null) {
   const [data, setData] = useState<RegionAnalytics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -963,15 +1096,16 @@ function useRegionAnalytics(companyId: number, timeSegment: TimeSegment | null) 
 
         // Process the data to group by region
         const processedData = (rawData || []).reduce((acc: { [key: string]: any }, curr) => {
+          // Keep the original region name in the data
           const region = curr.geographic_region || 'unknown';
           
           if (!acc[region]) {
             acc[region] = {
-              geographic_region: region,
+              geographic_region: region, // Keep original format
               sentiment_scores: [],
               ranking_positions: [],
-              query_mentions: new Map(), // New structure for query-based mentions
-              early_stage_queries: new Set(), // Track unique queries in early stages
+              query_mentions: new Map(),
+              early_stage_queries: new Set(),
               feature_yes_count: 0,
               feature_total_count: 0,
               total_count: 0,
@@ -1052,7 +1186,7 @@ function useRegionAnalytics(companyId: number, timeSegment: TimeSegment | null) 
           const mentionPercentage = queryCount > 0 ? (totalMentionRate / queryCount) * 100 : 0;
 
           return {
-            geographic_region: region,
+            geographic_region: region, // Keep original format
             total_queries: data.total_count,
             avg_sentiment: data.sentiment_scores.length > 0 
               ? data.sentiment_scores.reduce((a: number, b: number) => a + b, 0) / data.sentiment_scores.length 
@@ -1081,6 +1215,15 @@ function useRegionAnalytics(companyId: number, timeSegment: TimeSegment | null) 
   return { data, isLoading, error };
 }
 
+// Add filter type definition at the top with other interfaces
+interface ResponseAnalysisFilters {
+  company_id: number;
+  geographic_region?: string;
+  icp_vertical?: string;
+  analysis_batch_id?: string;
+  created_at?: string;
+}
+
 function useVerticalAnalytics(companyId: number, region: string | null, timeSegment: TimeSegment | null) {
   const [data, setData] = useState<VerticalAnalytics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1101,7 +1244,7 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
         let query = createClient()
           .from('response_analysis')
           .select(`
-            industry_vertical,
+            icp_vertical,
             sentiment_score,
             ranking_position,
             company_mentioned,
@@ -1110,11 +1253,14 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
             query_id,
             buying_journey_stage
           `)
-          .eq('company_id', companyId)
-          .eq('geographic_region', region)
-          .not('industry_vertical', 'is', null);
+          .eq('company_id', companyId);
 
-        // Apply appropriate time-based filtering
+        // Add region filter if region is not null
+        if (region) {
+          query = query.eq('geographic_region', region);
+        }
+
+        // Add batch filter if applicable
         if (timeSegment.type === 'BATCH') {
           query = query.eq('analysis_batch_id', timeSegment.id);
         } else {
@@ -1123,21 +1269,24 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
             .lte('created_at', timeSegment.endDate);
         }
 
+        // Add not null filter for icp_vertical
+        query = query.not('icp_vertical', 'is', null);
+
         const { data: rawData, error: supabaseError } = await query;
 
         if (supabaseError) throw supabaseError;
 
         // Process the data to group by vertical
         const processedData = (rawData || []).reduce((acc: { [key: string]: any }, curr) => {
-          const vertical = curr.industry_vertical || 'unknown';
+          const vertical = curr.icp_vertical || 'unknown';
           
           if (!acc[vertical]) {
             acc[vertical] = {
-              industry_vertical: vertical,
+              icp_vertical: vertical,
               sentiment_scores: [],
               ranking_positions: [],
-              query_mentions: new Map(), // New structure for query-based mentions
-              early_stage_queries: new Set(), // Track unique queries in early stages
+              query_mentions: new Map(),
+              early_stage_queries: new Set(),
               feature_yes_count: 0,
               feature_total_count: 0,
               total_count: 0,
@@ -1197,7 +1346,7 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
           return acc;
         }, {});
 
-        // Convert the processed data to final format
+        // Convert to final format
         const finalData: VerticalAnalytics[] = Object.entries(processedData).map(([vertical, data]: [string, any]) => {
           // Calculate company mention percentage based on per-query rates
           let totalMentionRate = 0;
@@ -1212,7 +1361,7 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
           const mentionPercentage = queryCount > 0 ? (totalMentionRate / queryCount) * 100 : 0;
 
           return {
-            industry_vertical: vertical,
+            icp_vertical: vertical,
             total_queries: data.total_count,
             avg_sentiment: data.sentiment_scores.length > 0 
               ? data.sentiment_scores.reduce((a: number, b: number) => a + b, 0) / data.sentiment_scores.length 
@@ -1221,8 +1370,7 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
               ? data.ranking_positions.reduce((a: number, b: number) => a + b, 0) / data.ranking_positions.length
               : null,
             mention_percentage: mentionPercentage,
-            feature_score: (data.feature_yes_count * 100) / (data.feature_total_count || 1),
-            engines: Array.from(data.engines) as string[]
+            feature_score: (data.feature_yes_count * 100) / (data.feature_total_count || 1)
           };
         });
 
@@ -1241,7 +1389,7 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
   return { data, isLoading, error };
 }
 
-function usePersonaAnalytics(companyId: number, vertical: string | null) {
+function usePersonaAnalytics(companyId: number, vertical: string | null, timeSegment: TimeSegment | null) {
   const [data, setData] = useState<PersonaAnalytics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1258,19 +1406,45 @@ function usePersonaAnalytics(companyId: number, vertical: string | null) {
         setIsLoading(true);
         const supabase = createClient();
 
-        // First, get all unique queries for this vertical
-        const { data: queryData, error: queryError } = await supabase
+        // Build initial query
+        let query = supabase
           .from('response_analysis')
           .select('query_id, query_text, buying_journey_stage, company_name')
-          .eq('company_id', companyId)
-          .eq('industry_vertical', vertical || '')  // Add empty string fallback
-          .not('query_id', 'is', null);
+          .eq('company_id', companyId);
 
-        if (queryError) throw queryError;
+        // Only add vertical filter if vertical is not null
+        if (vertical) {
+          query = query.eq('icp_vertical', vertical);
+        }
 
-        // Then, get all responses for these queries
+        query = query.not('query_id', 'is', null);
+
+        // Add batch filter if applicable
+        if (timeSegment?.type === 'BATCH') {
+          query = query.eq('analysis_batch_id', timeSegment.id);
+        } else if (timeSegment) {
+          query = query
+            .gte('created_at', timeSegment.startDate)
+            .lte('created_at', timeSegment.endDate);
+        }
+
+        const { data: queryData, error: queryError } = await query;
+
+        if (queryError) {
+          console.error('Query error:', queryError);
+          throw queryError;
+        }
+
+        // Get unique query IDs
         const queryIds = Array.from(new Set((queryData || []).map(q => q.query_id)));
-        const { data: responseData, error: responseError } = await supabase
+        
+        if (queryIds.length === 0) {
+          setData([]);
+          return;
+        }
+
+        // Build response query
+        let responseQuery = supabase
           .from('response_analysis')
           .select(`
             sentiment_score,
@@ -1284,13 +1458,33 @@ function usePersonaAnalytics(companyId: number, vertical: string | null) {
             rank_list,
             response_text,
             citations_parsed,
-            recommended
+            recommended,
+            mentioned_companies
           `)
-          .eq('company_id', companyId)
-          .eq('industry_vertical', vertical || '')  // Add empty string fallback
-          .in('query_id', queryIds);
+          .eq('company_id', companyId);
 
-        if (responseError) throw responseError;
+        // Only add vertical filter if vertical is not null
+        if (vertical) {
+          responseQuery = responseQuery.eq('icp_vertical', vertical);
+        }
+
+        responseQuery = responseQuery.in('query_id', queryIds);
+
+        // Add time filters to response query
+        if (timeSegment?.type === 'BATCH') {
+          responseQuery = responseQuery.eq('analysis_batch_id', timeSegment.id);
+        } else if (timeSegment) {
+          responseQuery = responseQuery
+            .gte('created_at', timeSegment.startDate)
+            .lte('created_at', timeSegment.endDate);
+        }
+
+        const { data: responseData, error: responseError } = await responseQuery;
+
+        if (responseError) {
+          console.error('Response error:', responseError);
+          throw responseError;
+        }
 
         // Group responses by persona
         const processedData = (responseData as ResponseAnalysis[]).reduce((acc: { [key: string]: any }, curr) => {
@@ -1404,7 +1598,8 @@ function usePersonaAnalytics(companyId: number, vertical: string | null) {
                   recommended: curr.recommended || false,
                   citations: curr.citations_parsed?.urls,
                   solutionAnalysis: solutionAnalysis,
-                  companyMentioned: curr.company_mentioned || false
+                  companyMentioned: curr.company_mentioned || false,
+                  mentioned_companies: curr.mentioned_companies || []
                 };
 
                 if (curr.company_mentioned) {
@@ -1467,7 +1662,7 @@ function usePersonaAnalytics(companyId: number, vertical: string | null) {
     }
 
     fetchPersonaData();
-  }, [companyId, vertical]);
+  }, [companyId, vertical, timeSegment]); // Add timeSegment to dependencies
 
   return { data, isLoading, error };
 }
@@ -1542,22 +1737,22 @@ function PersonaCard({
           <MetricItem 
             label="Average Sentiment" 
             value={persona.avg_sentiment * 100}
-            change="+3.8%"
+            metricType="sentiment"
           />
           <MetricItem 
             label="Average Position" 
             value={persona.avg_position}
-            change="+1.0"
+            metricType="position"
           />
           <MetricItem 
             label="Company Mentioned" 
             value={persona.mention_percentage}
-            change="+9%"
+            metricType="mentions"
           />
           <MetricItem 
             label="Feature Score" 
             value={persona.feature_score}
-            change="+15%"
+            metricType="features"
           />
         </div>
 
@@ -1849,6 +2044,7 @@ function RegionsView({ companyId, currentSegment }: {
   const totalQueries = regionData.reduce((sum, region) => sum + region.total_queries, 0);
 
   const handleRegionClick = (regionName: string) => {
+    // Use the original region name for state
     setExpandedRegion(expandedRegion === regionName ? null : regionName);
     if (expandedRegion !== regionName && sectionRef.current) {
       setTimeout(() => {
@@ -1909,7 +2105,7 @@ function RegionsView({ companyId, currentSegment }: {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {regionData.map((region) => (
             <RegionCard 
-              key={region.geographic_region}
+              key={region.geographic_region} // Pass the original region name
               region={region.geographic_region}
               metrics={{
                 avgSentiment: region.avg_sentiment,
@@ -1920,7 +2116,7 @@ function RegionsView({ companyId, currentSegment }: {
               }}
               totalRegionQueries={totalQueries}
               isExpanded={expandedRegion === region.geographic_region}
-              onClick={() => handleRegionClick(region.geographic_region)}
+              onClick={handleRegionClick}
             />
           ))}
         </div>
@@ -1936,7 +2132,7 @@ function RegionsView({ companyId, currentSegment }: {
                 transition={{ duration: 0.2 }}
               >
                 <VerticalsSection 
-                  region={expandedRegion} 
+                  region={expandedRegion} // Pass the original region name
                   companyId={companyId}
                   totalRegionQueries={regionData.find(r => r.geographic_region === expandedRegion)?.total_queries}
                   currentSegment={currentSegment}
@@ -1964,11 +2160,13 @@ function VerticalsSection({
   const [expandedVertical, setExpandedVertical] = useState<string | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const { data: verticalData, isLoading, error } = useVerticalAnalytics(companyId, region, currentSegment);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const shouldScrollRef = useRef(false);
 
-  const handleVerticalClick = (verticalName: string) => {
-    setExpandedVertical(expandedVertical === verticalName ? null : verticalName);
-    if (expandedVertical !== verticalName && sectionRef.current) {
-      setTimeout(() => {
+  // Handle scroll after data is loaded
+  useEffect(() => {
+    if (!isLoading && shouldScrollRef.current && sectionRef.current && expandedVertical) {
+      const handleScroll = () => {
         const element = sectionRef.current;
         if (!element) return;
         
@@ -1977,7 +2175,34 @@ function VerticalsSection({
         const absoluteY = elementRect.top + window.pageYOffset + yOffset;
         
         window.scrollTo({ top: absoluteY, behavior: 'smooth' });
-      }, 300);
+      };
+
+      // Clear any existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      // Set a new timeout with a longer delay to ensure content is rendered
+      scrollTimeoutRef.current = setTimeout(handleScroll, 600);
+      shouldScrollRef.current = false;
+    }
+  }, [isLoading, expandedVertical]);
+
+  // Cleanup timeouts
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleVerticalClick = (verticalName: string) => {
+    const isExpanding = expandedVertical !== verticalName;
+    setExpandedVertical(isExpanding ? verticalName : null);
+    
+    if (isExpanding) {
+      shouldScrollRef.current = true;
     }
   };
 
@@ -2006,9 +2231,9 @@ function VerticalsSection({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {verticalData.map((vertical) => (
           <VerticalCard
-            key={vertical.industry_vertical}
+            key={vertical.icp_vertical}
             vertical={{
-              name: vertical.industry_vertical,
+              name: vertical.icp_vertical,
               metrics: {
                 avgSentiment: vertical.avg_sentiment,
                 avgPosition: vertical.avg_position,
@@ -2017,8 +2242,8 @@ function VerticalsSection({
                 totalQueries: vertical.total_queries
               }
             }}
-            isExpanded={expandedVertical === vertical.industry_vertical}
-            onClick={() => handleVerticalClick(vertical.industry_vertical)}
+            isExpanded={expandedVertical === vertical.icp_vertical}
+            onClick={() => handleVerticalClick(vertical.icp_vertical)}
             totalRegionQueries={totalRegionQueries}
           />
         ))}
@@ -2038,7 +2263,8 @@ function VerticalsSection({
                 region={region} 
                 vertical={expandedVertical} 
                 companyId={companyId}
-                totalVerticalQueries={verticalData.find(v => v.industry_vertical === expandedVertical)?.total_queries}
+                totalVerticalQueries={verticalData.find(v => v.icp_vertical === expandedVertical)?.total_queries}
+                currentSegment={currentSegment}
               />
             </motion.div>
           )}
@@ -2174,7 +2400,7 @@ function BreadcrumbPath({
   showQueries?: boolean;
 }) {
   const parts = [
-    { text: region, icon: Globe },
+    { text: region ? standardizeRegionName(region) : undefined, icon: Globe },
     { text: vertical, icon: Building2 },
     { text: persona, icon: User },
     { text: showQueries ? 'Queries' : null, icon: Search }
@@ -2219,7 +2445,7 @@ function BreadcrumbPath({
   );
 }
 
-// Add TimeSegment interface
+// Add TimeSegment interface at the top with other interfaces
 interface TimeSegment {
   id: string;
   type: 'BATCH' | 'WEEK' | 'MONTH';

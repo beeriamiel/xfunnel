@@ -11,6 +11,32 @@ import { unstable_noStore as noStore } from 'next/cache'
 export const metadata: Metadata = {
   title: "xFunnel",
   description: "Generate ICPs and Questions",
+  icons: {
+    icon: [
+      {
+        url: '/Favicon(32x32).png',
+        sizes: '32x32',
+        type: 'image/png',
+      },
+      {
+        url: '/logo(192x192).png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        url: '/logo(512x512).png',
+        sizes: '512x512',
+        type: 'image/png',
+      },
+    ],
+    apple: [
+      {
+        url: '/logo(192x192).png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+    ],
+  },
 }
 
 async function getSessionFromHeaders() {
@@ -34,8 +60,12 @@ export default async function RootLayout({
         <SessionProvider initialSession={session}>
           <RootProvider>
             <header className="flex items-center justify-between w-full px-6 py-3 border-b">
-              <Link href="/" className="text-xl font-bold">
-                xFunnel
+              <Link href="/" className="flex items-center">
+                <img 
+                  src="/logo(320x80).png" 
+                  alt="xFunnel" 
+                  className="h-8 w-auto"
+                />
               </Link>
               <AuthButton />
             </header>

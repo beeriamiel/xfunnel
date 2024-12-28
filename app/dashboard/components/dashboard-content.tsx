@@ -9,6 +9,8 @@ import { EngineMetricsChart } from './engine-metrics-chart'
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { BuyingJourneyAnalysis } from './buying-journey-analysis'
+import { CompetitorAnalysis } from './competitor-analysis'
+import { CitationAnalysis } from './citation-analysis'
 import { useDashboardStore } from '../store'
 
 interface Company {
@@ -56,9 +58,14 @@ function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
       <div className="grid gap-4">
         <Suspense fallback={<MetricsSkeleton />}>
           {activeView === 'engine' ? (
-            <EngineMetricsChart companyId={selectedCompany.id} />
-          ) : (
+            <>
+              <EngineMetricsChart companyId={selectedCompany.id} />
+              <CompetitorAnalysis companyId={selectedCompany.id} />
+            </>
+          ) : activeView === 'journey' ? (
             <BuyingJourneyAnalysis companyId={selectedCompany.id} />
+          ) : (
+            <CitationAnalysis companyId={selectedCompany.id} />
           )}
         </Suspense>
       </div>
@@ -75,7 +82,13 @@ export function DashboardContent({ selectedCompany }: Props) {
         <AppSidebar />
         <div className="flex-1">
           <DashboardHeader 
-            title={activeView === 'engine' ? 'AI Engine Performance' : 'Buying Journey Analysis'}
+            title={
+              activeView === 'engine' 
+                ? 'AI Engine Performance' 
+                : activeView === 'journey'
+                ? 'Buying Journey Analysis'
+                : 'Citation Analysis'
+            }
           />
           <Suspense fallback={<div className="p-8"><MetricsSkeleton /></div>}>
             {selectedCompany ? (
