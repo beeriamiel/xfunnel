@@ -40,6 +40,10 @@
      - Buyer journey mapping
      - Geographic targeting
      - Domain authority tracking
+       - Moz API integration
+       - Last crawled timestamp handling
+       - Domain/Page authority metrics
+       - Spam score tracking
      - Source type classification
      - Query text association
      - Content analysis storage
@@ -62,3 +66,11 @@
 - Retry mechanisms
 - Rate limiting
 - Citation validation errors 
+
+## External Integrations
+- Moz API
+  - Domain authority enrichment
+  - Page authority metrics
+  - Spam score analysis
+  - Last crawled data tracking
+  - Empty timestamp handling 

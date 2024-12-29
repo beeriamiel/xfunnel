@@ -1,4 +1,10 @@
-export type BatchType = 'icp' | 'query' | 'response' | 'response_analysis' | 'citations_moz';
+export type BatchType = 
+  | 'icp' 
+  | 'query' 
+  | 'response' 
+  | 'response_analysis' 
+  | 'citations_moz'
+  | 'citations_content';
 
 export type BatchStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 

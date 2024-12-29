@@ -73,6 +73,9 @@ export type Database = {
           source_type: string | null
           query_text: string | null
           content_analysis: string | null
+          content_markdown: string | null
+          content_scraped_at: string | null
+          content_scraping_error: string | null
         }
         Insert: {
           buyer_journey_phase?: string | null
@@ -96,6 +99,9 @@ export type Database = {
           source_type?: string | null
           query_text?: string | null
           content_analysis?: string | null
+          content_markdown?: string | null
+          content_scraped_at?: string | null
+          content_scraping_error?: string | null
         }
         Update: {
           buyer_journey_phase?: string | null
@@ -119,6 +125,9 @@ export type Database = {
           source_type?: string | null
           query_text?: string | null
           content_analysis?: string | null
+          content_markdown?: string | null
+          content_scraped_at?: string | null
+          content_scraping_error?: string | null
         }
         Relationships: []
       }

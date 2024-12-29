@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/app/supabase/server";
 import { Database } from "@/types/supabase";
 import { MozEnrichmentQueue } from './moz-queue';
+import { ContentScrapingQueue } from './content-queue';
 
 type CitationInsert = Database['public']['Tables']['citations']['Insert'];
 type ResponseAnalysis = Database['public']['Tables']['response_analysis']['Row'];
@@ -21,6 +22,7 @@ interface CitationMetadata {
   region: string | null;
   ranking_position: number | null;
   query_text: string | null;
+  source_type: ('Documentation' | 'Blog' | 'GitHub' | 'Guide' | 'Tutorial') | null;
 }
 
 interface ParsedCitation {
@@ -48,6 +50,8 @@ export async function processCitations(
   });
 
   return citationsParsed.urls.map((url, index) => {
+    const sourceType = citationsParsed.source_types[index] || null;
+
     const metadata: CitationMetadata = {
       citation_url: url,
       citation_order: index + 1, // 1-based indexing
@@ -63,7 +67,8 @@ export async function processCitations(
       response_text: responseAnalysis.response_text ?? '',
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
-      query_text: responseAnalysis.query_text ?? ''
+      query_text: responseAnalysis.query_text ?? '',
+      source_type: sourceType
     };
 
     console.log('Created citation metadata:', {
@@ -117,7 +122,8 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         response_text: citation.response_text,
         region: citation.region,
         ranking_position: citation.ranking_position,
-        query_text: citation.query_text
+        query_text: citation.query_text,
+        source_type: citation.source_type
       })))
       .select('id');
 
@@ -213,12 +219,12 @@ export async function processCitationsTransaction(
     // Insert citations and get their IDs
     const citationIds = await insertCitationBatch(citations);
 
-    // Initialize Moz enrichment queue
+    // Initialize queues
     const mozQueue = new MozEnrichmentQueue();
+    const contentQueue = new ContentScrapingQueue();
     
-    // Start Moz enrichment process only for newly added citations
     try {
-      console.log('Starting Moz enrichment for new citations:', {
+      console.log('Starting parallel enrichment processes:', {
         responseAnalysisId: responseAnalysis.id,
         citationIds
       });
@@ -234,19 +240,24 @@ export async function processCitationsTransaction(
       }
 
       if (newCitations && newCitations.length > 0) {
-        await mozQueue.processBatch(newCitations, responseAnalysis.company_id);
+        // Run both enrichment processes in parallel
+        await Promise.all([
+          mozQueue.processBatch(newCitations, responseAnalysis.company_id),
+          contentQueue.processBatch(newCitations, responseAnalysis.company_id)
+        ]);
       }
       
-      console.log('Completed Moz enrichment for new citations:', {
+      console.log('Completed enrichment processes:', {
         responseAnalysisId: responseAnalysis.id,
-        stats: await mozQueue.getQueueStats()
+        mozStats: await mozQueue.getQueueStats(),
+        contentStats: await contentQueue.getQueueStats()
       });
-    } catch (mozError) {
-      console.error('Moz enrichment error:', {
-        error: mozError,
+    } catch (enrichmentError) {
+      console.error('Enrichment error:', {
+        error: enrichmentError,
         responseAnalysisId: responseAnalysis.id
       });
-      // Don't throw the error - we want to keep the citations even if Moz enrichment fails
+      // Don't throw - we want to keep the citations even if enrichment fails
     }
 
     console.log('Successfully completed citations transaction');

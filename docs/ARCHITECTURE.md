@@ -45,6 +45,10 @@
      - Order tracking
      - Metadata enrichment
      - Transaction handling
+   - Metadata enrichment
+     - Moz API integration for domain metrics
+     - Conditional timestamp handling
+     - Authority score tracking
 
 3. Metrics Aggregation
    - Geographic segmentation
@@ -64,6 +68,11 @@
   - Citations table with metadata
   - Optimized indexes for citation queries
 - State Management: URL state (nuqs)
+- External APIs
+  - Moz API for domain authority metrics
+    - Domain/Page authority
+    - Spam score analysis
+    - Last crawled tracking
 
 ## Processing Pipeline
 1. Response Collection

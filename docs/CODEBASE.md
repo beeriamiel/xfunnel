@@ -23,6 +23,7 @@
     processor.ts    # Processing pipeline
     queue.ts        # Processing queue management
     citation-processor.ts # Citation processing system
+    moz-queue.ts    # Handles Moz API integration
 
 /hooks/            # Custom React hooks
   use-model-selection.ts
@@ -61,6 +62,13 @@
     - Extracts citations and features
     - Categorizes by region, industry, persona
     - Processes citation metadata
+
+  - `lib/batch-processing/moz-queue.ts`
+    - Handles Moz API integration
+    - Processes domain authority metrics
+    - Manages empty timestamp values
+    - Tracks spam scores
+    - URL normalization for matching
 
 ### 2. Dashboard Components
 - **Analysis Views**
@@ -110,6 +118,11 @@
      - Source type classification
      - Query text
      - Content analysis
+     - Domain authority metrics
+       - Moz API data
+       - Last crawled timestamps
+       - Page and domain authority
+       - Spam score tracking
    - Automatic timestamp management
      - Created at with default
      - Updated at with trigger

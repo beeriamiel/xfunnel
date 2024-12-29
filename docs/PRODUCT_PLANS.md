@@ -22,6 +22,13 @@ create table public.citations (
   region text null,
   ranking_position integer null,
   updated_at timestamp with time zone null default current_timestamp,
+  domain_authority numeric null,
+  page_authority numeric null,
+  spam_score numeric null,
+  root_domains_to_root_domain integer null,
+  external_links_to_root_domain integer null,
+  moz_last_crawled timestamp with time zone null,
+  moz_last_updated timestamp with time zone null,
   constraint citations_pkey primary key (id)
 );
 
