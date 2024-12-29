@@ -1,0 +1,153 @@
+Data Flow & Aggregation System
+Metric Sources & Flow
+Data flows upward: Query → Persona → Vertical → Region → Total
+
+Average Sentiment (%)
+
+Source: All query responses across all stages
+Averages: sentiment_score values
+Shows sentiment trend
+
+
+Average Position (#)
+
+Source: "solution_comparison" & "final_research" stages
+Averages: ranking_position values
+Lower number indicates better positioning
+
+
+Company Mentioned (%)
+
+Source: "problem_exploration" & "solution_education" stages
+Percentage of true values in company_mentioned
+Represents brand visibility rate
+
+
+Feature Score (%)
+
+Source: "solution_evaluation" stage only
+Percentage of "yes" responses from solution_analysis
+Ignores "no" and "unknown" responses
+
+
+
+Query Stage Details
+Each stage stores different response types:
+
+Problem Exploration & Solution Education
+
+Contains general product/company visibility queries
+Binary tracking of company mentions per answer engine
+Full response viewable on click
+
+
+Solution Comparison & Final Research
+
+Shows competitive rankings
+Lower ranking_position is better
+Displays ranked company lists
+
+
+Solution Evaluation
+
+Product requirements analysis
+Only "yes" responses count toward Feature Score
+Shows feature coverage percentage per engine
+
+
+
+Time Segmentation
+
+Batch Analysis
+
+Groups by: analysis_batch_id
+Shows daily created_at values
+Multiple batches possible per day
+
+
+Period Analysis
+
+Groups by: created_at weeks/months
+Formats: "Jan Week 1"/"January"
+Averages metrics within time period
+
+Query text gets pulled from query_text
+Region gets pulled from geographic_region
+Vertical gets pulled from icp_vertical
+Persona gets pulled from buyer_persona
+
+create table
+  public.response_analysis (
+    id bigint generated always as identity not null,
+    response_id bigint null,
+    citations_parsed jsonb null,
+    recommended boolean null,
+    cited boolean null,
+    created_at timestamp with time zone null default now(),
+    sentiment_score double precision null,
+    ranking_position integer null,
+    company_mentioned boolean null default false,
+    geographic_region text null,
+    industry_vertical text null,
+    buyer_persona text null,
+    buying_journey_stage text null,
+    response_text text null,
+    rank_list text null,
+    company_id bigint not null,
+    answer_engine text not null,
+    query_text text null,
+    query_id bigint null,
+    company_name text not null,
+    prompt_id bigint null,
+    prompt_name text null,
+    competitors_list text[] null default '{}'::text[],
+    mentioned_companies text[] null default '{}'::text[],
+    solution_analysis jsonb null,
+    analysis_batch_id uuid null,
+    created_by_batch boolean null default false,
+    icp_vertical text null,
+    constraint response_analysis_pkey primary key (id),
+    constraint fk_analysis_batch foreign key (analysis_batch_id) references batch_metadata (batch_id),
+    constraint response_analysis_company_id_fkey foreign key (company_id) references companies (id),
+    constraint response_analysis_prompt_id_fkey foreign key (prompt_id) references prompts (id),
+    constraint response_analysis_query_id_fkey foreign key (query_id) references queries (id),
+    constraint response_analysis_response_id_fkey foreign key (response_id) references responses (id)
+  ) tablespace pg_default;
+
+create index if not exists idx_response_analysis_company_name on public.response_analysis using btree (company_name) tablespace pg_default;
+
+create index if not exists idx_response_analysis_groups on public.response_analysis using btree (
+  geographic_region,
+  industry_vertical,
+  buyer_persona,
+  buying_journey_stage
+) tablespace pg_default;
+
+create index if not exists idx_response_analysis_metrics on public.response_analysis using btree (
+  sentiment_score,
+  ranking_position,
+  company_mentioned,
+  recommended
+) tablespace pg_default;
+
+create index if not exists idx_response_analysis_prompt on public.response_analysis using btree (prompt_id, created_at) tablespace pg_default;
+
+create index if not exists idx_response_analysis_prompt_name on public.response_analysis using btree (prompt_name) tablespace pg_default;
+
+create index if not exists idx_response_analysis_solution on public.response_analysis using gin (solution_analysis) tablespace pg_default;
+
+create index if not exists idx_response_analysis_response_id on public.response_analysis using btree (response_id) tablespace pg_default;
+
+create index if not exists idx_response_analysis_batch on public.response_analysis using btree (analysis_batch_id) tablespace pg_default;
+
+create index if not exists idx_response_analysis_company_id on public.response_analysis using btree (company_id) tablespace pg_default;
+
+create index if not exists idx_response_analysis_answer_engine on public.response_analysis using btree (answer_engine) tablespace pg_default;
+
+create index if not exists idx_response_analysis_query_id on public.response_analysis using btree (query_id) tablespace pg_default;
+
+create trigger response_analysis_company_name_before_insert before insert on response_analysis for each row
+execute function update_response_analysis_company_name ();
+
+create trigger response_analysis_before_insert before insert on response_analysis for each row
+execute function update_response_analysis_fields ();

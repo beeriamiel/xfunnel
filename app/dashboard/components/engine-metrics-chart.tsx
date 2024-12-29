@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer
 } from 'recharts';
@@ -15,9 +15,22 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { createClient } from '@/app/supabase/client';
-import { Activity, Users, Building2, Globe2, Search, MessageSquare, Brain, Target, Route, FileText, Calendar } from 'lucide-react';
+import { Activity, Users, Building2, Globe2, Search, MessageSquare, Brain, Target, Route, FileText, Calendar, Info } from 'lucide-react';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
 import { useDashboardStore } from '@/app/dashboard/store';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ResponseAnalysis {
   id: number;
@@ -30,7 +43,7 @@ interface ResponseAnalysis {
   ranking_position: number | null;
   company_mentioned: boolean | null;
   geographic_region: string | null;
-  industry_vertical: string | null;
+  icp_vertical: string | null;
   buyer_persona: string | null;
   buying_journey_stage: string | null;
   response_text: string | null;
@@ -71,7 +84,7 @@ interface ExtendedResponseAnalysis extends ResponseAnalysis {
   ranking_position: number | null;
   company_mentioned: boolean | null;
   geographic_region: string | null;
-  industry_vertical: string | null;
+  icp_vertical: string | null;
   buyer_persona: string | null;
   buying_journey_stage: string | null;
   response_text: string | null;
@@ -106,10 +119,16 @@ interface BaseGroup {
   }
 }
 
-interface BatchGroup extends BaseGroup {
+// Update the BatchGroup interface to include label
+interface BatchGroup {
   type: 'batch';
   batchId: string;
   date: string;
+  label?: string;
+  metrics: {
+    [engine: string]: MetricValues;
+  };
+  records: ExtendedResponseAnalysis[];
 }
 
 interface TimeGroup extends BaseGroup {
@@ -117,6 +136,7 @@ interface TimeGroup extends BaseGroup {
   startDate: string;
   endDate: string;
   label: string;
+  records: ExtendedResponseAnalysis[];
 }
 
 type Group = BatchGroup | TimeGroup;
@@ -151,12 +171,12 @@ const DB_ENGINE_MAP: { [key: string]: string } = {
 };
 
 const ENGINE_COLORS: { [key: string]: string } = {
-  perplexity: '#ff6b6b',     // Brighter coral
-  claude: '#12b886',         // Mint
-  gemini: '#4c6ef5',         // Indigo
-  searchgpt: '#fcc419',      // Yellow
-  aio: '#ff922b',           // Orange
-  default: '#adb5bd'        // Gray
+  perplexity: '#9333ea',     // Bright purple
+  claude: '#2563eb',         // Royal blue
+  gemini: '#db2777',         // Deep pink
+  searchgpt: '#4f46e5',      // Indigo
+  aio: '#06b6d4',           // Cyan
+  default: '#94a3b8'        // Slate gray
 };
 
 const ENGINE_NAMES: { [key: string]: string } = {
@@ -246,7 +266,17 @@ const METRICS: Record<MetricKey, MetricConfig> = {
   }
 };
 
-// Add proper date handling utilities
+// Update date handling utilities with validation
+function isValidDate(date: Date): boolean {
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+function parseDate(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  return isValidDate(date) ? date : null;
+}
+
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'long',
   year: 'numeric',
@@ -263,55 +293,48 @@ const SHORT_MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {
   year: 'numeric'
 });
 
-// Update the date formatting functions
-const formatDate = (date: string) => {
-  try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) {
-      console.warn('Invalid date:', date);
-      return 'Invalid Date';
-    }
-    return SHORT_MONTH_FORMATTER.format(d);
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Invalid Date';
-  }
+// Update the date formatting functions with validation
+const formatDate = (dateString: string) => {
+  const date = parseDate(dateString);
+  if (!date) return 'N/A';
+  return SHORT_MONTH_FORMATTER.format(date);
 };
 
-const formatTooltipDate = (date: string) => {
-  try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) {
-      console.warn('Invalid date:', date);
-      return 'Invalid Date';
-    }
-    return DATE_FORMATTER.format(d);
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Invalid Date';
-  }
+const formatTooltipDate = (dateString: string) => {
+  const date = parseDate(dateString);
+  if (!date) return 'N/A';
+  return DATE_FORMATTER.format(date);
 };
 
-// Add a function to get the start of the week
+// Add a function to get the start of the week with validation
 function getWeekStart(date: Date): Date {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getWeekStart');
+  }
   const d = new Date(date);
   const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   d.setDate(diff);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-// Add a function to get the end of the week
+// Add a function to get the end of the week with validation
 function getWeekEnd(date: Date): Date {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getWeekEnd');
+  }
   const d = new Date(getWeekStart(date));
   d.setDate(d.getDate() + 6);
   d.setHours(23, 59, 59, 999);
   return d;
 }
 
-// Update the week number calculation
+// Update the week number calculation with validation
 const getWeekNumber = (date: Date) => {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getWeekNumber');
+  }
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + 4 - (d.getDay() || 7));
@@ -320,15 +343,116 @@ const getWeekNumber = (date: Date) => {
   return weekNumber;
 };
 
-// Update the week label formatting
+// Add function to get week of month
+function getWeekOfMonth(date: Date): number {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getWeekOfMonth');
+  }
+  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  const dayOfMonth = date.getDate();
+  return Math.ceil((dayOfMonth + firstDayOfMonth.getDay()) / 7);
+}
+
+// Add ISO week calculation utilities
+function getISOWeek(date: Date): { year: number; week: number; } {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getISOWeek');
+  }
+  
+  // Create new date object and set to nearest Thursday (current date + 4 - current day number)
+  // current day number = 0 (Sunday) to 6 (Saturday)
+  const target = new Date(date.valueOf());
+  const dayNumber = (date.getDay() + 6) % 7; // Convert Sunday (0) to 6, and Monday (1) to 0
+  target.setDate(target.getDate() - dayNumber + 3);
+  
+  // Get first Thursday of the year
+  const firstThursday = new Date(target.getFullYear(), 0, 4);
+  const firstDay = (firstThursday.getDay() + 6) % 7;
+  firstThursday.setDate(firstThursday.getDate() - firstDay + 3);
+  
+  // Get week number: Number of weeks between target and first Thursday
+  const weekNumber = 1 + Math.ceil((target.valueOf() - firstThursday.valueOf()) / (7 * 24 * 60 * 60 * 1000));
+  
+  return {
+    year: target.getFullYear(),
+    week: weekNumber
+  };
+}
+
+// Get the month that owns the majority of days in a week
+function getWeekOwnerMonth(date: Date): Date {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getWeekOwnerMonth');
+  }
+  
+  // Get Monday of the week
+  const monday = new Date(date.valueOf());
+  const daysSinceMonday = (date.getDay() + 6) % 7; // Convert Sunday (0) to 6, Monday (1) to 0
+  monday.setDate(monday.getDate() - daysSinceMonday);
+  
+  // Get all days of the week
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(monday.valueOf());
+    day.setDate(monday.getDate() + i);
+    return day;
+  });
+  
+  // Count days per month
+  const monthCounts = weekDays.reduce((acc, day) => {
+    const monthKey = `${day.getFullYear()}-${day.getMonth()}`;
+    acc[monthKey] = (acc[monthKey] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Find month with most days
+  const [maxMonthKey] = Object.entries(monthCounts)
+    .reduce((max, curr) => curr[1] > max[1] ? curr : max);
+  
+  const [year, month] = maxMonthKey.split('-').map(Number);
+  return new Date(year, month, 1);
+}
+
+// Add function to get relative week number within a month
+function getRelativeWeekOfMonth(date: Date): number {
+  if (!isValidDate(date)) {
+    throw new Error('Invalid date provided to getRelativeWeekOfMonth');
+  }
+  
+  // Get the first day of the month
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  
+  // Get Monday of the first week
+  const firstMonday = new Date(firstDay);
+  const firstDayWeekday = firstDay.getDay();
+  const daysUntilMonday = firstDayWeekday === 0 ? 1 : (8 - firstDayWeekday);
+  firstMonday.setDate(firstDay.getDate() + daysUntilMonday - 7);
+  
+  // Calculate the number of weeks since the first Monday
+  const diffInDays = Math.floor((date.getTime() - firstMonday.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.ceil((diffInDays + 1) / 7);
+}
+
+// Update week label formatting to use relative week numbers
 const getWeekLabel = (date: Date) => {
-  const weekStart = getWeekStart(date);
-  const weekEnd = getWeekEnd(date);
-  return `${SHORT_MONTH_FORMATTER.format(weekStart)} Week ${getWeekNumber(date)}`;
+  if (!isValidDate(date)) {
+    return 'Invalid Week';
+  }
+  
+  try {
+    const monthDate = getWeekOwnerMonth(date);
+    const relativeWeek = getRelativeWeekOfMonth(date);
+    return `${SHORT_MONTH_FORMATTER.format(monthDate)} Week ${relativeWeek}`;
+  } catch (error) {
+    console.error('Error generating week label:', error);
+    return 'Invalid Week';
+  }
 };
 
-// Update the month label formatting
+// Update the month label formatting with validation
 const getMonthLabel = (date: Date) => {
+  if (!isValidDate(date)) {
+    return 'Invalid Month';
+  }
   return MONTH_FORMATTER.format(date);
 };
 
@@ -375,7 +499,7 @@ function useResearchData(companyId: number | null | undefined) {
             query_id,
             response_id,
             buyer_persona,
-            industry_vertical,
+            icp_vertical,
             geographic_region,
             sentiment_score,
             recommended,
@@ -394,7 +518,7 @@ function useResearchData(companyId: number | null | undefined) {
           uniqueQueries: new Set(summaryData.map(d => d.query_id)).size,
           totalResponses: new Set(summaryData.map(d => d.response_id)).size,
           uniquePersonas: new Set(summaryData.map(d => d.buyer_persona)).size,
-          uniqueVerticals: new Set(summaryData.map(d => d.industry_vertical)).size,
+          uniqueVerticals: new Set(summaryData.map(d => d.icp_vertical)).size,
           uniqueRegions: new Set(summaryData.map(d => d.geographic_region)).size,
           analyzedCompanies: 0, // Default value
           avgSentiment: summaryData.reduce((acc, curr) => acc + (curr.sentiment_score || 0), 0) / summaryData.length,
@@ -461,20 +585,14 @@ const MetricCard = memo(function MetricCard({ value, label, icon, formatter = (v
 
 function ResearchSummaryPlaceholder() {
   return (
-    <div className="mb-8">
-      <div className="mb-4">
-        <div className="h-6 w-48 bg-muted rounded animate-pulse mb-2" />
-        <div className="h-4 w-96 bg-muted rounded animate-pulse" />
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => (
-          <Card key={i} className="p-4 flex flex-col items-center justify-center space-y-2">
-            <div className="w-6 h-6 rounded-full bg-muted animate-pulse" />
-            <div className="h-8 w-16 bg-muted rounded animate-pulse" />
-            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-          </Card>
-        ))}
-      </div>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {[...Array(5)].map((_, i) => (
+        <Card key={i} className="p-4 flex flex-col items-center justify-center space-y-2">
+          <div className="w-6 h-6 rounded-full bg-muted animate-pulse" />
+          <div className="h-8 w-16 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+        </Card>
+      ))}
     </div>
   );
 }
@@ -509,13 +627,8 @@ const ResearchSummary = memo(function ResearchSummary({
 
   if (error || !data) {
     return (
-      <div className="mb-8">
-        <div className="mb-4">
-          <h4 className="text-lg font-semibold">Research Coverage</h4>
-          <p className="text-sm text-muted-foreground text-red-500">
-            {error || 'No data available'}
-          </p>
-        </div>
+      <div className="text-sm text-muted-foreground text-red-500">
+        {error || 'No data available'}
       </div>
     );
   }
@@ -529,33 +642,31 @@ const ResearchSummary = memo(function ResearchSummary({
   ];
 
   return (
-    <div className="mb-8">
-      <div className="mb-4">
-        <h4 className="text-lg font-semibold">Research Coverage</h4>
-        <p className="text-sm text-muted-foreground">Analysis scope for your company across AI platforms</p>
+    <AnimatePresence>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {metrics.map((metric, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 + index * 0.2 }}
+          >
+            <MetricCard {...metric} index={index} />
+          </motion.div>
+        ))}
       </div>
-      <AnimatePresence>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {metrics.map((metric, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.5 + index * 0.2 }}
-            >
-              <MetricCard {...metric} index={index} />
-            </motion.div>
-          ))}
-        </div>
-      </AnimatePresence>
-    </div>
+    </AnimatePresence>
   );
 });
 
 // Add new interfaces for processed data
 interface ProcessedMetricData {
   date: string;
-  [engine: string]: number | string | undefined;
+  label: string;
+  metrics: { [engine: string]: MetricValues };
+  records: ExtendedResponseAnalysis[];
+  activeMetric: MetricKey;
+  [engine: string]: number | string | any; // Update type to handle new fields
 }
 
 interface ProcessedData {
@@ -579,26 +690,95 @@ interface CustomTooltipProps {
   formatter: (value: number) => string;
 }
 
+// Add helper for response count formatting
+function formatResponseCount(count: number): string {
+  return `${count} ${count === 1 ? 'response' : 'responses'}`;
+}
+
+// Calculate total responses for a group
+function getTotalResponses(metrics: { [engine: string]: MetricValues }): number {
+  return Object.values(metrics).reduce((sum, engineMetrics) => sum + (engineMetrics.count || 0), 0);
+}
+
+// Add stage constants for clarity
+const PROBLEM_EXPLORATION = 'problem_exploration';
+const SOLUTION_EDUCATION = 'solution_education';
+const SOLUTION_COMPARISON = 'solution_comparison';
+const FINAL_RESEARCH = 'final_research';
+const SOLUTION_EVALUATION = 'solution_evaluation';
+
+// Update response count calculation to be metric-specific
+function getMetricSpecificResponses(
+  metrics: { [engine: string]: MetricValues },
+  activeMetric: MetricKey,
+  records: ExtendedResponseAnalysis[]
+): number {
+  // Filter records based on metric type
+  const filteredRecords = records.filter(record => {
+    const stage = record.buying_journey_stage;
+    
+    switch (activeMetric) {
+      case 'company_mentioned':
+        return stage === PROBLEM_EXPLORATION || stage === SOLUTION_EDUCATION;
+      
+      case 'position':
+        return stage === SOLUTION_COMPARISON || stage === FINAL_RESEARCH;
+      
+      case 'feature_score':
+        return stage === SOLUTION_EVALUATION;
+      
+      case 'sentiment':
+        return true; // All stages count for sentiment
+      
+      default:
+        return false;
+    }
+  });
+
+  // Count responses per engine and sum them up
+  return Object.entries(metrics).reduce((total, [engine, engineMetrics]) => {
+    const engineRecords = filteredRecords.filter(
+      record => DB_ENGINE_MAP[record.answer_engine?.toLowerCase() || ''] === engine
+    );
+    return total + engineRecords.length;
+  }, 0);
+}
+
+// Update CustomTooltip to use metric-specific counting
 const CustomTooltip = ({ active, payload, label, formatter }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length || !label) return null;
 
+  const firstPayload = payload[0]?.payload;
+  const metrics = firstPayload?.metrics || {};
+  const records = firstPayload?.records || [];
+  const activeMetric = firstPayload?.activeMetric as MetricKey;
+  
+  const totalResponses = getMetricSpecificResponses(metrics, activeMetric, records);
+
   return (
-    <div className="rounded-lg border bg-white px-3 py-2 shadow-md">
-      <p className="text-sm font-medium text-foreground mb-1.5">
-        {formatTooltipDate(label)}
-      </p>
-      <div className="space-y-1">
-        {payload.map((entry, index) => (
+    <div className="rounded-lg border bg-white px-3 py-2 shadow-md max-w-[280px]">
+      <div className="flex flex-col gap-1 mb-2 border-b pb-2">
+        <p className="text-sm font-medium text-foreground truncate">
+          {label}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {formatResponseCount(totalResponses)}
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        {payload?.map((entry: any) => (
           entry.value !== null && (
-            <div key={index} className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5">
+            <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <div 
-                  className="w-1.5 h-1.5 rounded-full" 
+                  className="w-2 h-2 shrink-0 rounded-full" 
                   style={{ backgroundColor: entry.color }}
                 />
-                <span className="text-sm text-muted-foreground">{entry.name}</span>
+                <span className="text-sm text-muted-foreground truncate">{entry.name}</span>
               </div>
-              <span className="text-sm font-medium tabular-nums">{formatter(entry.value)}</span>
+              <span className="text-sm font-medium tabular-nums shrink-0">
+                {formatter(entry.value)}
+              </span>
             </div>
           )
         ))}
@@ -692,7 +872,7 @@ function processHierarchicalMetrics(
     });
 
     // Process by vertical
-    const verticalGroups = groupBy(validRecords, r => r.industry_vertical || 'unknown');
+    const verticalGroups = groupBy(validRecords, r => r.icp_vertical || 'unknown');
     Object.entries(verticalGroups).forEach(([vertical, verticalRecords]) => {
       if (!metrics.byVertical[vertical]) {
         metrics.byVertical[vertical] = createEmptyMetricValues();
@@ -806,7 +986,16 @@ function processGroup(
   return result;
 }
 
-// Add debug logs to getCurrentMetricData
+// Add batch date formatter
+const BATCH_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  hour12: true
+});
+
+// Update getCurrentMetricData to include records for response counting
 function getCurrentMetricData(
   data: ProcessedDataByMode,
   sortingMode: SortingMode,
@@ -815,16 +1004,21 @@ function getCurrentMetricData(
   const groups = data[sortingMode];
   if (!groups.length) return [];
 
-  if (activeMetric === 'position') {
-    console.log('--- Debug: Chart Data Processing ---');
-    console.log('Sorting mode:', sortingMode);
-    console.log('Number of groups:', groups.length);
-  }
+  return groups.map(group => {
+    let label: string;
+    if (isBatchGroup(group)) {
+      const date = parseDate(group.date);
+      label = date ? BATCH_DATE_FORMATTER.format(date) : 'N/A';
+    } else {
+      label = group.label || 'N/A';
+    }
 
-  const result = groups.map(group => {
     const result: ProcessedMetricData = {
       date: isBatchGroup(group) ? group.date : group.startDate,
-      label: isBatchGroup(group) ? formatDate(group.date) : group.label
+      label,
+      metrics: group.metrics,
+      records: group.records, // Include the raw records
+      activeMetric, // Include the active metric type
     };
 
     Object.entries(group.metrics).forEach(([engine, metrics]) => {
@@ -833,23 +1027,39 @@ function getCurrentMetricData(
       }
     });
 
-    if (activeMetric === 'position') {
-      console.log(`Group ${result.label} metrics:`, result);
-    }
-
     return result;
   });
-
-  if (activeMetric === 'position') {
-    console.log('Final chart data:', result);
-  }
-
-  return result;
 }
 
 function isValidMetricValue(value: number | undefined | null): value is number {
   return typeof value === 'number' && !isNaN(value) && isFinite(value);
 }
+
+const METRIC_DESCRIPTIONS = {
+  company_mentioned: "Measures how frequently your company is mentioned in general product/solution queries. A higher percentage indicates stronger AI recognition and relevance of your product.",
+  position: "When AI engines compare and rank solutions, this shows your average ranking position. Lower numbers are better, indicating your solution ranks higher in competitive comparisons.",
+  feature_score: "Percentage of 'YES' responses when AI is asked about specific features of your product. Higher scores indicate better feature recognition and coverage by AI engines.",
+  sentiment: "A sophisticated analysis of how positively AI discusses your product, considering context, comparisons, and technical evaluations. Factors include praise strength, technical recognition, market positioning, and comparative advantages. Scores range from -1 (very negative) to 1 (very positive)."
+};
+
+const METRICS_INFO = {
+  company_mentioned: {
+    title: "Company Mentioned",
+    description: "Measures how frequently your company is mentioned in general product/solution queries. A higher percentage indicates stronger AI recognition and relevance of your product."
+  },
+  position: {
+    title: "Average Position",
+    description: "When AI engines compare and rank solutions, this shows your average ranking position. Lower numbers are better, indicating your solution ranks higher in competitive comparisons."
+  },
+  feature_score: {
+    title: "Feature Score",
+    description: "Percentage of 'YES' responses when AI is asked about specific features of your product. Higher scores indicate better feature recognition and coverage by AI engines."
+  },
+  sentiment: {
+    title: "Average Sentiment",
+    description: "A sophisticated analysis of how positively AI discusses your product, considering context, comparisons, and technical evaluations. Factors include praise strength, technical recognition, market positioning, and comparative advantages. Scores range from -1 (very negative) to 1 (very positive)."
+  }
+};
 
 export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
@@ -892,15 +1102,16 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
       )
     );
 
-    const sortedData = [...data].sort((a, b) => 
-      new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-    );
+    const sortedData = [...data].sort((a, b) => {
+      const dateA = parseDate(a.created_at);
+      const dateB = parseDate(b.created_at);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
 
     sortedData.forEach(record => {
-      if (!record.created_at) return;
-
-      const date = new Date(record.created_at);
-      if (isNaN(date.getTime())) {
+      const date = parseDate(record.created_at);
+      if (!date) {
         console.warn('Invalid date in record:', record);
         return;
       }
@@ -908,75 +1119,85 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
       if (record.analysis_batch_id) {
         const batchKey = record.analysis_batch_id;
         if (!batchGroups[batchKey]) {
+          const batchRecords = data.filter(r => r.analysis_batch_id === batchKey);
           batchGroups[batchKey] = {
             type: 'batch',
             batchId: batchKey,
             date: record.created_at,
-            metrics: {}
+            metrics: {},
+            records: batchRecords
           };
+          batchGroups[batchKey].metrics = processGroup(batchRecords, uniqueEngines);
         }
-        const batchRecords = data.filter(r => r.analysis_batch_id === batchKey);
-        batchGroups[batchKey].metrics = processGroup(batchRecords, uniqueEngines);
       }
 
-      const weekStart = getWeekStart(date);
-      const weekEnd = getWeekEnd(date);
-      const weekKey = weekStart.toISOString();
+      try {
+        const weekStart = getWeekStart(date);
+        const weekEnd = getWeekEnd(date);
+        const weekKey = weekStart.toISOString();
 
-      if (!weekGroups[weekKey]) {
-        weekGroups[weekKey] = {
-          type: 'time',
-          startDate: weekStart.toISOString(),
-          endDate: weekEnd.toISOString(),
-          label: getWeekLabel(date),
-          metrics: {}
-        };
+        if (!weekGroups[weekKey]) {
+          const weekRecords = data.filter(r => {
+            const recordDate = parseDate(r.created_at);
+            if (!recordDate) return false;
+            return recordDate >= weekStart && recordDate <= weekEnd;
+          });
+          weekGroups[weekKey] = {
+            type: 'time',
+            startDate: weekStart.toISOString(),
+            endDate: weekEnd.toISOString(),
+            label: getWeekLabel(date),
+            metrics: {},
+            records: weekRecords
+          };
+          weekGroups[weekKey].metrics = processGroup(weekRecords, uniqueEngines);
+        }
+
+        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+        const monthKey = monthStart.toISOString();
+
+        if (!monthGroups[monthKey]) {
+          const monthRecords = data.filter(r => {
+            const recordDate = parseDate(r.created_at);
+            if (!recordDate) return false;
+            return recordDate >= monthStart && recordDate <= monthEnd;
+          });
+          monthGroups[monthKey] = {
+            type: 'time',
+            startDate: monthStart.toISOString(),
+            endDate: monthEnd.toISOString(),
+            label: getMonthLabel(date),
+            metrics: {},
+            records: monthRecords
+          };
+          monthGroups[monthKey].metrics = processGroup(monthRecords, uniqueEngines);
+        }
+      } catch (error) {
+        console.error('Error processing date groups:', error);
       }
-
-      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-      const monthKey = monthStart.toISOString();
-
-      if (!monthGroups[monthKey]) {
-        monthGroups[monthKey] = {
-          type: 'time',
-          startDate: monthStart.toISOString(),
-          endDate: monthEnd.toISOString(),
-          label: getMonthLabel(date),
-          metrics: {}
-        };
-      }
-    });
-
-    Object.keys(weekGroups).forEach(weekKey => {
-      const group = weekGroups[weekKey];
-      const periodRecords = data.filter(r => {
-        if (!r.created_at) return false;
-        const recordDate = new Date(r.created_at);
-        return recordDate >= new Date(group.startDate) && 
-               recordDate <= new Date(group.endDate);
-      });
-      group.metrics = processGroup(periodRecords, uniqueEngines);
-    });
-
-    Object.keys(monthGroups).forEach(monthKey => {
-      const group = monthGroups[monthKey];
-      const periodRecords = data.filter(r => {
-        if (!r.created_at) return false;
-        const recordDate = new Date(r.created_at);
-        return recordDate >= new Date(group.startDate) && 
-               recordDate <= new Date(group.endDate);
-      });
-      group.metrics = processGroup(periodRecords, uniqueEngines);
     });
 
     setProcessedDataByMode({
       batch: Object.values(batchGroups)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        .sort((a, b) => {
+          const dateA = parseDate(a.date);
+          const dateB = parseDate(b.date);
+          if (!dateA || !dateB) return 0;
+          return dateA.getTime() - dateB.getTime();
+        }),
       week: Object.values(weekGroups)
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()),
+        .sort((a, b) => {
+          const dateA = new Date(a.startDate);
+          const dateB = new Date(b.startDate);
+          return dateA.getTime() - dateB.getTime();
+        }),
       month: Object.values(monthGroups)
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+        .sort((a, b) => {
+          const dateA = new Date(a.startDate);
+          const dateB = new Date(b.startDate);
+          return dateA.getTime() - dateB.getTime();
+        })
     });
   }, []);
 
@@ -1003,7 +1224,10 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
             answer_engine,
             buying_journey_stage,
             query_id,
-            analysis_batch_id
+            analysis_batch_id,
+            icp_vertical,
+            geographic_region,
+            buyer_persona
           `)
           .eq('company_id', effectiveCompanyId)
           .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
@@ -1035,226 +1259,274 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
 
   if (!effectiveCompanyId) {
     return (
-      <div className="w-full bg-white rounded-lg border shadow-sm">
-        <div className="p-6">
-          <h3 className="text-lg font-semibold">AI Engine Performance Over Time</h3>
-          <div className="h-[400px] w-full flex items-center justify-center text-muted-foreground">
-            Please select a company to view metrics
+      <div className="space-y-6">
+        <Card className="w-full bg-white shadow-sm">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold">Research Coverage</h3>
+            <div className="h-[200px] w-full flex items-center justify-center text-muted-foreground">
+              Please select a company to view metrics
+            </div>
           </div>
-        </div>
+        </Card>
+        <Card className="w-full bg-white shadow-sm">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold">AI Engine Performance Over Time</h3>
+            <div className="h-[400px] w-full flex items-center justify-center text-muted-foreground">
+              Please select a company to view metrics
+            </div>
+          </div>
+        </Card>
       </div>
     );
   }
 
-  // Add this inside the chart rendering section, before the ResponsiveContainer
-  if (activeMetric === 'position' && currentData.length > 0) {
-    console.log('--- Debug: Chart Rendering ---');
-    console.log('Current metric:', activeMetric);
-    console.log('Domain:', currentMetric.domain);
-    console.log('Ticks:', currentMetric.yAxisConfig?.ticks);
-    console.log('Data points:', currentData);
-  }
-
   return (
-    <div className="w-full bg-white rounded-xl border shadow-lg">
-      <div className="p-8">
-        <ResearchSummary 
-          companyId={effectiveCompanyId}
-          data={researchData.data}
-          isLoading={researchData.isLoading}
-          error={researchData.error}
-        />
-        
-        {isLoading ? (
-          <ChartPlaceholder />
-        ) : error ? (
-          <div className="h-[400px] w-full flex items-center justify-center text-muted-foreground">
-            {error}
+    <div className="space-y-6">
+      {/* Research Coverage Card */}
+      <Card className="w-full bg-white shadow-sm">
+        <div className="p-6">
+          <div className="mb-6">
+            <h3 className="text-2xl font-semibold tracking-tight">Research Coverage</h3>
+            <p className="text-sm text-muted-foreground mt-1">Analysis scope for your company across AI platforms</p>
           </div>
-        ) : currentData.length > 0 ? (
-          <>
-            <div className="flex flex-col space-y-6 mb-8">
-              <div className="space-y-1.5">
-                <h3 className="text-xl font-semibold text-foreground">AI Engine Performance Over Time</h3>
-                <p className="text-sm text-muted-foreground">{currentMetric.description}</p>
-              </div>
+          <ResearchSummary 
+            companyId={effectiveCompanyId}
+            data={researchData.data}
+            isLoading={researchData.isLoading}
+            error={researchData.error}
+          />
+        </div>
+      </Card>
 
-              <div className="flex items-center justify-between">
-                {/* Metric Selection */}
-                <div className="flex items-center border rounded-lg p-1 bg-muted/5">
-                  {Object.entries(METRICS).map(([key, { label }]) => (
-                    <button
-                      key={key}
-                      onClick={() => setActiveMetric(key as MetricKey)}
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200",
-                        "text-sm font-medium",
-                        "hover:bg-muted/10",
-                        activeMetric === key
-                          ? "bg-white text-primary shadow-sm"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {METRIC_ICONS[key as MetricKey]}
-                      {label}
-                    </button>
-                  ))}
+      {/* AI Engine Performance Card */}
+      <Card className="w-full bg-white shadow-sm">
+        <div className="p-6">
+          {isLoading ? (
+            <ChartPlaceholder />
+          ) : error ? (
+            <div className="h-[400px] w-full flex items-center justify-center text-muted-foreground">
+              {error}
+            </div>
+          ) : currentData.length > 0 ? (
+            <>
+              <div className="flex flex-col space-y-6 mb-8">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1.5">
+                    <h3 className="text-2xl font-semibold tracking-tight">AI Engine Performance Over Time</h3>
+                    <p className="text-sm text-muted-foreground">{currentMetric.description}</p>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+                      >
+                        <Info className="h-4 w-4" />
+                        <span className="sr-only">View metrics information</span>
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold tracking-tight">Understanding Your Metrics</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-6 pt-4">
+                        {Object.entries(METRICS_INFO).map(([key, { title, description }]) => (
+                          <div key={key} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              {METRIC_ICONS[key as MetricKey]}
+                              <h4 className="font-medium leading-none tracking-tight">{title}</h4>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
-                {/* Time Period Selection */}
-                <div className="border-l pl-6 ml-6">
+                <div className="flex items-center justify-between">
+                  {/* Metric Selection */}
+                  <Tabs
+                    value={activeMetric}
+                    onValueChange={(value) => setActiveMetric(value as MetricKey)}
+                    className="w-auto"
+                  >
+                    <TabsList className="bg-muted/10 p-1 h-9 rounded-lg">
+                      {Object.entries(METRICS).map(([key, { label }]) => (
+                        <TabsTrigger
+                          key={key}
+                          value={key}
+                          className={cn(
+                            "px-3 h-7 rounded-md transition-all duration-200",
+                            "text-sm font-medium",
+                            "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm",
+                            "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/5",
+                            "flex items-center gap-1.5"
+                          )}
+                        >
+                          {METRIC_ICONS[key as MetricKey]}
+                          {label}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+
+                  {/* Time Period Selection */}
                   <Tabs
                     value={sortingMode}
                     onValueChange={(value) => setSortingMode(value as SortingMode)}
                     className="w-auto"
                   >
-                    <TabsList className="grid grid-cols-3 p-1 bg-muted/5">
+                    <TabsList className="bg-muted/10 p-1 h-9 rounded-lg">
                       {TIME_PERIOD_OPTIONS.map(({ value, label, icon }) => (
                         <TabsTrigger
                           key={value}
                           value={value}
                           className={cn(
-                            "flex items-center gap-2 px-4 py-2",
-                            "data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                            "px-3 h-7 rounded-md transition-all duration-200",
+                            "text-sm font-medium",
+                            "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm",
+                            "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/5",
+                            "flex items-center gap-1.5"
                           )}
                         >
                           {icon}
-                          <span className="text-sm font-medium">{label}</span>
+                          {label}
                         </TabsTrigger>
                       ))}
                     </TabsList>
                   </Tabs>
                 </div>
               </div>
-            </div>
 
-            {/* Chart Area */}
-            <div className="w-full rounded-lg border bg-gradient-to-b from-white to-muted/5 p-4">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`${activeMetric}-${sortingMode}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-full aspect-[21/9] max-h-[400px]"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={currentData}
-                      margin={{ top: 20, right: 20, left: 40, bottom: 20 }}
-                    >
-                      <CartesianGrid 
-                        strokeDasharray="3 3" 
-                        stroke="hsl(var(--muted))" 
-                        horizontal={true}
-                        vertical={false}
-                        opacity={0.1}
-                      />
-                      <XAxis
-                        dataKey="label"
-                        stroke="hsl(var(--muted-foreground))"
-                        axisLine={false}
-                        tickLine={false}
-                        dy={10}
-                        tick={{ 
-                          fill: "hsl(var(--muted-foreground))",
-                          fontSize: 12 
-                        }}
-                        padding={{ left: 20, right: 20 }}
-                      />
-                      <YAxis
-                        tickFormatter={currentMetric.valueFormatter}
-                        domain={currentMetric.domain}
-                        ticks={currentMetric.yAxisConfig?.ticks}
-                        reversed={activeMetric === 'position'}
-                        stroke="hsl(var(--muted-foreground))"
-                        axisLine={false}
-                        tickLine={false}
-                        dx={-10}
-                        tick={{ 
-                          fill: "hsl(var(--muted-foreground))",
-                          fontSize: 12 
-                        }}
-                        width={35}
-                        tickMargin={12}
-                        scale="linear"
-                        orientation="left"
-                        interval={0}
-                        allowDataOverflow={false}
-                        allowDecimals={false}
-                        minTickGap={5}
-                      />
-                      <Tooltip
-                        content={<CustomTooltip formatter={currentMetric.valueFormatter} />}
-                        cursor={{ 
-                          stroke: 'hsl(var(--muted))',
-                          strokeWidth: 1,
-                          strokeDasharray: '3 3',
-                          opacity: 0.2
-                        }}
-                      />
-                      <Legend
-                        content={({ payload }) => (
-                          <div className="flex items-center justify-center gap-6 mt-6">
-                            {payload?.map((entry: any) => (
-                              <div 
-                                key={entry.value} 
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/5 hover:bg-muted/10 transition-colors"
-                              >
+              {/* Chart Area with adjusted padding */}
+              <div className="w-full rounded-lg border bg-gradient-to-b from-white to-muted/5 p-6">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`${activeMetric}-${sortingMode}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full aspect-[21/9] max-h-[500px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={currentData}
+                        margin={{ top: 20, right: 20, left: 40, bottom: 20 }}
+                      >
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke="hsl(var(--muted))" 
+                          horizontal={true}
+                          vertical={false}
+                          opacity={0.1}
+                        />
+                        <XAxis
+                          dataKey="label"
+                          stroke="hsl(var(--muted-foreground))"
+                          axisLine={false}
+                          tickLine={false}
+                          dy={10}
+                          tick={{ 
+                            fill: "hsl(var(--muted-foreground))",
+                            fontSize: 12 
+                          }}
+                          padding={{ left: 20, right: 20 }}
+                        />
+                        <YAxis
+                          tickFormatter={currentMetric.valueFormatter}
+                          domain={currentMetric.domain}
+                          ticks={currentMetric.yAxisConfig?.ticks}
+                          reversed={activeMetric === 'position'}
+                          stroke="hsl(var(--muted-foreground))"
+                          axisLine={false}
+                          tickLine={false}
+                          dx={-10}
+                          tick={{ 
+                            fill: "hsl(var(--muted-foreground))",
+                            fontSize: 12 
+                          }}
+                          width={35}
+                          tickMargin={12}
+                          scale="linear"
+                          orientation="left"
+                          interval={0}
+                          allowDataOverflow={false}
+                          allowDecimals={false}
+                          minTickGap={5}
+                        />
+                        <RechartsTooltip
+                          content={<CustomTooltip formatter={currentMetric.valueFormatter} />}
+                          cursor={{ 
+                            stroke: 'hsl(var(--muted))',
+                            strokeWidth: 1,
+                            strokeDasharray: '3 3',
+                            opacity: 0.2
+                          }}
+                        />
+                        <Legend
+                          content={({ payload }) => (
+                            <div className="flex items-center justify-center gap-6 mt-6">
+                              {payload?.map((entry: any) => (
                                 <div 
-                                  className="w-2 h-2 rounded-full" 
-                                  style={{ backgroundColor: entry.color }}
-                                />
-                                <span className="text-sm font-medium text-muted-foreground">
-                                  {entry.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      />
-                      {Object.keys(ENGINE_NAMES)
-                        .filter(engine => visibleEngines.includes(engine))
-                        .map((engine, index) => (
-                          <Line
-                            key={engine}
-                            type="monotoneX"
-                            dataKey={engine}
-                            name={ENGINE_NAMES[engine]}
-                            stroke={ENGINE_COLORS[engine] || ENGINE_COLORS.default}
-                            strokeWidth={2}
-                            dot={{ 
-                              r: 3,
-                              strokeWidth: 2,
-                              fill: '#fff',
-                              stroke: ENGINE_COLORS[engine] || ENGINE_COLORS.default,
-                              opacity: 0.8
-                            }}
-                            activeDot={{ 
-                              r: 6, 
-                              strokeWidth: 2,
-                              fill: ENGINE_COLORS[engine] || ENGINE_COLORS.default,
-                              stroke: '#fff'
-                            }}
-                            connectNulls={true}
-                            animationBegin={index * 200}
-                            animationDuration={1500}
-                            animationEasing="ease-out"
-                          />
-                        ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </motion.div>
-              </AnimatePresence>
+                                  key={entry.value} 
+                                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/5 hover:bg-muted/10 transition-colors"
+                                >
+                                  <div 
+                                    className="w-2 h-2 rounded-full" 
+                                    style={{ backgroundColor: entry.color }}
+                                  />
+                                  <span className="text-sm font-medium text-muted-foreground">
+                                    {entry.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        />
+                        {Object.keys(ENGINE_NAMES)
+                          .filter(engine => visibleEngines.includes(engine))
+                          .map((engine, index) => (
+                            <Line
+                              key={engine}
+                              type="monotoneX"
+                              dataKey={engine}
+                              name={ENGINE_NAMES[engine]}
+                              stroke={ENGINE_COLORS[engine] || ENGINE_COLORS.default}
+                              strokeWidth={2}
+                              dot={{ 
+                                r: 3,
+                                strokeWidth: 2,
+                                fill: '#fff',
+                                stroke: ENGINE_COLORS[engine] || ENGINE_COLORS.default,
+                                opacity: 0.8
+                              }}
+                              activeDot={{ 
+                                r: 6, 
+                                strokeWidth: 2,
+                                fill: ENGINE_COLORS[engine] || ENGINE_COLORS.default,
+                                stroke: '#fff'
+                              }}
+                              connectNulls={true}
+                              animationBegin={index * 200}
+                              animationDuration={1500}
+                              animationEasing="ease-out"
+                            />
+                          ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </>
+          ) : (
+            <div className="h-[400px] w-full flex items-center justify-center text-muted-foreground">
+              No data available for the selected company
             </div>
-          </>
-        ) : (
-          <div className="h-[400px] w-full flex items-center justify-center text-muted-foreground">
-            No data available for the selected company
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 } 

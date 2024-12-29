@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { FileText, Menu, ChevronRight, Activity, Route } from "lucide-react"
+import { FileText, Menu, ChevronRight, Activity, Route, Link2 } from "lucide-react"
 import { usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
@@ -46,6 +46,13 @@ export function AppSidebar({ className }: SidebarProps) {
           active: isDashboard && activeView === 'journey',
           icon: <Route className="h-4 w-4" />,
           onClick: () => setActiveView('journey'),
+        },
+        {
+          title: "Citation Analysis",
+          href: getHref("/dashboard"),
+          active: isDashboard && activeView === 'citation',
+          icon: <Link2 className="h-4 w-4" />,
+          onClick: () => setActiveView('citation'),
         },
       ],
     },
