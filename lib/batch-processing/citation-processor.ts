@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/app/supabase/server";
 import { Database } from "@/types/supabase";
+import { MozEnrichmentQueue } from './moz-queue';
 
 type CitationInsert = Database['public']['Tables']['citations']['Insert'];
 type ResponseAnalysis = Database['public']['Tables']['response_analysis']['Row'];
@@ -78,10 +79,10 @@ export async function processCitations(
 /**
  * Insert a batch of citations into the database
  */
-export async function insertCitationBatch(citations: CitationMetadata[]): Promise<void> {
+export async function insertCitationBatch(citations: CitationMetadata[]): Promise<number[]> {
   if (citations.length === 0) {
     console.log('No citations to insert');
-    return;
+    return [];
   }
 
   const adminClient = createAdminClient();
@@ -117,7 +118,8 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         region: citation.region,
         ranking_position: citation.ranking_position,
         query_text: citation.query_text
-      })));
+      })))
+      .select('id');
 
     // Log full response details
     console.log('Insert operation details:', {
@@ -131,7 +133,7 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         code: error.code
       } : null,
       dataInserted: !!data,
-      rowCount: (data as unknown as CitationInsert[])?.length
+      rowCount: data?.length
     });
 
     if (error) {
@@ -144,8 +146,10 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
 
     console.log('Successfully inserted citations batch:', {
       count: citations.length,
-      insertedRows: (data as unknown as CitationInsert[])?.length
+      insertedRows: data?.length
     });
+
+    return (data || []).map(row => row.id);
   } catch (error) {
     console.error('Failed to insert citations:', {
       error,
@@ -206,8 +210,44 @@ export async function processCitationsTransaction(
       citationCount: citations.length
     });
 
-    // Insert citations
-    await insertCitationBatch(citations);
+    // Insert citations and get their IDs
+    const citationIds = await insertCitationBatch(citations);
+
+    // Initialize Moz enrichment queue
+    const mozQueue = new MozEnrichmentQueue();
+    
+    // Start Moz enrichment process only for newly added citations
+    try {
+      console.log('Starting Moz enrichment for new citations:', {
+        responseAnalysisId: responseAnalysis.id,
+        citationIds
+      });
+      
+      // Get the citations we just inserted
+      const { data: newCitations, error } = await adminClient
+        .from('citations')
+        .select('id, citation_url')
+        .in('id', citationIds);
+
+      if (error) {
+        throw error;
+      }
+
+      if (newCitations && newCitations.length > 0) {
+        await mozQueue.processBatch(newCitations, responseAnalysis.company_id);
+      }
+      
+      console.log('Completed Moz enrichment for new citations:', {
+        responseAnalysisId: responseAnalysis.id,
+        stats: await mozQueue.getQueueStats()
+      });
+    } catch (mozError) {
+      console.error('Moz enrichment error:', {
+        error: mozError,
+        responseAnalysisId: responseAnalysis.id
+      });
+      // Don't throw the error - we want to keep the citations even if Moz enrichment fails
+    }
 
     console.log('Successfully completed citations transaction');
   } catch (error) {
