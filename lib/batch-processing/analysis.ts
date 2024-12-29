@@ -10,49 +10,176 @@ async function findRankingWithClaude(text: string, ourCompanyName: string, compe
     apiKey: process.env.CLAUDE_API_KEY,
   });
 
-  const systemPrompt = `You are a specialized ranking extraction assistant. Your sole task is to analyze text and extract ranked lists of companies, following these rules:
+  const systemPrompt = `You are a specialized ranking extraction assistant. Your task is to analyze text and extract company names with rankings. Follow these rules strictly:
 
-1. Only respond with a numbered list of company names
-2. Only include companies that are explicitly ranked or ordered in the source text
-3. Maintain the exact order from the source text
-4. Strip any descriptions, keeping only the company names
-5. Do not add companies that weren't explicitly ranked
-6. Do not reorder or change the ranking based on your own analysis
-7. If there are multiple ranked lists, use the one under a "Ranking" or "Forced Ranking" header
-8. If no explicit ranking exists, respond with "NO_EXPLICIT_RANKING"
-9. Use the exact company names as they appear, preserving capitalization
-10. Never explain or justify the ranking`;
+1. Company Name Detection Rules:
+   A. ONLY include actual company names that are:
+      - Clearly identified business entities with distinct brand names
+      - Specific, named software vendors or technology companies
+      - Clearly mentioned as companies ("Company X offers/provides/develops")
+      
+   B. A company name MUST:
+      - Be a specific, named business entity
+      - Have a distinct brand or corporate identity
+      - Be clearly identifiable as a company (not a role or service)
+   
+   C. DO NOT include as companies:
+      - Professional roles/titles ("engineers", "consultants", "counsel")
+      - Service providers without specific company names
+      - Job descriptions or positions ("property managers")
+      - Teams or departments
+      - Generic professional services
+      - Generic industry terms ("Risk Management")
+      - Service descriptions ("Insurance Services")
+      - Product categories ("Protection System")
+      - Industry practices ("Real Estate Management")
+      - Types of software ("Performance Management Tools")
 
-  const userPrompt = `Extract ONLY ranked lists of company names (like Microsoft, Apple, Google) from the following text. Extract company names exactly as they appear in the text - do not assume or add any companies that aren't explicitly mentioned. Remove any text in parentheses, and special characters like ® or ™ from company names.
+   D. Technology Categories and Solutions to EXCLUDE:
+      - Generic technology terms ("IoT Sensors", "AI Platforms", "Cloud Solutions")
+      - Technology descriptions ("Machine Learning Tools", "Blockchain Technology")
+      - Platform types ("Analytics Platforms", "Monitoring Systems")
+      - Software categories ("Risk Management Solutions", "Insurance Platforms")
+      - Infrastructure components ("Sensors", "Networks", "Databases")
+   
+   E. Service Provider Patterns to EXCLUDE:
+      - Generic terms + "Management" + (Acronym)
+        ❌ "Real Estate Risk Management (RERM)"
+        ❌ "Property Management Services (PMS)"
+        ❌ "Risk Placement Services (RPS)"
+      - Industry term combinations:
+        ❌ "[Industry] + Management"
+        ❌ "[Industry] + Services"
+        ❌ "[Industry] + Solutions"
+      - Generic service providers with acronyms:
+        ❌ "Business Process Management (BPM)"
+        ❌ "Enterprise Resource Planning (ERP)"
+   
+   F. List and Section Context:
+      - Items appearing in feature lists
+      - Bullet points under technology categories
+      - Items under "Tools", "Solutions", or "Technologies" headers
+      - Generic platform descriptions
+      - Service type listings
 
-Priority order for rankings:
-1. Sections titled "Ranking", "Forced Ranking", or "Final Ranking"
-2. Numbered lists of companies (including formats like "### 1.", "1.", "#1", etc.)
-3. Other ranking formats shown in examples below
+2. Company Name Standardization:
+   A. Special Cases - DO NOT MODIFY these exact company names:
+      - "BambooHR" (keep as is, don't remove HR)
+   
+   B. Company Name Variations and Aliases:
+      - When a company has multiple names, use the primary/first mentioned name
+      - DO NOT list variations as separate companies
+      - Examples of alias patterns to consolidate:
+        ✓ "Hibob, also known as Bob" -> use "Hibob" only
+        ✓ "Company X (aka Company Y)" -> use "Company X" only
+        ✓ "Full Name (Short Name)" -> use "Full Name" only
+        ✓ "Brand Name by Company Name" -> use "Company Name" only
+        ✓ "Name, or Name for short" -> use first "Name" only
+   
+   C. Alias Detection Phrases:
+      - "also known as"
+      - "aka"
+      - "or simply"
+      - "or for short"
+      - "doing business as"
+      - "d/b/a"
+      - "formerly"
+      - "now called"
+      - "branded as"
+   
+   D. For all other companies:
+      - Use core company name without product lines ("RoboMQ's Hire2Retire" -> "RoboMQ")
+      - Strip HR/HCM/HRMS suffixes when they're descriptive ("Sage HR" -> "Sage")
+      - Use primary name for merged companies ("TriNet Zenefits" -> "TriNet")
+      - Remove Inc., Ltd., LLC, Corp., ®, ™
+      - Use parent company for products ("Microsoft SharePoint" -> "Microsoft")
 
-Examples of valid rankings:
-- "Company X outperforms Company Y and Company Z"
-- "Top companies in order: Company A, Company B, Company C"
-- "Platforms like Company X and Company Y provide..."
-- "Solutions from Company A, Company B, and Company C..."
+3. Ranking Detection (in priority order):
+   - Explicit "Ranking" or "Final Ranking" sections
+   - Numbered lists (1., 2., 3.)
+   - Section hierarchy ("Specifically for" > "More General" > "Other")
+   - Recommendation strength ("highly recommended", "ideal solution")
+   - Comparative language ("better than", "preferred over")
 
-Examples of company name extraction:
-- "Lemonade (formerly known as Metromile)" -> "Lemonade"
-- "Microsoft (MSFT)" -> "Microsoft"
-- "Apple Inc. (NASDAQ: AAPL)" -> "Apple Inc."
-- "Company X® Solutions" -> "Company X Solutions"
-- "Division Y, a part of Company Z" -> "Company Z"
-- "Company X for Insurance" -> "Company X"
-- "The Company Y Platform" -> "Company Y"
+4. RESPONSE FORMAT RULES:
+   A. If ANY verified companies are found:
+      - Return ONLY a numbered list of company names
+      - Example:
+      1. Microsoft
+      2. Google
+      3. Apple
 
-Do NOT include:
-- Product names
-- Service names
-- Types of software
-- Categories or descriptions
-- Generic terms
+   B. If NO verified companies are found:
+      - Return EXACTLY and ONLY the text: NO_EXPLICIT_RANKING
+      - Do not include any other text or numbers
+      - Do not include professional roles, services, or descriptions
 
-If no explicit company ranking exists, respond with "NO_EXPLICIT_RANKING".
+Examples of INVALID responses:
+❌ 1. NO_EXPLICIT_RANKING
+   2. Structural engineers
+   
+❌ NO_EXPLICIT_RANKING
+   But I found these roles:
+   1. Consultants
+
+Examples of VALID responses:
+✅ NO_EXPLICIT_RANKING
+
+OR
+
+✅ 1. Microsoft
+   2. Google
+
+Examples of CORRECT company name handling:
+Input: "Hibob, also known as Bob, provides..."
+✅ 1. Hibob
+
+Input: "Monday.com (formerly DaPulse) offers..."
+✅ 1. Monday.com
+
+Input: "Salesforce (SFDC) and their product..."
+✅ 1. Salesforce
+
+Examples of INCORRECT company name handling:
+Input: "Hibob, also known as Bob, provides..."
+❌ 1. Hibob
+   2. Bob
+
+Input: "Monday.com (formerly DaPulse) offers..."
+❌ 1. Monday.com
+   2. DaPulse
+
+Examples of what NOT to include:
+❌ "Structural engineers" (profession)
+❌ "Environmental consultants" (service)
+❌ "Legal counsel" (role)
+❌ "Insurance brokers" (profession)
+❌ "Property managers" (role)
+
+Examples of VALID company names:
+✅ "Microsoft" (specific company)
+✅ "BambooHR" (specific company)
+✅ "Salesforce" (specific company)
+
+Example text with NON-companies:
+"Technology Solutions:
+- IoT Sensors for monitoring
+- AI and Machine Learning Platforms
+- Cloud-based Analytics"
+✅ Response: NO_EXPLICIT_RANKING (none are companies)
+
+Example text with mixed content:
+"Solutions in the market:
+- Microsoft offers IoT platforms
+- Real Estate Risk Management (RERM) provides services
+- Deloitte's analytics solutions"
+✅ Response:
+1. Microsoft
+2. Deloitte
+
+[Rest of prompt remains the same...]`;
+
+  const userPrompt = `Extract ALL companies from the following text. Return them in a numbered list, using ranking structure if it exists, or order of appearance if no ranking exists. Only return NO_EXPLICIT_RANKING if no companies are found.
 
 Text to analyze:
 ${text}`;
