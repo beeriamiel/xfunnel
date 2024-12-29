@@ -265,3 +265,19 @@ export async function processCitationsTransaction(
   - Content analysis
   - Error handling and logging
   - Database updates 
+
+### URL Classifier
+- Location: `lib/utils/url-classifier.ts`
+- Features:
+  - Domain extraction and normalization
+  - UGC domain list management
+  - Fuzzy name matching
+  - Detailed classification logging
+
+### Citation Processor
+- Location: `lib/batch-processing/citation-processor.ts`
+- Enhanced with:
+  - URL source classification
+  - Company name lookup
+  - Competitor matching
+  - Preserved enrichment processes 

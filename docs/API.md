@@ -100,3 +100,20 @@
     }
   }
   ``` 
+
+## Citation Processing
+
+### URL Classification
+- Automatic source type classification:
+  - OWNED: Company's own domain (fuzzy matched)
+  - COMPETITOR: Competitor domains (fuzzy matched)
+  - UGC: User-generated content sites (50+ domains)
+  - EARNED: All other sources
+- Classification happens during citation processing
+- Integrated with existing Moz and content enrichment
+
+### Database Schema
+Citations table includes:
+- source_type: ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED')
+- Default: 'EARNED'
+- NOT NULL constraint 

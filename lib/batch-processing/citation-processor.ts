@@ -4,6 +4,7 @@ import { MozEnrichmentQueue } from './moz-queue';
 import { ContentScrapingQueue } from './content-queue';
 import { classifyUrl } from '@/lib/utils/url-classifier';
 import { SourceType } from '@/lib/types/batch';
+import { ContentAnalysisService } from '@/lib/services/content-analysis-service';
 
 type CitationInsert = Database['public']['Tables']['citations']['Insert'];
 type ResponseAnalysis = Database['public']['Tables']['response_analysis']['Row'];
@@ -247,7 +248,7 @@ export async function processCitationsTransaction(
       // Get the citations we just inserted
       const { data: newCitations, error } = await adminClient
         .from('citations')
-        .select('id, citation_url')
+        .select('id, citation_url, query_text, response_text, content_markdown')
         .in('id', citationIds);
 
       if (error) {
@@ -255,20 +256,136 @@ export async function processCitationsTransaction(
       }
 
       if (newCitations && newCitations.length > 0) {
-        // RESTORE: Run both enrichment processes in parallel
-        const mozQueue = new MozEnrichmentQueue();
-        const contentQueue = new ContentScrapingQueue();
+        try {
+          // Run Moz enrichment and content scraping in parallel
+          const mozQueue = new MozEnrichmentQueue();
+          const contentQueue = new ContentScrapingQueue();
 
-        await Promise.all([
-          mozQueue.processBatch(newCitations, responseAnalysis.company_id),
-          contentQueue.processBatch(newCitations, responseAnalysis.company_id)
-        ]);
+          console.log('Starting enrichment processes:', {
+            responseAnalysisId: responseAnalysis.id,
+            citationCount: newCitations.length,
+            timestamp: new Date().toISOString()
+          });
 
-        console.log('Completed enrichment processes:', {
-          responseAnalysisId: responseAnalysis.id,
-          mozStats: await mozQueue.getQueueStats(),
-          contentStats: await contentQueue.getQueueStats()
-        });
+          // Wait for both processes to complete
+          await Promise.all([
+            mozQueue.processBatch(newCitations, responseAnalysis.company_id),
+            contentQueue.processBatch(newCitations, responseAnalysis.company_id)
+          ]);
+
+          console.log('Enrichment processes completed, waiting for content to be saved...');
+          
+          // Add delay to ensure content is saved
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Get citations that have content
+          const { data: citationsWithContent, error: contentError } = await adminClient
+            .from('citations')
+            .select(`
+              id,
+              citation_url,
+              query_text,
+              response_text,
+              content_markdown
+            `)
+            .in('id', citationIds)
+            .filter('content_markdown', 'not.is', null);
+
+          if (contentError) {
+            throw contentError;
+          }
+
+          // Process content analysis if we have citations with content
+          if (citationsWithContent && citationsWithContent.length > 0) {
+            console.log('Starting content analysis phase:', {
+              totalCitations: citationsWithContent.length,
+              citationIds: citationsWithContent.map(c => c.id),
+              timestamp: new Date().toISOString()
+            });
+
+            const contentAnalysisService = new ContentAnalysisService();
+            const BATCH_SIZE = 3; // Smaller batch size for Claude API
+
+            // Process in batches
+            for (let i = 0; i < citationsWithContent.length; i += BATCH_SIZE) {
+              const batch = citationsWithContent.slice(i, i + BATCH_SIZE);
+              
+              console.log(`Processing content analysis batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(citationsWithContent.length/BATCH_SIZE)}`);
+
+              // Process batch in parallel
+              await Promise.all(
+                batch.map(async (citation) => {
+                  try {
+                    console.log('Starting content analysis for citation:', {
+                      citationId: citation.id,
+                      contentLength: citation.content_markdown?.length,
+                      timestamp: new Date().toISOString()
+                    });
+
+                    const analysis = await contentAnalysisService.analyzeContent(
+                      citation.query_text || '',
+                      citation.response_text || '',
+                      citation.content_markdown || ''
+                    );
+
+                    // Update citation with analysis
+                    const { error: updateError } = await adminClient
+                      .from('citations')
+                      .update({ 
+                        content_analysis: JSON.stringify(analysis),
+                        content_analysis_updated_at: new Date().toISOString()
+                      })
+                      .eq('id', citation.id);
+
+                    if (updateError) {
+                      throw updateError;
+                    }
+
+                    console.log('Content analysis completed for citation:', {
+                      citationId: citation.id,
+                      analysisWordCount: analysis.analysis_details.total_words,
+                      timestamp: new Date().toISOString()
+                    });
+
+                  } catch (analysisError) {
+                    console.error('Content analysis failed for citation:', {
+                      citationId: citation.id,
+                      error: analysisError,
+                      timestamp: new Date().toISOString()
+                    });
+                    // Continue with other citations
+                  }
+                })
+              );
+
+              // Rate limiting between batches
+              if (i + BATCH_SIZE < citationsWithContent.length) {
+                console.log('Rate limiting pause between batches...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
+
+            console.log('Content analysis phase completed:', {
+              totalProcessed: citationsWithContent.length,
+              timestamp: new Date().toISOString()
+            });
+          }
+
+          console.log('All enrichment processes completed:', {
+            responseAnalysisId: responseAnalysis.id,
+            mozStats: await mozQueue.getQueueStats(),
+            contentStats: await contentQueue.getQueueStats(),
+            timestamp: new Date().toISOString()
+          });
+
+        } catch (enrichmentError) {
+          console.error('Enrichment error:', {
+            error: enrichmentError,
+            responseAnalysisId: responseAnalysis.id,
+            timestamp: new Date().toISOString()
+          });
+          // Don't throw - we want to keep the citations even if enrichment fails
+        }
       }
     } catch (enrichmentError) {
       console.error('Enrichment error:', {

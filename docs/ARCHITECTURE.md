@@ -120,3 +120,17 @@
 - Filters out PDFs and document types
 - Handles rate limiting and retries
 - Stores results in citations table with content analysis metadata 
+
+## Citation Processing Pipeline
+
+### URL Classification System
+- Automatic source classification during citation processing
+- Classification hierarchy:
+  1. UGC Check (exact domain match)
+  2. OWNED Check (fuzzy company name match)
+  3. COMPETITOR Check (fuzzy competitor name match)
+  4. EARNED (default)
+- Integrated with:
+  - Moz domain authority enrichment
+  - Content scraping pipeline
+  - Citation metadata processing 

@@ -72,14 +72,6 @@ export class ContentScrapingQueue {
       if (content) {
         updateData.content_markdown = content;
         updateData.content_scraping_error = null;
-        const contentAnalysis = {
-          wordCount: content.split(/\s+/).length,
-          hasCode: content.includes('```'),
-          headings: content.match(/^#+\s+.+$/gm)?.length || 0,
-          // Add other relevant metrics
-        };
-        
-        updateData.content_analysis = JSON.stringify(contentAnalysis);
       } else {
         updateData.content_scraping_error = 'Failed to scrape content';
       }

@@ -157,10 +157,10 @@ export async function fetchMozMetrics(urls: string[]): Promise<MozResponse> {
       totalDuration,
       requestDuration,
       parseTime: totalDuration - requestDuration,
-      resultsCount: data.results_by_site?.length || 0,
+      resultsCount: data.result?.results_by_site?.length || 0,
       errorsCount: data.errors_by_site?.length || 0,
-      successRate: data.results_by_site ? 
-        (data.results_by_site.length / urls.length) * 100 : 0
+      successRate: data.result?.results_by_site ? 
+        (data.result.results_by_site.length / urls.length) * 100 : 0
     });
 
     // Log any errors in detail
