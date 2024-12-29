@@ -244,3 +244,24 @@ export async function processCitationsTransaction(
 - User flows
 - Dashboard interactions
 - Data visualization 
+
+## Key Components
+
+### FirecrawlClient
+- Location: `lib/clients/firecrawl.ts`
+- Handles web content scraping
+- Features:
+  - Exponential backoff retry logic
+  - Rate limit handling
+  - Detailed error logging
+  - Response validation
+  - Timeout configuration
+
+### ContentScrapingQueue
+- Location: `lib/batch-processing/content-queue.ts`
+- Manages content scraping pipeline
+- Features:
+  - Document type filtering
+  - Content analysis
+  - Error handling and logging
+  - Database updates 

@@ -368,7 +368,8 @@ CREATE INDEX idx_citations_created_at ON public.citations USING btree (created_a
 CREATE INDEX idx_citations_moz_last_updated ON public.citations USING btree (moz_last_updated)
 CREATE INDEX idx_citations_response_analysis_id ON public.citations USING btree (response_analysis_id)
 CREATE INDEX idx_citations_company_id ON public.citations USING btree (company_id)
-CREATE UNIQUE INDEX citations_pkey ON public.citations USING btree (id)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+CREATE UNIQUE INDEX citations_pkey ON public.citations USING btree (id)
+CREATE INDEX idx_citations_source_type ON public.citations USING btree (source_type)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | INDEXES: | public       | companies               | CREATE INDEX idx_companies_number_of_employees ON public.companies USING btree (number_of_employees)
 CREATE UNIQUE INDEX companies_pkey ON public.companies USING btree (id)
 CREATE INDEX idx_companies_product_category ON public.companies USING btree (product_category)
@@ -452,3 +453,29 @@ generation_progress_status_check CHECK ((status = ANY (ARRAY['generating_icps'::
 | public      | responses               | Users can view responses to their queries    | PERMISSIVE |               | ALL     | (EXISTS ( SELECT 1
    FROM queries
   WHERE ((queries.id = responses.query_id) AND (queries.user_id = auth.uid())))) |                                       |
+
+-- First create the enum type
+CREATE TYPE citation_source_type AS ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED');
+
+-- Map existing values to new enum values
+UPDATE citations 
+SET source_type = CASE 
+    WHEN source_type IS NULL OR source_type = '' THEN 'EARNED'
+    WHEN source_type = 'Affiliate' THEN 'EARNED'
+    WHEN source_type = 'Documentation' THEN 'EARNED'
+    WHEN source_type = 'Blog' THEN 'EARNED'
+    WHEN source_type = 'GitHub' THEN 'EARNED'
+    WHEN source_type = 'Guide' THEN 'EARNED'
+    WHEN source_type = 'Tutorial' THEN 'EARNED'
+    ELSE 'EARNED'
+END;
+
+-- Now we can safely alter the column
+ALTER TABLE citations 
+  ALTER COLUMN source_type TYPE citation_source_type 
+  USING source_type::citation_source_type;
+
+-- Add NOT NULL constraint with default
+ALTER TABLE citations 
+  ALTER COLUMN source_type SET NOT NULL,
+  ALTER COLUMN source_type SET DEFAULT 'EARNED';

@@ -41,4 +41,13 @@ export interface BatchTrackingService {
   completeBatch(batchId: string): Promise<void>;
   getBatchInfo(batchId: string): Promise<BatchMetadata>;
   getCompanyBatches(companyId: number, type?: BatchType): Promise<BatchMetadata[]>;
-} 
+}
+
+export const SourceType = {
+  OWNED: 'OWNED',
+  COMPETITOR: 'COMPETITOR',
+  UGC: 'UGC',
+  EARNED: 'EARNED'
+} as const;
+
+export type SourceType = typeof SourceType[keyof typeof SourceType]; 

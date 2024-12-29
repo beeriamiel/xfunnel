@@ -107,3 +107,16 @@
      - Updated at trigger
    - Referential integrity
    - Transaction handling 
+
+## Content Processing Pipeline
+
+### Content Scraping
+- ContentScrapingQueue handles web content extraction
+- Uses Firecrawl API for HTML to markdown conversion
+- Implements content analysis:
+  - Word count
+  - Code block detection
+  - Heading structure analysis
+- Filters out PDFs and document types
+- Handles rate limiting and retries
+- Stores results in citations table with content analysis metadata 

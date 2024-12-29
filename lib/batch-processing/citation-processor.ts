@@ -2,6 +2,8 @@ import { createAdminClient } from "@/app/supabase/server";
 import { Database } from "@/types/supabase";
 import { MozEnrichmentQueue } from './moz-queue';
 import { ContentScrapingQueue } from './content-queue';
+import { classifyUrl } from '@/lib/utils/url-classifier';
+import { SourceType } from '@/lib/types/batch';
 
 type CitationInsert = Database['public']['Tables']['citations']['Insert'];
 type ResponseAnalysis = Database['public']['Tables']['response_analysis']['Row'];
@@ -203,7 +205,14 @@ export async function processCitationsTransaction(
   const adminClient = createAdminClient();
 
   try {
-    // Start transaction
+    // Get company data for URL classification
+    const { data: company } = await adminClient
+      .from('companies')
+      .select('name')
+      .eq('id', responseAnalysis.company_id)
+      .single();
+
+    // RESTORE: Initial citation processing
     const citations = await processCitations(responseAnalysis, citationsParsed);
     
     if (citations.length === 0) {
@@ -216,19 +225,25 @@ export async function processCitationsTransaction(
       citationCount: citations.length
     });
 
-    // Insert citations and get their IDs
-    const citationIds = await insertCitationBatch(citations);
+    // Add URL classification to citations
+    const citationsWithSourceType = citations.map(citation => ({
+      ...citation,
+      source_type: classifyUrl(
+        citation.citation_url,
+        company?.name || '',
+        responseAnalysis.mentioned_companies || []
+      )
+    }));
 
-    // Initialize queues
-    const mozQueue = new MozEnrichmentQueue();
-    const contentQueue = new ContentScrapingQueue();
-    
+    // RESTORE: Insert citations and get their IDs
+    const citationIds = await insertCitationBatch(citationsWithSourceType);
+
     try {
       console.log('Starting parallel enrichment processes:', {
         responseAnalysisId: responseAnalysis.id,
         citationIds
       });
-      
+
       // Get the citations we just inserted
       const { data: newCitations, error } = await adminClient
         .from('citations')
@@ -240,18 +255,21 @@ export async function processCitationsTransaction(
       }
 
       if (newCitations && newCitations.length > 0) {
-        // Run both enrichment processes in parallel
+        // RESTORE: Run both enrichment processes in parallel
+        const mozQueue = new MozEnrichmentQueue();
+        const contentQueue = new ContentScrapingQueue();
+
         await Promise.all([
           mozQueue.processBatch(newCitations, responseAnalysis.company_id),
           contentQueue.processBatch(newCitations, responseAnalysis.company_id)
         ]);
+
+        console.log('Completed enrichment processes:', {
+          responseAnalysisId: responseAnalysis.id,
+          mozStats: await mozQueue.getQueueStats(),
+          contentStats: await contentQueue.getQueueStats()
+        });
       }
-      
-      console.log('Completed enrichment processes:', {
-        responseAnalysisId: responseAnalysis.id,
-        mozStats: await mozQueue.getQueueStats(),
-        contentStats: await contentQueue.getQueueStats()
-      });
     } catch (enrichmentError) {
       console.error('Enrichment error:', {
         error: enrichmentError,

@@ -74,3 +74,29 @@
   - Spam score analysis
   - Last crawled data tracking
   - Empty timestamp handling 
+
+## External APIs
+
+### Firecrawl API
+- Base URL: `https://api.firecrawl.dev/v1`
+- Used for scraping web content and converting to markdown
+- Key features:
+  - Converts web pages to clean markdown
+  - Handles rate limiting and retries
+  - Supports timeout configuration
+  - Filters out PDFs and documents
+- Response structure:
+  ```json
+  {
+    "success": boolean,
+    "data": {
+      "markdown": string,
+      "metadata": {
+        "title": string,
+        "description": string,
+        "language": string,
+        "sourceURL": string
+      }
+    }
+  }
+  ``` 
