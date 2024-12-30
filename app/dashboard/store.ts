@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 
 interface DashboardStore {
-  activeView: 'engine' | 'journey' | 'citation'
-  setActiveView: (view: 'engine' | 'journey' | 'citation') => void
+  activeView: 'engine' | 'journey' | 'citation' | 'takeaways'
+  setActiveView: (view: 'engine' | 'journey' | 'citation' | 'takeaways') => void
   selectedCompanyId: number | null
   setSelectedCompanyId: (id: number | null) => void
 }

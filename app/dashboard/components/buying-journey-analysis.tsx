@@ -37,6 +37,7 @@ interface ResponseAnalysis {
   response_text: string | null;
   citations_parsed: { urls: string[] } | null;
   recommended?: boolean;
+  mentioned_companies?: string[];
 }
 
 interface Metrics {
@@ -431,9 +432,9 @@ function RegionCard({
 
         <div className={cardStyles.metrics}>
           <MetricItem 
-            label="Average Sentiment" 
-            value={metrics.avgSentiment * 100}
-            metricType="sentiment"
+            label="Company Mentioned" 
+            value={metrics.companyMentioned}
+            metricType="mentions"
           />
           <MetricItem 
             label="Average Position" 
@@ -441,14 +442,14 @@ function RegionCard({
             metricType="position"
           />
           <MetricItem 
-            label="Company Mentioned" 
-            value={metrics.companyMentioned}
-            metricType="mentions"
-          />
-          <MetricItem 
             label="Feature Score" 
             value={metrics.featureScore}
             metricType="features"
+          />
+          <MetricItem 
+            label="Average Sentiment" 
+            value={metrics.avgSentiment * 100}
+            metricType="sentiment"
           />
         </div>
 
@@ -500,9 +501,9 @@ function VerticalCard({
 
         <div className={cardStyles.metrics}>
           <MetricItem 
-            label="Average Sentiment" 
-            value={vertical.metrics.avgSentiment * 100}
-            metricType="sentiment"
+            label="Company Mentioned" 
+            value={vertical.metrics.companyMentioned}
+            metricType="mentions"
           />
           <MetricItem 
             label="Average Position" 
@@ -510,14 +511,14 @@ function VerticalCard({
             metricType="position"
           />
           <MetricItem 
-            label="Company Mentioned" 
-            value={vertical.metrics.companyMentioned}
-            metricType="mentions"
-          />
-          <MetricItem 
             label="Feature Score" 
             value={vertical.metrics.featureScore}
             metricType="features"
+          />
+          <MetricItem 
+            label="Average Sentiment" 
+            value={vertical.metrics.avgSentiment * 100}
+            metricType="sentiment"
           />
         </div>
 
@@ -1735,9 +1736,9 @@ function PersonaCard({
 
         <div className={cardStyles.metrics}>
           <MetricItem 
-            label="Average Sentiment" 
-            value={persona.avg_sentiment * 100}
-            metricType="sentiment"
+            label="Company Mentioned" 
+            value={persona.mention_percentage}
+            metricType="mentions"
           />
           <MetricItem 
             label="Average Position" 
@@ -1745,14 +1746,14 @@ function PersonaCard({
             metricType="position"
           />
           <MetricItem 
-            label="Company Mentioned" 
-            value={persona.mention_percentage}
-            metricType="mentions"
-          />
-          <MetricItem 
             label="Feature Score" 
             value={persona.feature_score}
             metricType="features"
+          />
+          <MetricItem 
+            label="Average Sentiment" 
+            value={persona.avg_sentiment * 100}
+            metricType="sentiment"
           />
         </div>
 
@@ -1889,7 +1890,7 @@ function PhaseMetrics({ phase, queries }: { phase: string; queries: Query[] }) {
                           opacity-0 group-hover:opacity-100 transition-opacity
                           bg-popover text-popover-foreground rounded-md shadow-md
                           p-2 text-xs whitespace-nowrap">
-              <div className="text-green-600">��� Present: {Math.round(featurePercentage)}%</div>
+              <div className="text-green-600"> Present: {Math.round(featurePercentage)}%</div>
               <div className="text-red-600">✗ Missing: {Math.round((featureAnalysis.no / total) * 100)}%)</div>
               <div className="text-muted-foreground">? Unknown: {Math.round((featureAnalysis.unknown / total) * 100)}%</div>
             </div>
@@ -2553,10 +2554,10 @@ function MetricsSummary({ metrics }: { metrics: MetricsData }) {
   return (
     <div className="grid grid-cols-4 gap-4 mb-8">
       <MetricCard
-        title="Sentiment Score"
-        value={metrics.current.sentiment}
-        previousValue={metrics.previous?.sentiment}
-        change={metrics.changes?.sentiment}
+        title="Company Mentions"
+        value={metrics.current.mentions}
+        previousValue={metrics.previous?.mentions}
+        change={metrics.changes?.mentions}
         format="percentage"
       />
       <MetricCard
@@ -2568,17 +2569,17 @@ function MetricsSummary({ metrics }: { metrics: MetricsData }) {
         lowerIsBetter
       />
       <MetricCard
-        title="Company Mentions"
-        value={metrics.current.mentions}
-        previousValue={metrics.previous?.mentions}
-        change={metrics.changes?.mentions}
-        format="percentage"
-      />
-      <MetricCard
         title="Feature Score"
         value={metrics.current.features}
         previousValue={metrics.previous?.features}
         change={metrics.changes?.features}
+        format="percentage"
+      />
+      <MetricCard
+        title="Sentiment Score"
+        value={metrics.current.sentiment}
+        previousValue={metrics.previous?.sentiment}
+        change={metrics.changes?.sentiment}
         format="percentage"
       />
     </div>

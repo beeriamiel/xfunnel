@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { createClient } from '@/app/supabase/client'
 import { SourceCard } from './source-card'
 import { SourceData } from './types'
-import { isValidCitation, groupCitationsByUrl, convertToSourceData, RawCitation } from './utils'
+import { isValidCitation, groupCitationsByUrl, convertToSourceData } from './utils'
 import { Badge } from "@/components/ui/badge"
+import { Globe } from 'lucide-react'
 
 const MENTION_PHASES = ['problem_exploration', 'solution_education'] as const
 
@@ -14,13 +15,20 @@ interface Props {
   selectedCompetitor?: string
 }
 
-export function SourcesAnalysisMentions({ companyId, selectedCompetitor }: Props) {
+export const SourcesAnalysisMentions = memo(function SourcesAnalysisMentions({ 
+  companyId, 
+  selectedCompetitor 
+}: Props) {
   const [sources, setSources] = useState<SourceData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let isMounted = true
+
     async function fetchData() {
+      if (!companyId || !selectedCompetitor) return
+
       try {
         setIsLoading(true)
         setError(null)
@@ -40,6 +48,7 @@ export function SourcesAnalysisMentions({ companyId, selectedCompetitor }: Props
             buyer_journey_phase,
             rank_list,
             mentioned_companies,
+            mentioned_companies_count,
             icp_vertical,
             response_text,
             region,
@@ -51,37 +60,63 @@ export function SourcesAnalysisMentions({ companyId, selectedCompetitor }: Props
             created_at,
             updated_at
           `)
-          .eq('company_id', companyId || 0)
+          .eq('company_id', companyId)
           .in('buyer_journey_phase', MENTION_PHASES)
 
         if (error) throw error
 
-        // Safely type and filter the raw data
-        const rawData = data as unknown[];
-        const validCitations = rawData.filter(isValidCitation);
+        if (!isMounted) return
+
+        const rawData = data as unknown[]
+        const validCitations = rawData.filter(isValidCitation)
         
-        // Filter by selected competitor if one is selected
+        // First filter: Find responses where AI mentioned the company
         const filteredCitations = selectedCompetitor 
-          ? validCitations.filter(citation => citation.mentioned_companies?.includes(selectedCompetitor))
-          : validCitations;
+          ? validCitations.filter(citation => 
+              citation.mentioned_companies?.includes(selectedCompetitor)
+            )
+          : validCitations
 
         // Group citations by URL and convert to source data
+        // mentioned_companies_count will be used in SourceCard for displaying source analysis
         const groupedCitations = groupCitationsByUrl(filteredCitations)
         const sourcesData = groupedCitations.map(convertToSourceData)
 
         setSources(sourcesData)
       } catch (err) {
         console.error('Error fetching mentions data:', err)
-        setError('Failed to load mentions data')
+        if (isMounted) {
+          setError('Failed to load mentions data')
+        }
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
-    if (companyId) {
-      fetchData()
+    fetchData()
+
+    return () => {
+      isMounted = false
     }
   }, [companyId, selectedCompetitor])
+
+  if (!selectedCompetitor) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+        <div className="p-3 rounded-full bg-muted/20">
+          <Globe className="h-6 w-6 text-muted-foreground/60" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="font-medium text-muted-foreground">Select a Company</h3>
+          <p className="text-sm text-muted-foreground/60">
+            Choose a competitor from the chart or table above to view their mentions
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return <div className="text-center py-8">Loading mentions data...</div>
@@ -113,7 +148,7 @@ export function SourcesAnalysisMentions({ companyId, selectedCompetitor }: Props
           </span>
         </div>
       )}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6 w-full max-w-full px-1">
         {sources.map((source, index) => (
           <SourceCard
             key={`${source.citation_url}-${index}`}
@@ -124,4 +159,4 @@ export function SourcesAnalysisMentions({ companyId, selectedCompetitor }: Props
       </div>
     </div>
   )
-} 
+}) 

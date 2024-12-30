@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog"
 import {
   Tabs,
@@ -23,7 +22,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
-import { Globe, ExternalLink, ChevronRight, Calendar, Search } from "lucide-react"
+import { Globe, ExternalLink, ChevronRight, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SourceCardProps } from './types'
 import {
@@ -34,6 +33,7 @@ import {
   Radar,
   ResponsiveContainer
 } from 'recharts'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Query {
   text: string
@@ -41,78 +41,82 @@ interface Query {
   response: string
 }
 
-function QueryCard({ query, onViewResponse }: { query: Query; onViewResponse: () => void }) {
+const QueryCard = memo(function QueryCard({ query }: { query: Query }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
   return (
-    <Card className="group relative overflow-hidden border-border/50 hover:border-primary/20 transition-all duration-300">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-md bg-muted">
-            <Search className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-foreground truncate">{query.text}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <Calendar className="h-3 w-3 text-muted-foreground" />
-              <time className="text-xs text-muted-foreground">{query.date}</time>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onViewResponse}
-            className="opacity-0 group-hover:opacity-100 transition-all duration-300"
+    <Card className="p-4 space-y-2 hover:bg-muted/5 transition-all">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium leading-relaxed">{query.text}</p>
+          <time className="text-xs text-muted-foreground block">{query.date}</time>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="ml-4 shrink-0 hover:bg-primary/5"
+        >
+          {isExpanded ? (
+            <>
+              Hide Response
+              <ChevronUp className="h-4 w-4 ml-2" />
+            </>
+          ) : (
+            <>
+              View Response
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </>
+          )}
+        </Button>
+      </div>
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
           >
-            View
-            <ChevronRight className="h-3 w-3 ml-1 transition-transform group-hover:translate-x-0.5" />
-          </Button>
-        </div>
-        
-        <div className="relative pl-4 border-l border-border">
-          <p className="text-sm text-muted-foreground line-clamp-2">{query.response}</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ResponseModal({ isOpen, onClose, query }: { isOpen: boolean; onClose: () => void; query: Query }) {
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-0">
-        <DialogHeader className="px-6 py-4 border-b bg-background/95 sticky top-0 z-10">
-          <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Search className="h-5 w-5 text-muted-foreground" />
-            Query Response
-          </DialogTitle>
-          <DialogDescription className="flex items-center gap-2">
-            <Calendar className="h-3 w-3" />
-            <time className="text-sm">{query.date}</time>
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="p-6 space-y-6">
-          <div className="relative pl-4 border-l border-border space-y-2">
-            <h3 className="text-sm font-medium">Query</h3>
-            <p className="text-sm text-muted-foreground">{query.text}</p>
-          </div>
-
-          <ScrollArea className="h-[400px] rounded-lg border p-6">
-            <div className="relative pl-4 border-l border-border space-y-2">
-              <h3 className="text-sm font-medium">Response</h3>
-              <div className="prose prose-sm max-w-none text-muted-foreground">
-                {query.response}
+            <div className="pt-3 mt-3 border-t border-border/50">
+              <div className="relative rounded-lg border bg-gradient-to-br from-muted/20 via-background to-muted/10 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-1 w-1 rounded-full bg-primary/60" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Response</span>
+                </div>
+                <div className="prose prose-sm max-w-none pl-3 text-sm text-muted-foreground whitespace-pre-wrap">
+                  {query.response}
+                </div>
               </div>
             </div>
-          </ScrollArea>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
   )
+})
+
+QueryCard.displayName = 'QueryCard'
+
+// Add helper function to process company mentions
+function processCompanyMentions(companies: string[] | undefined): string[] {
+  if (!companies) return []
+  return companies
+    .map(company => {
+      const [name, count] = company.split(':')
+      const mentionCount = parseInt(count)
+      return { name, count: mentionCount }
+    })
+    .filter(company => company.count > 0)
+    .map(company => `${company.name} (${company.count})`)
 }
 
-export function SourceCard({ data, type }: SourceCardProps) {
+export const SourceCard = memo(function SourceCard({ data, type }: SourceCardProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [selectedQuery, setSelectedQuery] = useState<Query | null>(null)
+  
+  // Process company mentions
+  const processedCompanies = processCompanyMentions(data.mentioned_companies_count)
 
   // Prepare radar chart data
   const radarData = data.content_analysis?.metrics ? [
@@ -125,7 +129,7 @@ export function SourceCard({ data, type }: SourceCardProps) {
     { subject: 'Authority', value: data.content_analysis.metrics.authority.score },
     { subject: 'Readability', value: data.content_analysis.metrics.readability.score },
     { subject: 'Unique Words', value: data.content_analysis.metrics.unique_words.score },
-  ] : [];
+  ] : []
 
   return (
     <>
@@ -186,59 +190,40 @@ export function SourceCard({ data, type }: SourceCardProps) {
             </Button>
           </div>
 
-          {type === 'mentions' && data.mentioned_companies && data.mentioned_companies.length > 0 && (
+          {data.mentioned_companies_count && data.mentioned_companies_count.length > 0 && (
             <div className="pt-3 border-t border-border/50">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2 mb-2">
                 Companies mentioned
               </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {data.mentioned_companies.slice(0, 5).map((company, i) => (
+              <div className="grid grid-cols-2 gap-1.5 max-w-full">
+                {processedCompanies.slice(0, 5).map((company, i) => (
                   <Badge 
                     key={i} 
                     variant="outline"
-                    className="text-xs bg-muted/50"
+                    className="text-xs bg-muted/50 truncate"
                   >
                     {company}
                   </Badge>
                 ))}
-                {data.mentioned_companies.length > 5 && (
+                {processedCompanies.length > 5 && (
                   <HoverCard>
                     <HoverCardTrigger asChild>
                       <Badge 
                         variant="outline"
-                        className="text-xs bg-muted/50 cursor-help"
+                        className="text-xs bg-muted/50 cursor-help truncate"
                       >
-                        +{data.mentioned_companies.length - 5} more
+                        +{processedCompanies.length - 5} more
                       </Badge>
                     </HoverCardTrigger>
                     <HoverCardContent className="w-64">
                       <div className="space-y-1.5">
-                        {data.mentioned_companies.slice(5).map((company, i) => (
-                          <div key={i} className="text-sm">{company}</div>
+                        {processedCompanies.slice(5).map((company, i) => (
+                          <div key={i} className="text-sm truncate">{company}</div>
                         ))}
                       </div>
                     </HoverCardContent>
                   </HoverCard>
                 )}
-              </div>
-            </div>
-          )}
-
-          {type === 'rankings' && data.rank_list && (
-            <div className="pt-3 border-t border-border/50">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2 mb-2">
-                Rankings
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {data.rank_list.split('\n').slice(0, 5).map((rank, i) => (
-                  <Badge 
-                    key={i} 
-                    variant="outline"
-                    className="text-xs bg-muted/50"
-                  >
-                    {rank.trim()}
-                  </Badge>
-                ))}
               </div>
             </div>
           )}
@@ -303,32 +288,18 @@ export function SourceCard({ data, type }: SourceCardProps) {
                 </Card>
 
                 <div className="space-y-4">
-                  {type === 'mentions' && data.mentioned_companies && (
+                  {data.mentioned_companies_count && data.mentioned_companies_count.length > 0 && (
                     <Card className="p-6">
                       <h3 className="text-sm font-medium mb-4">Companies Mentioned</h3>
                       <div className="grid grid-cols-2 gap-2">
-                        {data.mentioned_companies.map((company, i) => (
+                        {processedCompanies.map((company, i) => (
                           <Badge 
                             key={i}
                             variant="outline"
-                            className="bg-muted/50 hover:bg-muted transition-colors"
+                            className="text-sm bg-muted/50"
                           >
                             {company}
                           </Badge>
-                        ))}
-                      </div>
-                    </Card>
-                  )}
-
-                  {type === 'rankings' && data.rank_list && (
-                    <Card className="p-6">
-                      <h3 className="text-sm font-medium mb-4">Rankings</h3>
-                      <div className="space-y-2">
-                        {data.rank_list.split('\n').map((rank, i) => (
-                          <div key={i} className="flex justify-between items-center">
-                            <span className="text-sm">{rank.trim()}</span>
-                            <Badge variant="outline">#{i + 1}</Badge>
-                          </div>
                         ))}
                       </div>
                     </Card>
@@ -344,7 +315,6 @@ export function SourceCard({ data, type }: SourceCardProps) {
                       <QueryCard
                         key={i}
                         query={query}
-                        onViewResponse={() => setSelectedQuery(query)}
                       />
                     ))}
                   </div>
@@ -375,14 +345,8 @@ export function SourceCard({ data, type }: SourceCardProps) {
           </Tabs>
         </DialogContent>
       </Dialog>
-
-      {selectedQuery && (
-        <ResponseModal
-          query={selectedQuery}
-          isOpen={!!selectedQuery}
-          onClose={() => setSelectedQuery(null)}
-        />
-      )}
     </>
   )
-} 
+})
+
+SourceCard.displayName = 'SourceCard' 

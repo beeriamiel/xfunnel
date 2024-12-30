@@ -4,11 +4,12 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { FileText, Menu, ChevronRight, Activity, Route, Link2 } from "lucide-react"
+import { FileText, Menu, ChevronRight, Activity, Route, Link2, Lightbulb } from "lucide-react"
 import { usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
 import { useDashboardStore } from "@/app/dashboard/store"
+import { ProBadge } from "@/components/ui/pro-badge"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
@@ -53,6 +54,15 @@ export function AppSidebar({ className }: SidebarProps) {
           active: isDashboard && activeView === 'citation',
           icon: <Link2 className="h-4 w-4" />,
           onClick: () => setActiveView('citation'),
+          badge: <ProBadge />,
+        },
+        {
+          title: "Key Takeaways",
+          href: getHref("/dashboard"),
+          active: isDashboard && activeView === 'takeaways',
+          icon: <Lightbulb className="h-4 w-4" />,
+          onClick: () => setActiveView('takeaways'),
+          badge: <ProBadge />,
         },
       ],
     },
@@ -78,7 +88,12 @@ export function AppSidebar({ className }: SidebarProps) {
                   >
                     <Link href={item.href}>
                       {item.icon}
-                      {!isCollapsed && <span className="ml-2">{item.title}</span>}
+                      {!isCollapsed && (
+                        <span className="ml-2 flex items-center">
+                          {item.title}
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   </Button>
                 ))}

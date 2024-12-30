@@ -25,13 +25,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
-import { Info } from "lucide-react"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  PopoverClose,
+} from "@/components/ui/popover"
+import { Info, X } from "lucide-react"
 import { BarChart3, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 // Constants for stages
 const MENTION_STAGES = ['problem_exploration', 'solution_education']
@@ -85,33 +87,50 @@ const METRIC_EXPLANATIONS = {
   }
 }
 
-interface InfoHoverCardProps {
-  type: 'mentions' | 'rankings'
+interface InfoButtonProps {
+  title: string
+  description: string
+  example?: string
 }
 
-function InfoHoverCard({ type }: InfoHoverCardProps) {
-  const info = type === 'mentions' 
-    ? METRIC_EXPLANATIONS.mentions
-    : METRIC_EXPLANATIONS.rankings
-  
+function InfoButton({ title, description, example }: InfoButtonProps) {
   return (
-    <HoverCard>
-      <HoverCardTrigger asChild>
-        <Info className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground cursor-help inline-flex ml-1.5" />
-      </HoverCardTrigger>
-      <HoverCardContent 
-        side="top"
-        align="center"
-        alignOffset={-15}
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 rounded-full hover:bg-muted/50 transition-colors"
+        >
+          <Info className="h-4 w-4 text-muted-foreground" />
+          <span className="sr-only">View information about {title}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent 
         className="w-80 p-4"
+        align="center"
       >
-        <div className="text-left space-y-2">
-          <h4 className="font-semibold text-sm">{info.title}</h4>
-          <p className="text-sm text-muted-foreground leading-snug">{info.description}</p>
-          <p className="text-sm text-muted-foreground/80 italic leading-snug">{info.example}</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-sm">{title}</h4>
+            <PopoverClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-full hover:bg-muted/50 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </PopoverClose>
+          </div>
+          <p className="text-sm text-muted-foreground leading-snug">{description}</p>
+          {example && (
+            <p className="text-sm text-muted-foreground/80 italic leading-snug">{example}</p>
+          )}
         </div>
-      </HoverCardContent>
-    </HoverCard>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -131,7 +150,11 @@ function CompetitorChart({
           <h4 className="text-base font-medium tracking-tight">
             {METRIC_EXPLANATIONS[type].title}
           </h4>
-          <InfoHoverCard type={type} />
+          <InfoButton
+            title={METRIC_EXPLANATIONS[type].title}
+            description={METRIC_EXPLANATIONS[type].description}
+            example={METRIC_EXPLANATIONS[type].example}
+          />
         </div>
         <div className="relative h-[400px] w-full rounded-lg border bg-gradient-to-b from-background to-muted/20">
           <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3">
@@ -176,7 +199,11 @@ function CompetitorChart({
         <h4 className="text-base font-medium tracking-tight">
           {METRIC_EXPLANATIONS[type].title}
         </h4>
-        <InfoHoverCard type={type} />
+        <InfoButton
+          title={METRIC_EXPLANATIONS[type].title}
+          description={METRIC_EXPLANATIONS[type].description}
+          example={METRIC_EXPLANATIONS[type].example}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6">
@@ -258,7 +285,11 @@ function CompetitorChart({
                 </TableHead>
                 <TableHead className="text-right text-xs font-medium text-muted-foreground">
                   {type === 'mentions' ? 'Mentions' : 'Position'}
-                  <InfoHoverCard type={type} />
+                  <InfoButton
+                    title={METRIC_EXPLANATIONS[type].title}
+                    description={METRIC_EXPLANATIONS[type].description}
+                    example={METRIC_EXPLANATIONS[type].example}
+                  />
                 </TableHead>
               </TableRow>
             </TableHeader>
