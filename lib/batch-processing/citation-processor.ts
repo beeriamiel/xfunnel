@@ -1,7 +1,15 @@
 import { createAdminClient } from "@/app/supabase/server";
-import { Database } from "@/types/supabase";
+import { Database, CitationSourceType } from "@/types/supabase";
+import { MozEnrichmentQueue } from './moz-queue';
+import { ContentScrapingQueue } from './content-queue';
+import { classifyUrl, normalizeCompanyName } from '@/lib/utils/url-classifier';
+import { SourceType } from '@/lib/types/batch';
+import { ContentAnalysisService } from '@/lib/services/content-analysis-service';
 
-type CitationInsert = Database['public']['Tables']['citations']['Insert'];
+
+type CitationInsert = Database['public']['Tables']['citations']['Insert'] & {
+  mentioned_companies_count?: string[] | null;
+};
 type ResponseAnalysis = Database['public']['Tables']['response_analysis']['Row'];
 
 interface CitationMetadata {
@@ -20,13 +28,13 @@ interface CitationMetadata {
   region: string | null;
   ranking_position: number | null;
   query_text: string | null;
+  source_type?: CitationSourceType | null;
 }
 
 interface ParsedCitation {
   urls: string[];
   context: string[];
   relevance: number[];
-  source_types: ('Documentation' | 'Blog' | 'GitHub' | 'Guide' | 'Tutorial')[];
 }
 
 /**
@@ -49,7 +57,7 @@ export async function processCitations(
   return citationsParsed.urls.map((url, index) => {
     const metadata: CitationMetadata = {
       citation_url: url,
-      citation_order: index + 1, // 1-based indexing
+      citation_order: index + 1,
       response_analysis_id: responseAnalysis.id,
       company_id: responseAnalysis.company_id,
       recommended: responseAnalysis.recommended ?? false,
@@ -62,7 +70,7 @@ export async function processCitations(
       response_text: responseAnalysis.response_text ?? '',
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
-      query_text: responseAnalysis.query_text ?? ''
+      query_text: responseAnalysis.query_text ?? '',
     };
 
     console.log('Created citation metadata:', {
@@ -78,10 +86,10 @@ export async function processCitations(
 /**
  * Insert a batch of citations into the database
  */
-export async function insertCitationBatch(citations: CitationMetadata[]): Promise<void> {
+export async function insertCitationBatch(citations: CitationMetadata[]): Promise<number[]> {
   if (citations.length === 0) {
     console.log('No citations to insert');
-    return;
+    return [];
   }
 
   const adminClient = createAdminClient();
@@ -116,8 +124,10 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         response_text: citation.response_text,
         region: citation.region,
         ranking_position: citation.ranking_position,
-        query_text: citation.query_text
-      })));
+        query_text: citation.query_text,
+        source_type: citation.source_type ?? 'EARNED'
+      })))
+      .select('id');
 
     // Log full response details
     console.log('Insert operation details:', {
@@ -131,7 +141,7 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         code: error.code
       } : null,
       dataInserted: !!data,
-      rowCount: (data as unknown as CitationInsert[])?.length
+      rowCount: data?.length
     });
 
     if (error) {
@@ -144,8 +154,10 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
 
     console.log('Successfully inserted citations batch:', {
       count: citations.length,
-      insertedRows: (data as unknown as CitationInsert[])?.length
+      insertedRows: data?.length
     });
+
+    return (data || []).map(row => row.id);
   } catch (error) {
     console.error('Failed to insert citations:', {
       error,
@@ -193,7 +205,14 @@ export async function processCitationsTransaction(
   const adminClient = createAdminClient();
 
   try {
-    // Start transaction
+    // Get company data for URL classification
+    const { data: company } = await adminClient
+      .from('companies')
+      .select('name')
+      .eq('id', responseAnalysis.company_id)
+      .single();
+
+    // RESTORE: Initial citation processing
     const citations = await processCitations(responseAnalysis, citationsParsed);
     
     if (citations.length === 0) {
@@ -206,12 +225,212 @@ export async function processCitationsTransaction(
       citationCount: citations.length
     });
 
-    // Insert citations
-    await insertCitationBatch(citations);
+    // Add URL classification to citations
+    const citationsWithSourceType = citations.map(citation => ({
+      ...citation,
+      source_type: classifyUrl(
+        citation.citation_url,
+        company?.name || '',
+        responseAnalysis.mentioned_companies || []
+      )
+    }));
+
+    // RESTORE: Insert citations and get their IDs
+    const citationIds = await insertCitationBatch(citationsWithSourceType);
+
+    try {
+      console.log('Starting parallel enrichment processes:', {
+        responseAnalysisId: responseAnalysis.id,
+        citationIds
+      });
+
+      // Get the citations we just inserted
+      const { data: newCitations, error } = await adminClient
+        .from('citations')
+        .select('id, citation_url, query_text, response_text, content_markdown')
+        .in('id', citationIds);
+
+      if (error) {
+        throw error;
+      }
+
+      if (newCitations && newCitations.length > 0) {
+        try {
+          // Run Moz enrichment and content scraping in parallel
+          const mozQueue = new MozEnrichmentQueue();
+          const contentQueue = new ContentScrapingQueue();
+
+          console.log('Starting enrichment processes:', {
+            responseAnalysisId: responseAnalysis.id,
+            citationCount: newCitations.length,
+            timestamp: new Date().toISOString()
+          });
+
+          // Wait for both processes to complete
+          await Promise.all([
+            mozQueue.processBatch(newCitations, responseAnalysis.company_id),
+            contentQueue.processBatch(newCitations, responseAnalysis.company_id)
+          ]);
+
+          console.log('Enrichment processes completed, waiting for content to be saved...');
+          
+          // Add delay to ensure content is saved
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Get citations that have content
+          const { data: citationsWithContent, error: contentError } = await adminClient
+            .from('citations')
+            .select(`
+              id,
+              citation_url,
+              query_text,
+              response_text,
+              content_markdown
+            `)
+            .in('id', citationIds)
+            .filter('content_markdown', 'not.is', null);
+
+          if (contentError) {
+            throw contentError;
+          }
+
+          // Process content analysis if we have citations with content
+          if (citationsWithContent && citationsWithContent.length > 0) {
+            console.log('Starting content analysis phase:', {
+              totalCitations: citationsWithContent.length,
+              citationIds: citationsWithContent.map(c => c.id),
+              timestamp: new Date().toISOString()
+            });
+
+            // Process each citation
+            for (const citation of citationsWithContent) {
+              try {
+                // Count company mentions if we have content and companies
+                if (citation.content_markdown && (responseAnalysis.mentioned_companies?.length ?? 0) > 0) {
+                  console.log('Counting company mentions for citation:', {
+                    citationId: citation.id,
+                    companiesCount: responseAnalysis.mentioned_companies?.length ?? 0
+                  });
+
+                  const mentionCounts = countCompanyMentions(
+                    citation.content_markdown,
+                    responseAnalysis.mentioned_companies ?? []
+                  );
+
+                  // Update the citation with mention counts
+                  const { error: updateError } = await adminClient
+                    .from('citations')
+                    .update({ mentioned_companies_count: mentionCounts })
+                    .eq('id', citation.id);
+
+                  if (updateError) {
+                    console.error('Failed to update mention counts:', {
+                      citationId: citation.id,
+                      error: updateError
+                    });
+                  } else {
+                    console.log('Updated mention counts:', {
+                      citationId: citation.id,
+                      counts: mentionCounts
+                    });
+                  }
+                }
+
+                // Continue with existing content analysis...
+                const contentAnalysisService = new ContentAnalysisService();
+                const analysis = await contentAnalysisService.analyzeContent(
+                  citation.query_text || '',
+                  citation.response_text || '',
+                  citation.content_markdown || ''
+                );
+
+                // Update citation with analysis
+                const { error: updateError } = await adminClient
+                  .from('citations')
+                  .update({ 
+                    content_analysis: JSON.stringify(analysis),
+                    content_analysis_updated_at: new Date().toISOString()
+                  })
+                  .eq('id', citation.id);
+
+                if (updateError) {
+                  throw updateError;
+                }
+
+                console.log('Content analysis completed for citation:', {
+                  citationId: citation.id,
+                  analysisWordCount: analysis.analysis_details.total_words,
+                  timestamp: new Date().toISOString()
+                });
+
+              } catch (analysisError) {
+                console.error('Content analysis failed for citation:', {
+                  citationId: citation.id,
+                  error: analysisError,
+                  timestamp: new Date().toISOString()
+                });
+                // Continue with other citations
+              }
+            }
+          }
+
+          console.log('All enrichment processes completed:', {
+            responseAnalysisId: responseAnalysis.id,
+            mozStats: await mozQueue.getQueueStats(),
+            contentStats: await contentQueue.getQueueStats(),
+            timestamp: new Date().toISOString()
+          });
+
+        } catch (enrichmentError) {
+          console.error('Enrichment error:', {
+            error: enrichmentError,
+            responseAnalysisId: responseAnalysis.id,
+            timestamp: new Date().toISOString()
+          });
+          // Don't throw - we want to keep the citations even if enrichment fails
+        }
+      }
+    } catch (enrichmentError) {
+      console.error('Enrichment error:', {
+        error: enrichmentError,
+        responseAnalysisId: responseAnalysis.id
+      });
+      // Don't throw - we want to keep the citations even if enrichment fails
+    }
 
     console.log('Successfully completed citations transaction');
   } catch (error) {
     console.error('Transaction failed:', error);
     throw error;
   }
+}
+
+// Add this new function after the existing imports
+function countCompanyMentions(content: string, companies: string[]): string[] {
+  if (!content || !companies || companies.length === 0) {
+    return [];
+  }
+
+  console.log('Counting company mentions:', {
+    contentLength: content.length,
+    companyCount: companies.length
+  });
+
+  return companies.map(company => {
+    // Use the same normalization as ranking detection
+    const normalizedCompany = normalizeCompanyName(company);
+    const normalizedContent = content.toLowerCase();
+    
+    // Count occurrences using normalized names
+    const count = (normalizedContent.match(
+      new RegExp(escapeRegExp(normalizedCompany), 'g')
+    ) || []).length;
+
+    return `${company}:${count}`;
+  });
+}
+
+// Add helper function for RegExp escaping
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 } 

@@ -40,6 +40,10 @@
      - Buyer journey mapping
      - Geographic targeting
      - Domain authority tracking
+       - Moz API integration
+       - Last crawled timestamp handling
+       - Domain/Page authority metrics
+       - Spam score tracking
      - Source type classification
      - Query text association
      - Content analysis storage
@@ -62,3 +66,65 @@
 - Retry mechanisms
 - Rate limiting
 - Citation validation errors 
+
+## External Integrations
+- Moz API
+  - Domain authority enrichment
+  - Page authority metrics
+  - Spam score analysis
+  - Last crawled data tracking
+  - Empty timestamp handling 
+
+## External APIs
+
+### Firecrawl API
+- Base URL: `https://api.firecrawl.dev/v1`
+- Used for scraping web content and converting to markdown
+- Key features:
+  - Converts web pages to clean markdown
+  - Handles rate limiting and retries
+  - Supports timeout configuration
+  - Filters out PDFs and documents
+- Response structure:
+  ```json
+  {
+    "success": boolean,
+    "data": {
+      "markdown": string,
+      "metadata": {
+        "title": string,
+        "description": string,
+        "language": string,
+        "sourceURL": string
+      }
+    }
+  }
+  ``` 
+
+## Citation Processing
+
+### URL Classification
+- Automatic source type classification:
+  - OWNED: Company's own domain (fuzzy matched)
+  - COMPETITOR: Competitor domains (fuzzy matched)
+  - UGC: User-generated content sites (50+ domains)
+  - EARNED: All other sources
+- Classification happens during citation processing
+- Integrated with existing Moz and content enrichment
+
+### Database Schema
+Citations table includes:
+- source_type: ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED')
+- Default: 'EARNED'
+- NOT NULL constraint 
+
+## Content Analysis API
+- POST `/api/analyze-content`
+  - Analyzes content using Claude
+  - Strict JSON validation
+  - Format requirements:
+    - No trailing commas
+    - Valid number formats (0-100)
+    - Proper quote usage
+    - Exact property names
+  - Error handling for malformed responses 

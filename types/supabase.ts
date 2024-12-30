@@ -6,6 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export type CitationSourceType = 'OWNED' | 'COMPETITOR' | 'UGC' | 'EARNED';
+
 export type Database = {
   public: {
     Tables: {
@@ -58,21 +60,32 @@ export type Database = {
           citation_url: string
           company_id: number
           company_mentioned: boolean | null
+          content_analysis: string | null
+          content_analysis_updated_at: string | null
+          content_markdown: string | null
+          content_scraped_at: string | null
+          content_scraping_error: string | null
           created_at: string | null
+          domain_authority: number | null
+          external_links_to_root_domain: number | null
           icp_vertical: string | null
           id: number
           mentioned_companies: string[] | null
+          mentioned_companies_count: string[] | null
+          moz_last_crawled: string | null
+          moz_last_updated: string | null
+          page_authority: number | null
+          query_text: string | null
           rank_list: string | null
           ranking_position: number | null
           recommended: boolean | null
           region: string | null
           response_analysis_id: number
           response_text: string | null
+          root_domains_to_root_domain: number | null
+          source_type: CitationSourceType
+          spam_score: number | null
           updated_at: string | null
-          domain_authority: number | null
-          source_type: string | null
-          query_text: string | null
-          content_analysis: string | null
         }
         Insert: {
           buyer_journey_phase?: string | null
@@ -81,21 +94,32 @@ export type Database = {
           citation_url: string
           company_id: number
           company_mentioned?: boolean | null
+          content_analysis?: string | null
+          content_analysis_updated_at?: string | null
+          content_markdown?: string | null
+          content_scraped_at?: string | null
+          content_scraping_error?: string | null
           created_at?: string | null
+          domain_authority?: number | null
+          external_links_to_root_domain?: number | null
           icp_vertical?: string | null
           id?: never
           mentioned_companies?: string[] | null
+          mentioned_companies_count?: string[] | null
+          moz_last_crawled?: string | null
+          moz_last_updated?: string | null
+          page_authority?: number | null
+          query_text?: string | null
           rank_list?: string | null
           ranking_position?: number | null
           recommended?: boolean | null
           region?: string | null
           response_analysis_id: number
           response_text?: string | null
+          root_domains_to_root_domain?: number | null
+          source_type?: CitationSourceType
+          spam_score?: number | null
           updated_at?: string | null
-          domain_authority?: number | null
-          source_type?: string | null
-          query_text?: string | null
-          content_analysis?: string | null
         }
         Update: {
           buyer_journey_phase?: string | null
@@ -104,21 +128,32 @@ export type Database = {
           citation_url?: string
           company_id?: number
           company_mentioned?: boolean | null
+          content_analysis?: string | null
+          content_analysis_updated_at?: string | null
+          content_markdown?: string | null
+          content_scraped_at?: string | null
+          content_scraping_error?: string | null
           created_at?: string | null
+          domain_authority?: number | null
+          external_links_to_root_domain?: number | null
           icp_vertical?: string | null
           id?: never
           mentioned_companies?: string[] | null
+          mentioned_companies_count?: string[] | null
+          moz_last_crawled?: string | null
+          moz_last_updated?: string | null
+          page_authority?: number | null
+          query_text?: string | null
           rank_list?: string | null
           ranking_position?: number | null
           recommended?: boolean | null
           region?: string | null
           response_analysis_id?: number
           response_text?: string | null
+          root_domains_to_root_domain?: number | null
+          source_type?: CitationSourceType
+          spam_score?: number | null
           updated_at?: string | null
-          domain_authority?: number | null
-          source_type?: string | null
-          query_text?: string | null
-          content_analysis?: string | null
         }
         Relationships: []
       }
@@ -694,7 +729,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      citation_source_type: "OWNED" | "COMPETITOR" | "UGC" | "EARNED"
     }
     CompositeTypes: {
       [_ in never]: never

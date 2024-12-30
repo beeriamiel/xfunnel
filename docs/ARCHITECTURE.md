@@ -45,6 +45,18 @@
      - Order tracking
      - Metadata enrichment
      - Transaction handling
+   - Metadata enrichment
+     - Moz API integration for domain metrics
+     - Conditional timestamp handling
+     - Authority score tracking
+   - Moz API integration
+     - Nested result structure handling
+     - Accurate response logging
+     - Error tracking and monitoring
+   - Claude content analysis
+     - Strict JSON formatting rules
+     - Response validation
+     - Error handling for malformed responses
 
 3. Metrics Aggregation
    - Geographic segmentation
@@ -64,6 +76,18 @@
   - Citations table with metadata
   - Optimized indexes for citation queries
 - State Management: URL state (nuqs)
+- External APIs
+  - Moz API for domain authority metrics
+    - Domain/Page authority
+    - Spam score analysis
+    - Last crawled tracking
+  - Moz API
+    - Nested response structure
+    - Results tracking and monitoring
+  - Claude API
+    - JSON validation
+    - Strict formatting rules
+    - Error handling
 
 ## Processing Pipeline
 1. Response Collection
@@ -98,3 +122,30 @@
      - Updated at trigger
    - Referential integrity
    - Transaction handling 
+
+## Content Processing Pipeline
+
+### Content Scraping
+- ContentScrapingQueue handles web content extraction
+- Uses Firecrawl API for HTML to markdown conversion
+- Implements content analysis:
+  - Word count
+  - Code block detection
+  - Heading structure analysis
+- Filters out PDFs and document types
+- Handles rate limiting and retries
+- Stores results in citations table with content analysis metadata 
+
+## Citation Processing Pipeline
+
+### URL Classification System
+- Automatic source classification during citation processing
+- Classification hierarchy:
+  1. UGC Check (exact domain match)
+  2. OWNED Check (fuzzy company name match)
+  3. COMPETITOR Check (fuzzy competitor name match)
+  4. EARNED (default)
+- Integrated with:
+  - Moz domain authority enrichment
+  - Content scraping pipeline
+  - Citation metadata processing 

@@ -227,8 +227,8 @@ ${text}`;
       .map((name, index) => `${index + 1}. ${name}`)
       .join('\n');
 
-    const ranking_position = companies.findIndex(
-      name => name.toLowerCase() === ourCompanyName.toLowerCase()
+    const ranking_position = companies.findIndex(name => 
+      normalizeCompanyName(name) === normalizeCompanyName(ourCompanyName)
     ) + 1 || null;
 
     return {
@@ -1200,7 +1200,12 @@ function calculateRankingConfidence(section: string, sectionIndex: number, total
 function normalizeCompanyName(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[-\s]|(inc|ltd|llc|corp|company)\.?$/g, '')
+    // Remove special characters and periods
+    .replace(/[^\w\s-]/g, '')
+    // Remove common suffixes
+    .replace(/\b(inc|ltd|llc|corp|company)\b/g, '')
+    // Remove extra spaces
+    .replace(/\s+/g, '')
     .trim();
 }
 
