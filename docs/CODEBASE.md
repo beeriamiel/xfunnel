@@ -283,6 +283,11 @@ export async function processCitationsTransaction(
   - UGC domain list management
   - Fuzzy name matching
   - Detailed classification logging
+  - Enhanced functionality:
+    - Exported normalizeCompanyName function
+    - Improved period handling
+    - Better special character management
+    - More accurate fuzzy matching
 
 ### Citation Processor
 - Location: `lib/batch-processing/citation-processor.ts`
@@ -290,4 +295,9 @@ export async function processCitationsTransaction(
   - URL source classification
   - Company name lookup
   - Competitor matching
-  - Preserved enrichment processes 
+  - Preserved enrichment processes
+  - New features:
+    - Better company name normalization
+    - Enhanced Moz metrics handling
+    - Improved error logging
+    - Transaction safety 
