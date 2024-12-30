@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart3, AlertCircle, Globe } from "lucide-react"
+import { BarChart3, AlertCircle, Globe, Info } from "lucide-react"
 import {
   PieChart,
   Pie,
@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/tooltip"
 import { SourcesAnalysisMentions } from './source-analysis/sources-analysis-mentions'
 import { SourcesAnalysisRankings } from './source-analysis/sources-analysis-rankings'
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 
 // Constants for journey stages
 const MENTION_STAGES = ['problem_exploration', 'solution_education']
@@ -446,17 +447,31 @@ function mapCitationToSourceAnalysis(groupedCitation: GroupedCitation): Extended
   }
 }
 
-function CompetitorChart({ 
-  data,
-  type,
-  onCompetitorSelect,
-  currentCompanyName
-}: { 
+interface CompetitorChartProps {
   data: CompetitorData[]
   type: 'mentions' | 'rankings'
   onCompetitorSelect: (name: string) => void
   currentCompanyName?: string
-}) {
+  selectedCompany?: string | null
+}
+
+const MemoizedCompetitorChart = memo(CompetitorChart, (prevProps, nextProps) => {
+  // Re-render if data, currentCompanyName, type, or selectedCompany changes
+  return (
+    prevProps.data === nextProps.data &&
+    prevProps.currentCompanyName === nextProps.currentCompanyName &&
+    prevProps.type === nextProps.type &&
+    prevProps.selectedCompany === nextProps.selectedCompany
+  )
+})
+
+function CompetitorChart({ 
+  data,
+  type,
+  onCompetitorSelect,
+  currentCompanyName,
+  selectedCompany
+}: CompetitorChartProps) {
   // Calculate total mentions for ALL competitors first
   const totalMentions = data.reduce((sum, item) => sum + item.mentions.count, 0)
 
@@ -669,14 +684,15 @@ function CompetitorChart({
             <TableBody>
               {top5Data.map((item, index) => {
                 const isCurrentCompany = item.name === currentCompanyName
+                const isSelected = item.name === selectedCompany
                 return (
                   <TableRow 
                     key={item.name}
                     className={cn(
-                      "cursor-pointer transition-colors",
-                      isCurrentCompany 
-                        ? "bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/10 dark:hover:bg-purple-900/20" 
-                        : "hover:bg-muted/50"
+                      "cursor-pointer transition-all",
+                      isSelected && "bg-gradient-to-r from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-900/10 border-l-2 border-l-purple-500",
+                      isCurrentCompany && !isSelected && "bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/10 dark:hover:bg-purple-900/20",
+                      !isSelected && !isCurrentCompany && "hover:bg-muted/50"
                     )}
                     onClick={() => onCompetitorSelect(item.name)}
                   >
@@ -685,20 +701,25 @@ function CompetitorChart({
                         <div 
                           className={cn(
                             "w-3 h-3 rounded-full",
-                            isCurrentCompany && "ring-2 ring-purple-500/20"
+                            isCurrentCompany && "ring-2 ring-purple-500/20",
+                            isSelected && "ring-2 ring-purple-500"
                           )}
                           style={{ 
                             backgroundColor: getColor(index, isCurrentCompany)
                           }}
                         />
                         <span className={cn(
-                          isCurrentCompany && "font-medium text-purple-700 dark:text-purple-300"
+                          isCurrentCompany && "font-medium text-purple-700 dark:text-purple-300",
+                          isSelected && "font-semibold text-purple-800 dark:text-purple-200"
                         )}>
                           {item.name}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className={cn(
+                      "text-right",
+                      isSelected && "font-medium text-purple-800 dark:text-purple-200"
+                    )}>
                       {type === 'mentions' 
                         ? `${(item.mentions.count / totalMentions * 100).toFixed(1)}% (${item.mentions.count})`
                         : item.rankings.averagePosition 
@@ -1276,18 +1297,182 @@ function generatePlaceholderSource(index: number, competitor: string): ExtendedS
   }
 }
 
+// Add helper function for info popovers
+function InfoPopover({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-5 w-5 rounded-full hover:bg-muted/50"
+        >
+          <Info className="h-4 w-4 text-muted-foreground" />
+          <span className="sr-only">Info</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80">
+        {title && (
+          <div className="mb-2 font-medium">{title}</div>
+        )}
+        <div className="text-sm text-muted-foreground">
+          {children}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+interface CompetitorSectionProps {
+  title: string
+  type: 'mentions' | 'rankings'
+  data: CompetitorData[]
+  currentCompanyName?: string
+  companyId: number
+  onCompetitorSelect: (name: string) => void
+  selectedCompetitor?: string
+}
+
+const CompetitorSection = memo(({ 
+  title, 
+  type,
+  data,
+  currentCompanyName,
+  companyId,
+  onCompetitorSelect,
+  selectedCompetitor 
+}: CompetitorSectionProps) => {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CardTitle>{title}</CardTitle>
+          <InfoPopover title={type === 'mentions' ? "About Competitor Mentions" : "About Rankings Analysis"}>
+            {type === 'mentions' ? (
+              <>
+                <p>These mentions come from AI responses to general questions about solutions, without specifically targeting any company.</p>
+                <p className="mt-2">The chart shows which companies the AI naturally associates with solutions in your space.</p>
+              </>
+            ) : (
+              <>
+                <p>These rankings come from AI responses when explicitly asked to compare and rank solutions.</p>
+                <p className="mt-2">The chart shows how often each company appears in top positions when the AI ranks competitors.</p>
+              </>
+            )}
+            <p className="mt-2">Click on any company to see the sources where they were {type === 'mentions' ? 'mentioned' : 'ranked'}.</p>
+          </InfoPopover>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <MemoizedCompetitorChart 
+          data={data}
+          type={type}
+          currentCompanyName={currentCompanyName}
+          onCompetitorSelect={onCompetitorSelect}
+          selectedCompany={selectedCompetitor}
+        />
+        <ScrollArea className="h-[400px] rounded-md border">
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="font-semibold">Top Sources</h3>
+              <InfoPopover 
+                title={`About ${type === 'mentions' ? 'Top Sources' : 'Ranking Sources'}`}
+              >
+                {type === 'mentions' ? (
+                  <>
+                    <p>These are the sources that the AI referenced when mentioning the selected company in its responses.</p>
+                    <p className="mt-2">Click on any source to see:</p>
+                    <ul className="mt-1 space-y-1 list-disc list-inside">
+                      <li>How many times the AI used it</li>
+                      <li>Which questions triggered these citations</li>
+                      <li>Other companies mentioned in the same source</li>
+                      <li>Content quality metrics that impact AI visibility</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p>These are the sources the AI used to justify its rankings of competitors.</p>
+                    <p className="mt-2">Click on any source to see:</p>
+                    <ul className="mt-1 space-y-1 list-disc list-inside">
+                      <li>The specific rankings given</li>
+                      <li>The context behind the rankings</li>
+                      <li>Content quality metrics</li>
+                      <li>Other related sources</li>
+                    </ul>
+                  </>
+                )}
+              </InfoPopover>
+            </div>
+            {type === 'mentions' ? (
+              <SourcesAnalysisMentions
+                companyId={companyId}
+                selectedCompetitor={selectedCompetitor}
+              />
+            ) : (
+              <SourcesAnalysisRankings
+                companyId={companyId}
+                selectedCompetitor={selectedCompetitor}
+              />
+            )}
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  )
+})
+
+CompetitorSection.displayName = 'CompetitorSection'
+
+// Add this component before CitationAnalysis
+function ChartLoadingState() {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      className="relative overflow-hidden border-border rounded-lg p-8 bg-gradient-to-br from-background via-background to-muted/20"
+    >
+      <div className="flex flex-col items-center justify-center space-y-4">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          className="rounded-full bg-primary/10 p-4"
+        >
+          <BarChart3 className="h-8 w-8 text-primary/70" />
+        </motion.div>
+        <div className="text-center space-y-2">
+          <motion.h3 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-base font-medium"
+          >
+            Retrieving competitor data...
+          </motion.h3>
+          <motion.p 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-sm text-muted-foreground"
+          >
+            Preparing charts and analysis
+          </motion.p>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
-  // Add state for current company name
   const [currentCompanyName, setCurrentCompanyName] = useState<string | null>(null)
-  
-  // Separate states for mentions and rankings
   const [selectedMentionCompetitor, setSelectedMentionCompetitor] = useState<string | null>(null)
   const [selectedRankingCompetitor, setSelectedRankingCompetitor] = useState<string | null>(null)
   const [competitorData, setCompetitorData] = useState<CompetitorData[]>([])
-  const [selectedSource, setSelectedSource] = useState<ExtendedSourceAnalysis | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isChartReady, setIsChartReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Memoize the competitor data to prevent unnecessary recalculations
+  const memoizedCompetitorData = useMemo(() => competitorData, [competitorData])
 
   useEffect(() => {
     async function fetchData() {
@@ -1298,6 +1483,7 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
 
       try {
         setIsLoading(true)
+        setIsChartReady(false)
         setError(null)
         
         const supabase = createClient()
@@ -1394,55 +1580,21 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
         })
 
         setCompetitorData(Array.from(competitorMap.values()))
+        setIsLoading(false)
+        
+        // Add a small delay before showing charts for smooth transition
+        setTimeout(() => {
+          setIsChartReady(true)
+        }, 500)
       } catch (err) {
         console.error('Error fetching competitor data:', err)
         setError('Failed to load competitor data')
-      } finally {
         setIsLoading(false)
       }
     }
 
     fetchData()
   }, [companyId])
-
-  // Function to get sources for a selected competitor
-  const getSourcesForCompetitor = (competitor: string): ExtendedSourceAnalysis[] => {
-    const relevantResponses = competitorData.find(c => c.name === competitor)
-    if (!relevantResponses) return []
-
-    // Get the appropriate sources based on the journey stage
-    const allSources = [
-      ...relevantResponses.mentions.sources,
-      ...relevantResponses.rankings.sources
-    ]
-
-    // Convert to ExtendedSourceAnalysis
-    return allSources.map(response => ({
-      ...response,
-      citationCount: 1,
-      contentMetrics: {
-        keywordStuffing: 0,
-        uniqueWords: 0,
-        readability: 0,
-        authority: 0,
-        technicalTerms: 0,
-        fluency: 0,
-        citations: 0,
-        quotations: 0,
-        statistics: 0
-      },
-      queries: [{
-        text: response.query_text || '',
-        date: new Date(response.created_at || '').toLocaleDateString(),
-        context: response.response_text || ''
-      }],
-      url: '', // These fields are optional now
-      domain: '',
-      domainAuthority: 0,
-      urlType: 'ugc',
-      rank: response.ranking_position
-    }))
-  }
 
   if (!companyId) {
     return (
@@ -1465,19 +1617,8 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
     )
   }
 
-  if (isLoading) {
-    return (
-      <Card className="relative overflow-hidden border-border">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20" />
-        <div className="relative p-8 space-y-8">
-          <div className="space-y-2">
-            <div className="h-6 w-1/4 animate-pulse rounded-md bg-muted/20" />
-            <div className="h-4 w-1/2 animate-pulse rounded-md bg-muted/20" />
-          </div>
-          <div className="h-[350px] animate-pulse rounded-lg bg-muted/20" />
-        </div>
-      </Card>
-    )
+  if (isLoading || !isChartReady) {
+    return <ChartLoadingState />
   }
 
   if (error) {
@@ -1500,54 +1641,33 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Mentions Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Competitors by Mentions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <CompetitorChart 
-            data={competitorData} 
-            type="mentions" 
-            onCompetitorSelect={setSelectedMentionCompetitor}
-            currentCompanyName={currentCompanyName || undefined}
-          />
-          <ScrollArea className="h-[400px] rounded-md border">
-            <div className="p-4">
-              <h3 className="font-semibold mb-4">Top Sources</h3>
-              <SourcesAnalysisMentions 
-                companyId={companyId}
-                selectedCompetitor={selectedMentionCompetitor ?? undefined}
-              />
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* Rankings Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Competitors by Rankings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <CompetitorChart 
-            data={competitorData} 
-            type="rankings"
-            onCompetitorSelect={setSelectedRankingCompetitor}
-            currentCompanyName={currentCompanyName || undefined}
-          />
-          <ScrollArea className="h-[400px] rounded-md border">
-            <div className="p-4">
-              <h3 className="font-semibold mb-4">Top Sources</h3>
-              <SourcesAnalysisRankings
-                companyId={companyId}
-                selectedCompetitor={selectedRankingCompetitor ?? undefined}
-              />
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="grid grid-cols-1 md:grid-cols-2 gap-6"
+      >
+        <CompetitorSection
+          title="Top Competitors by Mentions"
+          type="mentions"
+          data={memoizedCompetitorData}
+          currentCompanyName={currentCompanyName || undefined}
+          companyId={companyId}
+          onCompetitorSelect={setSelectedMentionCompetitor}
+          selectedCompetitor={selectedMentionCompetitor || undefined}
+        />
+        
+        <CompetitorSection
+          title="Top Competitors by Rankings"
+          type="rankings"
+          data={memoizedCompetitorData}
+          currentCompanyName={currentCompanyName || undefined}
+          companyId={companyId}
+          onCompetitorSelect={setSelectedRankingCompetitor}
+          selectedCompetitor={selectedRankingCompetitor || undefined}
+        />
+      </motion.div>
+    </AnimatePresence>
   )
 } 

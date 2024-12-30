@@ -112,6 +112,9 @@ export function convertToSourceData(groupedCitation: GroupedCitation): SourceDat
     }))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date descending
 
+  // Process mentioned companies to include counts
+  const mentionedCompaniesCount = latestCitation.mentioned_companies?.map(company => `${company}:1`) || undefined;
+
   return {
     domain: groupedCitation.domain,
     citation_url: groupedCitation.url,
@@ -119,7 +122,7 @@ export function convertToSourceData(groupedCitation: GroupedCitation): SourceDat
     domain_authority: latestCitation.domain_authority || undefined,
     source_type: (latestCitation.source_type as 'owned' | 'ugc' | 'affiliate') || undefined,
     buyer_journey_phase: latestCitation.buyer_journey_phase || undefined,
-    mentioned_companies: latestCitation.mentioned_companies || undefined,
+    mentioned_companies_count: mentionedCompaniesCount,
     rank_list: latestCitation.rank_list || undefined,
     content_analysis: parseContentAnalysis(latestCitation.content_analysis),
     queries

@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { BuyingJourneyAnalysis } from './buying-journey-analysis'
 import { CompetitorAnalysis } from './competitor-analysis'
 import { CitationAnalysis } from './citation-analysis'
+import { KeyTakeaways } from './key-takeaways/key-takeaways'
 import { useDashboardStore } from '../store'
 
 interface Company {
@@ -64,8 +65,10 @@ function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
             </>
           ) : activeView === 'journey' ? (
             <BuyingJourneyAnalysis companyId={selectedCompany.id} />
-          ) : (
+          ) : activeView === 'citation' ? (
             <CitationAnalysis companyId={selectedCompany.id} />
+          ) : (
+            <KeyTakeaways />
           )}
         </Suspense>
       </div>
@@ -87,7 +90,9 @@ export function DashboardContent({ selectedCompany }: Props) {
                 ? 'AI Engine Performance' 
                 : activeView === 'journey'
                 ? 'Buying Journey Analysis'
-                : 'Citation Analysis'
+                : activeView === 'citation'
+                ? 'Citation Analysis'
+                : 'Key Takeaways'
             }
           />
           <Suspense fallback={<div className="p-8"><MetricsSkeleton /></div>}>
