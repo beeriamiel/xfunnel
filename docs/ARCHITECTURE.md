@@ -49,6 +49,14 @@
      - Moz API integration for domain metrics
      - Conditional timestamp handling
      - Authority score tracking
+   - Moz API integration
+     - Nested result structure handling
+     - Accurate response logging
+     - Error tracking and monitoring
+   - Claude content analysis
+     - Strict JSON formatting rules
+     - Response validation
+     - Error handling for malformed responses
 
 3. Metrics Aggregation
    - Geographic segmentation
@@ -73,6 +81,13 @@
     - Domain/Page authority
     - Spam score analysis
     - Last crawled tracking
+  - Moz API
+    - Nested response structure
+    - Results tracking and monitoring
+  - Claude API
+    - JSON validation
+    - Strict formatting rules
+    - Error handling
 
 ## Processing Pipeline
 1. Response Collection

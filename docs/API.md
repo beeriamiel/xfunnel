@@ -117,3 +117,14 @@ Citations table includes:
 - source_type: ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED')
 - Default: 'EARNED'
 - NOT NULL constraint 
+
+## Content Analysis API
+- POST `/api/analyze-content`
+  - Analyzes content using Claude
+  - Strict JSON validation
+  - Format requirements:
+    - No trailing commas
+    - Valid number formats (0-100)
+    - Proper quote usage
+    - Exact property names
+  - Error handling for malformed responses 

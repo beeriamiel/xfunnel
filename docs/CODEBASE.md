@@ -69,6 +69,9 @@
     - Manages empty timestamp values
     - Tracks spam scores
     - URL normalization for matching
+    - Handles nested Moz API response structure
+    - Accurate logging and monitoring
+    - Error handling and validation
 
 ### 2. Dashboard Components
 - **Analysis Views**
@@ -92,6 +95,13 @@
   - Server components for initial data
   - Real-time updates via hooks
   - Optimistic updates for UI
+
+### Content Analysis Service
+  - `lib/services/content-analysis-service.ts`
+    - Strict JSON validation
+    - Claude response formatting rules
+    - Error handling for malformed responses
+    - Detailed logging
 
 ## Database Schema
 

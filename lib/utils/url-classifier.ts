@@ -1,3 +1,5 @@
+export type SourceType = 'OWNED' | 'COMPETITOR' | 'UGC' | 'EARNED';
+
 const UGC_DOMAINS = new Set([
   'reddit.com',
   'quora.com',
@@ -98,6 +100,16 @@ function fuzzyMatch(domain: string, name: string): boolean {
       domainPart.includes(part) || part.includes(domainPart)
     )
   );
+}
+
+export function normalizeCompanyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\./g, '')         // Remove all periods first
+    .replace(/[^\w\s-]/g, '')   // Then remove other special chars except spaces/hyphens
+    .replace(/\s+/g, '-')       // Replace spaces with hyphens
+    .replace(/-+/g, '-')        // Replace multiple hyphens with single
+    .trim();
 }
 
 export function classifyUrl(

@@ -1,12 +1,15 @@
 import { createAdminClient } from "@/app/supabase/server";
-import { Database } from "@/types/supabase";
+import { Database, CitationSourceType } from "@/types/supabase";
 import { MozEnrichmentQueue } from './moz-queue';
 import { ContentScrapingQueue } from './content-queue';
-import { classifyUrl } from '@/lib/utils/url-classifier';
+import { classifyUrl, normalizeCompanyName } from '@/lib/utils/url-classifier';
 import { SourceType } from '@/lib/types/batch';
 import { ContentAnalysisService } from '@/lib/services/content-analysis-service';
 
-type CitationInsert = Database['public']['Tables']['citations']['Insert'];
+
+type CitationInsert = Database['public']['Tables']['citations']['Insert'] & {
+  mentioned_companies_count?: string[] | null;
+};
 type ResponseAnalysis = Database['public']['Tables']['response_analysis']['Row'];
 
 interface CitationMetadata {
@@ -25,14 +28,13 @@ interface CitationMetadata {
   region: string | null;
   ranking_position: number | null;
   query_text: string | null;
-  source_type: ('Documentation' | 'Blog' | 'GitHub' | 'Guide' | 'Tutorial') | null;
+  source_type?: CitationSourceType | null;
 }
 
 interface ParsedCitation {
   urls: string[];
   context: string[];
   relevance: number[];
-  source_types: ('Documentation' | 'Blog' | 'GitHub' | 'Guide' | 'Tutorial')[];
 }
 
 /**
@@ -53,11 +55,9 @@ export async function processCitations(
   });
 
   return citationsParsed.urls.map((url, index) => {
-    const sourceType = citationsParsed.source_types[index] || null;
-
     const metadata: CitationMetadata = {
       citation_url: url,
-      citation_order: index + 1, // 1-based indexing
+      citation_order: index + 1,
       response_analysis_id: responseAnalysis.id,
       company_id: responseAnalysis.company_id,
       recommended: responseAnalysis.recommended ?? false,
@@ -71,7 +71,6 @@ export async function processCitations(
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
       query_text: responseAnalysis.query_text ?? '',
-      source_type: sourceType
     };
 
     console.log('Created citation metadata:', {
@@ -126,7 +125,7 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         region: citation.region,
         ranking_position: citation.ranking_position,
         query_text: citation.query_text,
-        source_type: citation.source_type
+        source_type: citation.source_type ?? 'EARNED'
       })))
       .select('id');
 
@@ -303,72 +302,76 @@ export async function processCitationsTransaction(
               timestamp: new Date().toISOString()
             });
 
-            const contentAnalysisService = new ContentAnalysisService();
-            const BATCH_SIZE = 3; // Smaller batch size for Claude API
+            // Process each citation
+            for (const citation of citationsWithContent) {
+              try {
+                // Count company mentions if we have content and companies
+                if (citation.content_markdown && (responseAnalysis.mentioned_companies?.length ?? 0) > 0) {
+                  console.log('Counting company mentions for citation:', {
+                    citationId: citation.id,
+                    companiesCount: responseAnalysis.mentioned_companies?.length ?? 0
+                  });
 
-            // Process in batches
-            for (let i = 0; i < citationsWithContent.length; i += BATCH_SIZE) {
-              const batch = citationsWithContent.slice(i, i + BATCH_SIZE);
-              
-              console.log(`Processing content analysis batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(citationsWithContent.length/BATCH_SIZE)}`);
+                  const mentionCounts = countCompanyMentions(
+                    citation.content_markdown,
+                    responseAnalysis.mentioned_companies ?? []
+                  );
 
-              // Process batch in parallel
-              await Promise.all(
-                batch.map(async (citation) => {
-                  try {
-                    console.log('Starting content analysis for citation:', {
+                  // Update the citation with mention counts
+                  const { error: updateError } = await adminClient
+                    .from('citations')
+                    .update({ mentioned_companies_count: mentionCounts })
+                    .eq('id', citation.id);
+
+                  if (updateError) {
+                    console.error('Failed to update mention counts:', {
                       citationId: citation.id,
-                      contentLength: citation.content_markdown?.length,
-                      timestamp: new Date().toISOString()
+                      error: updateError
                     });
-
-                    const analysis = await contentAnalysisService.analyzeContent(
-                      citation.query_text || '',
-                      citation.response_text || '',
-                      citation.content_markdown || ''
-                    );
-
-                    // Update citation with analysis
-                    const { error: updateError } = await adminClient
-                      .from('citations')
-                      .update({ 
-                        content_analysis: JSON.stringify(analysis),
-                        content_analysis_updated_at: new Date().toISOString()
-                      })
-                      .eq('id', citation.id);
-
-                    if (updateError) {
-                      throw updateError;
-                    }
-
-                    console.log('Content analysis completed for citation:', {
+                  } else {
+                    console.log('Updated mention counts:', {
                       citationId: citation.id,
-                      analysisWordCount: analysis.analysis_details.total_words,
-                      timestamp: new Date().toISOString()
+                      counts: mentionCounts
                     });
-
-                  } catch (analysisError) {
-                    console.error('Content analysis failed for citation:', {
-                      citationId: citation.id,
-                      error: analysisError,
-                      timestamp: new Date().toISOString()
-                    });
-                    // Continue with other citations
                   }
-                })
-              );
+                }
 
-              // Rate limiting between batches
-              if (i + BATCH_SIZE < citationsWithContent.length) {
-                console.log('Rate limiting pause between batches...');
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Continue with existing content analysis...
+                const contentAnalysisService = new ContentAnalysisService();
+                const analysis = await contentAnalysisService.analyzeContent(
+                  citation.query_text || '',
+                  citation.response_text || '',
+                  citation.content_markdown || ''
+                );
+
+                // Update citation with analysis
+                const { error: updateError } = await adminClient
+                  .from('citations')
+                  .update({ 
+                    content_analysis: JSON.stringify(analysis),
+                    content_analysis_updated_at: new Date().toISOString()
+                  })
+                  .eq('id', citation.id);
+
+                if (updateError) {
+                  throw updateError;
+                }
+
+                console.log('Content analysis completed for citation:', {
+                  citationId: citation.id,
+                  analysisWordCount: analysis.analysis_details.total_words,
+                  timestamp: new Date().toISOString()
+                });
+
+              } catch (analysisError) {
+                console.error('Content analysis failed for citation:', {
+                  citationId: citation.id,
+                  error: analysisError,
+                  timestamp: new Date().toISOString()
+                });
+                // Continue with other citations
               }
             }
-
-            console.log('Content analysis phase completed:', {
-              totalProcessed: citationsWithContent.length,
-              timestamp: new Date().toISOString()
-            });
           }
 
           console.log('All enrichment processes completed:', {
@@ -400,4 +403,34 @@ export async function processCitationsTransaction(
     console.error('Transaction failed:', error);
     throw error;
   }
+}
+
+// Add this new function after the existing imports
+function countCompanyMentions(content: string, companies: string[]): string[] {
+  if (!content || !companies || companies.length === 0) {
+    return [];
+  }
+
+  console.log('Counting company mentions:', {
+    contentLength: content.length,
+    companyCount: companies.length
+  });
+
+  return companies.map(company => {
+    // Use the same normalization as ranking detection
+    const normalizedCompany = normalizeCompanyName(company);
+    const normalizedContent = content.toLowerCase();
+    
+    // Count occurrences using normalized names
+    const count = (normalizedContent.match(
+      new RegExp(escapeRegExp(normalizedCompany), 'g')
+    ) || []).length;
+
+    return `${company}:${count}`;
+  });
+}
+
+// Add helper function for RegExp escaping
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 } 
