@@ -109,14 +109,24 @@
   - COMPETITOR: Competitor domains (fuzzy matched)
   - UGC: User-generated content sites (50+ domains)
   - EARNED: All other sources
-- Classification happens during citation processing
-- Integrated with existing Moz and content enrichment
+- Enhanced company name normalization:
+  - Handles periods and special characters
+  - Consistent domain matching
+  - Improved fuzzy matching
 
 ### Database Schema
 Citations table includes:
 - source_type: ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED')
 - Default: 'EARNED'
-- NOT NULL constraint 
+- NOT NULL constraint
+- New fields:
+  - content_analysis_updated_at
+  - moz_last_crawled
+  - moz_last_updated
+  - page_authority
+  - spam_score
+  - root_domains_to_root_domain
+  - external_links_to_root_domain
 
 ## Content Analysis API
 - POST `/api/analyze-content`

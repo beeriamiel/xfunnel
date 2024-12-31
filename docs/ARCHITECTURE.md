@@ -145,7 +145,15 @@
   2. OWNED Check (fuzzy company name match)
   3. COMPETITOR Check (fuzzy competitor name match)
   4. EARNED (default)
-- Integrated with:
-  - Moz domain authority enrichment
-  - Content scraping pipeline
-  - Citation metadata processing 
+- Enhanced normalization:
+  - Improved company name handling
+  - Better period and special character handling
+  - More accurate domain matching
+
+### Moz Integration
+- Enhanced metrics tracking:
+  - Domain authority
+  - Page authority
+  - Spam score
+  - Root domains
+  - External links 
