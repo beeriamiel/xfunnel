@@ -9,7 +9,7 @@ export async function generateOpenAIResponse(query: string) {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "chatgpt-4o-latest",
       messages: [
         {
           role: "system",
