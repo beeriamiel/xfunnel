@@ -31,12 +31,12 @@ export function TechnicalChanges({ changes }: TechnicalChangesProps) {
 
   const getImpactColor = (impact: TechnicalChange['impact']) => {
     switch (impact) {
-      case 'positive':
+      case 'high':
         return 'bg-green-500'
-      case 'negative':
-        return 'bg-red-500'
-      case 'neutral':
+      case 'medium':
         return 'bg-blue-500'
+      case 'low':
+        return 'bg-yellow-500'
       default:
         return 'bg-gray-500'
     }
@@ -44,12 +44,12 @@ export function TechnicalChanges({ changes }: TechnicalChangesProps) {
 
   const getImpactTextColor = (impact: TechnicalChange['impact']) => {
     switch (impact) {
-      case 'positive':
+      case 'high':
         return 'border-green-500 text-green-500'
-      case 'negative':
-        return 'border-red-500 text-red-500'
-      case 'neutral':
+      case 'medium':
         return 'border-blue-500 text-blue-500'
+      case 'low':
+        return 'border-yellow-500 text-yellow-500'
       default:
         return 'border-gray-500 text-gray-500'
     }

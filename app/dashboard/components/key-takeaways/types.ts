@@ -6,6 +6,7 @@ export interface LowHangingFruit {
   estimatedEffort: string
   potentialImpact: string
   timestamp: string
+  sourceUrl?: string
   actionItems: string[]
   metrics?: {
     name: string
@@ -18,7 +19,7 @@ export interface TechnicalChange {
   id: string
   title: string
   description: string
-  impact: 'positive' | 'negative' | 'neutral'
+  impact: 'high' | 'medium' | 'low'
   date: string
   details: string
   affectedAreas: string[]
@@ -43,50 +44,80 @@ export const MOCK_DATA = {
   lowHangingFruits: [
     {
       id: '1',
-      title: 'Add Statistics to HR Software Blog',
-      description: 'Enhance credibility of hibob.com blog post with relevant statistics and quotations',
-      impact: 'high',
-      estimatedEffort: '2 hours',
-      potentialImpact: '30% engagement increase',
+      title: 'Add AI Favorite Metrics - HiBob Blog',
+      description: 'Major improvement opportunities identified through citations, quotations, and statistics',
+      sourceUrl: 'https://www.hibob.com/blog/hr-software-small-businesses/',
+      impact: 'medium',
+      estimatedEffort: '4-6 hours',
+      potentialImpact: '132% visibility improvement',
       timestamp: new Date().toISOString(),
       actionItems: [
-        'Add industry statistics about HR software adoption',
-        'Include customer success metrics',
-        'Insert expert quotations',
-        'Add comparison data'
+        'Increase citations from 9 to 20-25 high-authority sources',
+        'Add 8-10 expert quotations throughout the content',
+        'Expand statistics from 8 to 15-20 relevant data points',
+        'Improve statistical context integration',
+        'Enhance citation variety and quality'
       ],
       metrics: [
         {
-          name: 'Current Engagement',
-          value: '2.5 min avg.',
-          potential: '4 min avg.'
+          name: 'Citations',
+          value: '30%',
+          potential: '80%+'
         },
         {
-          name: 'Conversion Rate',
-          value: '2.1%',
-          potential: '3.5%'
+          name: 'Quotations',
+          value: '20%',
+          potential: '75%+'
+        },
+        {
+          name: 'Statistics',
+          value: '70%',
+          potential: '85%+'
+        },
+        {
+          name: 'Position Score',
+          value: 'Base',
+          potential: '+41%'
         }
       ]
     },
     {
-      id: '2',
-      title: 'Optimize Meta Descriptions',
-      description: 'Add missing meta descriptions to key landing pages',
+      id: '3',
+      title: 'Optimize Affiliate Content - Outsail Review',
+      description: 'Critical content improvements needed for affiliate review page with extremely low content quality scores',
+      sourceUrl: 'https://www.outsail.co/post/hibob-reviews-pricing-pros-cons-user-reviews',
       impact: 'medium',
-      estimatedEffort: '1 hour',
-      potentialImpact: '15% SEO improvement',
+      estimatedEffort: '3-4 hours',
+      potentialImpact: '85% content quality improvement',
       timestamp: new Date().toISOString(),
       actionItems: [
-        'Write compelling meta descriptions',
-        'Include target keywords',
-        'Keep within 155 characters',
-        'Focus on value proposition'
+        'Add comprehensive product statistics and comparisons',
+        'Include expert quotes and testimonials',
+        'Integrate industry research citations',
+        'Enhance technical accuracy and terminology',
+        'Build authority through expert validation',
+        'Optimize for AI readability while maintaining affiliate effectiveness'
       ],
       metrics: [
         {
-          name: 'CTR',
-          value: '1.8%',
-          potential: '2.5%'
+          name: 'Content Quality',
+          value: '10%',
+          potential: '75%+'
+        },
+        {
+          name: 'Authority',
+          value: '0%',
+          potential: '70%+'
+        },
+        {
+          name: 'Technical Terms',
+          value: '20%',
+          potential: '80%+'
+        },
+        {
+          name: 'Citations',
+          value: '0%',
+          potential: '60%+'
         }
       ]
     }
@@ -95,85 +126,142 @@ export const MOCK_DATA = {
   technicalChanges: [
     {
       id: '1',
-      title: 'LLM Model Update',
-      description: 'Updated to latest version with improved context handling',
-      impact: 'positive',
+      title: 'Enhanced LLMs.txt Implementation',
+      description: 'Implemented and enhanced LLMs.txt with unique AI preference data integration',
+      impact: 'high',
       date: new Date().toISOString(),
-      details: 'The new model version shows 20% better context retention',
-      affectedAreas: ['Query Processing', 'Response Generation']
+      details: `Our implementation goes beyond the standard LLMs.txt format by incorporating real AI interaction data. While the standard helps AI systems understand documentation, our enhancement uses actual interaction patterns to optimize content structure and presentation.
+
+Key improvements:
+• AI-Optimized Navigation: Structure based on successful interaction patterns
+• Enhanced Context Windows: Optimized content chunks based on AI processing patterns
+• Smart Content Prioritization: Using real interaction data to highlight key information
+• Automated Updates: Content structure evolves based on ongoing AI interactions
+
+Current metrics show:
+• 45% improvement in AI content understanding
+• 30% faster response generation
+• 60% more accurate context retention
+• 25% reduction in clarification requests`,
+      affectedAreas: [
+        'Documentation Structure',
+        'AI Interaction Layer',
+        'Content Organization',
+        'Response Generation',
+        'Context Management'
+      ]
     }
   ] as TechnicalChange[],
   
   contentSuggestions: [
     {
       id: '1',
-      title: 'Query-Answer Matrix Attention Required',
-      description: 'Multiple queries identified requiring immediate attention and optimization',
+      title: 'Query Gap Analysis & Content Strategy',
+      description: 'Strategic implementation plan for 147 identified query gaps across buyer journey stages, based on analysis of thousands of region and persona-specific queries',
       priority: 'high',
       category: 'query-answer-matrix',
       actionItems: [
-        'Review and optimize 150+ identified queries',
-        'Update response templates for common queries',
-        'Implement automated query tracking system'
+        'Month 1: Implement Problem Exploration (35) & Solution Education (40) content',
+        'Month 2: Develop Solution Comparison (30) & Evaluation (25) content',
+        'Month 3: Create User Research (17) content & refine implementation',
+        'Create AI-optimized answer templates for each journey stage',
+        'Implement semantic markup for enhanced AI understanding',
+        'Set up tracking for query coverage and response accuracy'
       ],
       metrics: [
         {
-          name: 'Queries Needing Review',
-          value: '150+',
-          potential: '30% improvement in response accuracy'
+          name: 'Query Coverage',
+          value: '147 gaps',
+          potential: '85% improvement'
         },
         {
-          name: 'Response Time',
-          value: '2.5s',
-          potential: 'Potential 40% reduction'
+          name: 'Journey Stages',
+          value: '5 stages',
+          potential: '100% coverage'
+        },
+        {
+          name: 'Implementation',
+          value: '0%',
+          potential: '3 months'
+        },
+        {
+          name: 'Response Accuracy',
+          value: 'Limited',
+          potential: '90%+ accuracy'
         }
       ]
     },
     {
       id: '2',
-      title: 'Buying Journey Gap Analysis',
-      description: 'Critical gaps identified in the consideration phase of buying journey',
+      title: 'HR Manager Journey Gaps & AI Review Sources',
+      description: 'Critical gaps identified in HR Manager buying journey, with focus on AI review sources and competitive education',
       priority: 'high',
       category: 'buying-journey',
       actionItems: [
-        'Enhance product comparison content',
-        'Develop targeted decision-making tools',
-        'Create detailed use-case scenarios'
+        'Problem Exploration: Create indirect competitor comparison framework',
+        'Solution Education: Develop HR process transformation content',
+        'User Feedback: Optimize content for Perplexity, Claude, and GPT review sources',
+        'Implement review authenticity validation system',
+        'Build comprehensive HR Manager educational journey',
+        'Create competitive intelligence framework'
       ],
       metrics: [
         {
-          name: 'Conversion Drop',
-          value: '25%',
-          potential: '35% potential increase in conversion'
+          name: 'Problem Stage',
+          value: '40% coverage',
+          potential: '90% journey completion'
         },
         {
-          name: 'User Engagement',
-          value: 'Low',
-          potential: '45% potential improvement'
+          name: 'Solution Stage',
+          value: 'Critical gaps',
+          potential: '85% content coverage'
+        },
+        {
+          name: 'AI Reviews',
+          value: '3 platforms',
+          potential: '100% source optimization'
+        },
+        {
+          name: 'Journey Completion',
+          value: '35% complete',
+          potential: '95% completion rate'
         }
       ]
     },
     {
       id: '3',
-      title: 'Competitor Strategy Implementation',
-      description: 'Analysis of successful competitor content strategies ready for implementation',
-      priority: 'medium',
+      title: 'AI-Driven Content Strategy Blueprint',
+      description: 'Strategic content creation plan based on analysis of millions of AI content preference data points, delivering two best-in-class articles monthly',
+      priority: 'high',
       category: 'competitor-analysis',
       actionItems: [
-        'Implement video tutorials based on competitor success',
-        'Enhance technical documentation structure',
-        'Add interactive product demos'
+        'Analyze millions of AI interaction patterns and preferences',
+        'Identify top-performing content structures and formats',
+        'Create content templates based on successful AI citations',
+        'Implement bi-monthly premium content creation schedule',
+        'Monitor and analyze AI response patterns',
+        'Continuously refine content strategy based on AI preferences'
       ],
       metrics: [
         {
-          name: 'Content Gap',
-          value: '3 key areas',
-          potential: '40% engagement increase potential'
+          name: 'AI Data Points',
+          value: '2M+ analyzed',
+          potential: '100% coverage'
         },
         {
-          name: 'Market Share',
-          value: '15%',
-          potential: '10% potential growth'
+          name: 'Content Output',
+          value: '0 articles',
+          potential: '24 annually'
+        },
+        {
+          name: 'AI Citation Rate',
+          value: 'Baseline',
+          potential: '300% increase'
+        },
+        {
+          name: 'Content Quality',
+          value: 'Current',
+          potential: '95% AI preference match'
         }
       ]
     }

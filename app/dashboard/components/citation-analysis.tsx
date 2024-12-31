@@ -1579,7 +1579,16 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
             : 0
         })
 
-        setCompetitorData(Array.from(competitorMap.values()))
+        // Filter out companies with less than 10 ranking appearances
+        const MIN_RANKING_APPEARANCES = 10
+        const filteredCompetitors = Array.from(competitorMap.values()).filter(comp => {
+          // Keep companies that either:
+          // 1. Have 10 or more ranking appearances
+          // 2. Have no rankings but have mentions (to not affect mentions chart)
+          return comp.rankings.frequency >= MIN_RANKING_APPEARANCES || comp.rankings.frequency === 0
+        })
+
+        setCompetitorData(filteredCompetitors)
         setIsLoading(false)
         
         // Add a small delay before showing charts for smooth transition

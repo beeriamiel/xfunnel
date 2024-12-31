@@ -33,7 +33,7 @@ export interface SourceData {
   domain_authority?: number;
   source_type?: 'owned' | 'ugc' | 'affiliate';
   buyer_journey_phase?: string;
-  mentioned_companies_count?: string[]; // Format: ["CompanyName:Count"] - Example: ["Fiserv:57", "Payrix:0"]
+  mentioned_companies_count?: string[];
   rank_list?: string;
   content_analysis?: ContentAnalysis;
   queries: Query[];
