@@ -259,6 +259,7 @@ function MetricItem({
 const cardStyles = {
   base: "p-4 hover:bg-accent/10 cursor-pointer transition-all duration-200 border-[0.5px] border-border/40",
   expanded: "bg-accent/10 ring-1 ring-primary/5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
+  selected: "shadow-[0_0_15px_rgba(147,51,234,0.15)] border-purple-500/30 bg-purple-50/30",
   hover: "hover:bg-accent/5",
   header: "flex items-start gap-3 mb-3",
   iconWrapper: "p-2 rounded-lg shrink-0 mt-0.5",
@@ -366,13 +367,15 @@ function RegionCard({
   metrics,
   isExpanded,
   onClick,
-  totalRegionQueries 
+  totalRegionQueries,
+  isSelected 
 }: { 
   region: string
   metrics: Metrics
   isExpanded: boolean
   onClick: (region: string) => void
   totalRegionQueries: number
+  isSelected: boolean
 }) {
   // Get theme color based on standardized region name
   const getThemeColor = (region: string) => {
@@ -396,9 +399,12 @@ function RegionCard({
 
   return (
     <Card 
-      className={`${cardStyles.base} ${
-        isExpanded ? cardStyles.expanded : cardStyles.hover
-      }`}
+      className={cn(
+        cardStyles.base,
+        isExpanded && cardStyles.expanded,
+        isSelected && cardStyles.selected,
+        !isExpanded && !isSelected && cardStyles.hover
+      )}
       onClick={() => onClick(region)}
     >
       <div className="space-y-3">
@@ -466,18 +472,23 @@ function VerticalCard({
   vertical, 
   isExpanded,
   onClick,
-  totalRegionQueries 
+  totalRegionQueries,
+  isSelected
 }: { 
   vertical: Vertical
   isExpanded: boolean
   onClick: () => void
   totalRegionQueries?: number
+  isSelected: boolean
 }) {
   return (
     <Card 
-      className={`${cardStyles.base} ${
-        isExpanded ? cardStyles.expanded : cardStyles.hover
-      }`}
+      className={cn(
+        cardStyles.base,
+        isExpanded && cardStyles.expanded,
+        isSelected && cardStyles.selected,
+        !isExpanded && !isSelected && cardStyles.hover
+      )}
       onClick={onClick}
     >
       <div className="space-y-3">
@@ -959,7 +970,7 @@ function PersonasSection({
 }) {
   const [expandedPersona, setExpandedPersona] = useState<string | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const { data: personaData, isLoading, error } = usePersonaAnalytics(companyId, vertical, currentSegment);
+  const { data: personaData, isLoading, error } = usePersonaAnalytics(companyId, vertical, region, currentSegment);
 
   const handlePersonaClick = (personaName: string) => {
     setExpandedPersona(expandedPersona === personaName ? null : personaName);
@@ -989,6 +1000,7 @@ function PersonasSection({
             isExpanded={expandedPersona === persona.buyer_persona}
             onClick={() => handlePersonaClick(persona.buyer_persona)}
             totalVerticalQueries={totalVerticalQueries}
+            isSelected={expandedPersona === persona.buyer_persona}
           />
         ))}
       </div>
@@ -1390,7 +1402,7 @@ function useVerticalAnalytics(companyId: number, region: string | null, timeSegm
   return { data, isLoading, error };
 }
 
-function usePersonaAnalytics(companyId: number, vertical: string | null, timeSegment: TimeSegment | null) {
+function usePersonaAnalytics(companyId: number, vertical: string | null, region: string | null, timeSegment: TimeSegment | null) {
   const [data, setData] = useState<PersonaAnalytics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1413,9 +1425,14 @@ function usePersonaAnalytics(companyId: number, vertical: string | null, timeSeg
           .select('query_id, query_text, buying_journey_stage, company_name')
           .eq('company_id', companyId);
 
-        // Only add vertical filter if vertical is not null
+        // Add vertical filter if vertical is not null
         if (vertical) {
           query = query.eq('icp_vertical', vertical);
+        }
+
+        // Add region filter if region is not null
+        if (region) {
+          query = query.eq('geographic_region', region);
         }
 
         query = query.not('query_id', 'is', null);
@@ -1464,9 +1481,14 @@ function usePersonaAnalytics(companyId: number, vertical: string | null, timeSeg
           `)
           .eq('company_id', companyId);
 
-        // Only add vertical filter if vertical is not null
+        // Add vertical filter if vertical is not null
         if (vertical) {
           responseQuery = responseQuery.eq('icp_vertical', vertical);
+        }
+
+        // Add region filter if region is not null
+        if (region) {
+          responseQuery = responseQuery.eq('geographic_region', region);
         }
 
         responseQuery = responseQuery.in('query_id', queryIds);
@@ -1663,7 +1685,7 @@ function usePersonaAnalytics(companyId: number, vertical: string | null, timeSeg
     }
 
     fetchPersonaData();
-  }, [companyId, vertical, timeSegment]); // Add timeSegment to dependencies
+  }, [companyId, vertical, region, timeSegment]); // Add timeSegment to dependencies
 
   return { data, isLoading, error };
 }
@@ -1682,20 +1704,25 @@ function PersonaCard({
   persona,
   isExpanded,
   onClick,
-  totalVerticalQueries 
+  totalVerticalQueries,
+  isSelected
 }: { 
   persona: PersonaAnalytics
   isExpanded: boolean
   onClick: () => void
   totalVerticalQueries?: number
+  isSelected: boolean
 }) {
   const [title, seniority, department] = persona.buyer_persona.split(' | ');
 
   return (
     <Card 
-      className={`${cardStyles.base} ${
-        isExpanded ? cardStyles.expanded : cardStyles.hover
-      }`}
+      className={cn(
+        cardStyles.base,
+        isExpanded && cardStyles.expanded,
+        isSelected && cardStyles.selected,
+        !isExpanded && !isSelected && cardStyles.hover
+      )}
       onClick={onClick}
     >
       <div className="space-y-3">
@@ -2106,7 +2133,7 @@ function RegionsView({ companyId, currentSegment }: {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {regionData.map((region) => (
             <RegionCard 
-              key={region.geographic_region} // Pass the original region name
+              key={region.geographic_region}
               region={region.geographic_region}
               metrics={{
                 avgSentiment: region.avg_sentiment,
@@ -2118,6 +2145,7 @@ function RegionsView({ companyId, currentSegment }: {
               totalRegionQueries={totalQueries}
               isExpanded={expandedRegion === region.geographic_region}
               onClick={handleRegionClick}
+              isSelected={expandedRegion === region.geographic_region}
             />
           ))}
         </div>
@@ -2133,7 +2161,7 @@ function RegionsView({ companyId, currentSegment }: {
                 transition={{ duration: 0.2 }}
               >
                 <VerticalsSection 
-                  region={expandedRegion} // Pass the original region name
+                  region={expandedRegion}
                   companyId={companyId}
                   totalRegionQueries={regionData.find(r => r.geographic_region === expandedRegion)?.total_queries}
                   currentSegment={currentSegment}
@@ -2246,6 +2274,7 @@ function VerticalsSection({
             isExpanded={expandedVertical === vertical.icp_vertical}
             onClick={() => handleVerticalClick(vertical.icp_vertical)}
             totalRegionQueries={totalRegionQueries}
+            isSelected={expandedVertical === vertical.icp_vertical}
           />
         ))}
       </div>

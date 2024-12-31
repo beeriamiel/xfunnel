@@ -61,7 +61,10 @@ interface CompetitorData {
 }
 
 interface EngineData {
-  [engine: string]: CompetitorData[]
+  [engine: string]: {
+    mentions: CompetitorData[]
+    rankings: CompetitorData[]
+  }
 }
 
 interface CompetitorAnalysisProps {
@@ -168,24 +171,20 @@ function CompetitorChart({
     )
   }
 
-  // Filter out Rest category for rankings view first
-  const filteredData = type === 'rankings' 
-    ? data.filter(item => item.name !== "Rest")
-    : data
-
-  // Sort data based on view type
-  const sortedData = [...filteredData].sort((a, b) => {
-    // For mentions view, handle Rest category
+  // Filter and sort data based on view type
+  const sortedData = [...data].sort((a, b) => {
     if (type === 'mentions') {
       if (a.name === "Rest") return 1
       if (b.name === "Rest") return -1
       return b.mentions.percentage - a.mentions.percentage
     }
     
-    // For rankings view, handle N/A and sorting
-    // If both have positions, sort normally (lower numbers first)
+    // For rankings view
+    // If both have positions, sort by position (lower is better)
     if (a.rankings.position && b.rankings.position) {
-      return a.rankings.position - b.rankings.position
+      const positionDiff = (a.rankings.position as number) - (b.rankings.position as number)
+      // If positions are equal, sort by frequency
+      return positionDiff !== 0 ? positionDiff : b.rankings.frequency - a.rankings.frequency
     }
     // Push N/A to the end
     if (!a.rankings.position) return 1
@@ -453,7 +452,7 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
 
           // Initialize engine data if not exists with the main company
           if (!engineData[engine]) {
-            engineData[engine] = [{
+            const initialCompanyData = {
               name: companyName,
               mentions: {
                 count: 0,
@@ -463,14 +462,19 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
                 position: null,
                 frequency: 0
               }
-            }]
+            }
+            
+            engineData[engine] = {
+              mentions: [initialCompanyData],
+              rankings: [initialCompanyData]
+            }
           }
 
           // Process mentions (early stages)
           if (MENTION_STAGES.includes(record.buying_journey_stage || '')) {
             // Count if the company being analyzed is mentioned
             if (record.company_mentioned) {
-              const companyData = engineData[engine].find(m => m.name === companyName)
+              const companyData = engineData[engine].mentions.find(m => m.name === companyName)
               if (companyData) {
                 companyData.mentions.count++
               }
@@ -480,11 +484,11 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
             const mentionedCompanies = record.mentioned_companies || []
             mentionedCompanies.forEach(company => {
               if (company === companyName) return // Skip as we already counted it above
-              const existingData = engineData[engine].find(m => m.name === company)
+              const existingData = engineData[engine].mentions.find(m => m.name === company)
               if (existingData) {
                 existingData.mentions.count++
               } else {
-                engineData[engine].push({
+                engineData[engine].mentions.push({
                   name: company,
                   mentions: {
                     count: 1,
@@ -508,7 +512,9 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
                 if (!company) return
                 
                 const position = index + 1
-                const existingData = engineData[engine].find(r => r.name === company)
+                
+                // Check if company exists in rankings array
+                let existingData = engineData[engine].rankings.find(r => r.name === company)
                 
                 if (existingData) {
                   existingData.rankings.frequency++
@@ -516,7 +522,8 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
                     ? (existingData.rankings.position * (existingData.rankings.frequency - 1) + position) / existingData.rankings.frequency
                     : position
                 } else {
-                  engineData[engine].push({
+                  // Create new company data
+                  const newCompanyData = {
                     name: company,
                     mentions: {
                       count: 0,
@@ -526,7 +533,15 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
                       position: position,
                       frequency: 1
                     }
-                  })
+                  }
+                  
+                  // Add to rankings array
+                  engineData[engine].rankings.push(newCompanyData)
+                  
+                  // Also add to mentions array if not exists
+                  if (!engineData[engine].mentions.find(m => m.name === company)) {
+                    engineData[engine].mentions.push({ ...newCompanyData })
+                  }
                 }
               })
             } catch (e) {
@@ -535,47 +550,62 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
           }
         })
 
-        // Calculate percentages and limit to top 5 + current company + "Rest"
+        // Process and filter data for each engine
         const processedEngineData: EngineData = {}
         Object.entries(engineData).forEach(([currentEngine, data]) => {
           // Skip if no data for this engine
-          if (!data.length) return
+          if (!data.mentions.length) return
 
           // Calculate initial percentages
-          const totalMentions = data.reduce((sum, item) => sum + item.mentions.count, 0)
-          data.forEach(item => {
+          const totalMentions = data.mentions.reduce((sum, item) => sum + item.mentions.count, 0)
+          data.mentions.forEach(item => {
             item.mentions.percentage = (item.mentions.count / totalMentions) * 100
           })
 
           // Get the main company's data first
-          const mainCompanyData = data.find(item => item.name === companyName)
+          const mainCompanyData = data.mentions.find(item => item.name === companyName)
           if (!mainCompanyData) {
             console.warn(`Company ${companyName} not found in data for engine ${currentEngine}`)
             return
           }
 
-          // Sort remaining companies by mentions percentage
-          const otherCompanies = data
-            .filter(item => item.name !== companyName)
+          // Create two separate lists for mentions and rankings
+          const otherCompanies = data.mentions.filter(item => item.name !== companyName)
+          
+          // For mentions: sort by mention percentage and get top 5
+          const topMentionedCompanies = [...otherCompanies]
             .sort((a, b) => b.mentions.percentage - a.mentions.percentage)
+            .slice(0, 5)
 
-          // Get top 5 other companies
-          const top5 = otherCompanies.slice(0, 5)
+          // For rankings: sort by position (excluding null positions) and get top 5
+          const topRankedCompanies = [...otherCompanies]
+            .filter(item => item.rankings.position !== null)
+            .sort((a, b) => {
+              // Both should have positions since we filtered nulls
+              return (a.rankings.position as number) - (b.rankings.position as number)
+            })
+            .slice(0, 5)
 
-          // Calculate "Rest" from remaining companies
-          const restCompanies = otherCompanies.slice(5)
-          const restCount = restCompanies.reduce((sum, item) => sum + item.mentions.count, 0)
-          const restPercentage = restCompanies.reduce((sum, item) => sum + item.mentions.percentage, 0)
+          // Calculate "Rest" for mentions only
+          const restMentionedCompanies = otherCompanies
+            .filter(company => !topMentionedCompanies.includes(company))
+          const restCount = restMentionedCompanies.reduce((sum, item) => sum + item.mentions.count, 0)
+          const restPercentage = restMentionedCompanies.reduce((sum, item) => sum + item.mentions.percentage, 0)
 
-          // Create new data array with: main company first, top 5 others
-          const engineCompanies: CompetitorData[] = [
+          // Create the final data arrays
+          const mentionsData = [
             mainCompanyData,
-            ...top5
+            ...topMentionedCompanies
           ]
 
-          // Only add Rest for mentions data
-          if (restCompanies.length > 0) {
-            engineCompanies.push({
+          const rankingsData = [
+            mainCompanyData,
+            ...topRankedCompanies
+          ]
+
+          // Only add Rest category to mentions data
+          if (restMentionedCompanies.length > 0) {
+            mentionsData.push({
               name: "Rest",
               mentions: {
                 count: restCount,
@@ -588,7 +618,11 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
             })
           }
 
-          processedEngineData[currentEngine] = engineCompanies
+          // Store both views in the processed data
+          processedEngineData[currentEngine] = {
+            mentions: mentionsData,
+            rankings: rankingsData
+          }
         })
 
         setCompetitorData(processedEngineData)
@@ -756,7 +790,7 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
                 transition={{ duration: 0.2 }}
               >
                 <CompetitorChart
-                  data={currentEngineData}
+                  data={view === 'mentions' ? currentEngineData.mentions : currentEngineData.rankings}
                   companyName={companyName}
                   type={view}
                 />
