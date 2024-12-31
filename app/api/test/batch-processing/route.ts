@@ -1,166 +1,69 @@
 import { NextResponse } from 'next/server';
-import { ResponseAnalysisQueue } from "@/lib/batch-processing/queue";
-import { createAdminClient } from '@/app/supabase/server'
+import { ContentScrapingQueue } from '@/lib/batch-processing/content-queue';
+import { FirecrawlClient } from '@/lib/clients/firecrawl';
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   try {
-    // Get batch size from query params or use default
-    const { searchParams } = new URL(request.url);
-    const batchSize = parseInt(searchParams.get('batchSize') || '100');
-    const retryLimit = parseInt(searchParams.get('retryLimit') || '3');
-    const responseId = searchParams.get('responseId'); // Optional specific response ID
+    // Log environment setup
+    console.log('Environment check:', {
+      nodeEnv: process.env.NODE_ENV,
+      firecrawlKey: process.env.FIRECRAWL_API_KEY ? 'Present' : 'Missing',
+      baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'Not set',
+      timestamp: new Date().toISOString()
+    });
 
-    // Initialize queue with specified parameters
-    const queue = new ResponseAnalysisQueue(batchSize, retryLimit);
+    // Test a single citation with a real URL
+    const testCitation = {
+      id: 1,
+      citation_url: 'https://www.g2.com/products/walkme-digital-adoption-platform/reviews'
+    };
+
+    // Test API status first
+    const firecrawl = new FirecrawlClient();
+    const apiStatus = await firecrawl.checkApiStatus();
     
-    // If a specific response ID is provided, only process that one
-    if (responseId) {
-      const startId = parseInt(responseId);
-      const companyId = parseInt(searchParams.get('companyId') || '0');
-      await queue.processQueue(startId, startId, companyId);
-      
-      // Fetch the analysis result
-      const adminClient = createAdminClient();
-      const { data: analysis, error: analysisError } = await adminClient
-        .from('response_analysis')
-        .select('*')
-        .eq('response_id', startId)
-        .single();
-
-      if (analysisError) {
-        throw analysisError;
-      }
-
-      return NextResponse.json({
-        message: "Single response processed",
-        responseId: startId,
-        analysis: {
-          ranking_position: analysis?.ranking_position,
-          rank_list: analysis?.rank_list,
-          response_text: analysis?.response_text
-        }
-      });
+    if (!apiStatus) {
+      throw new Error('Firecrawl API status check failed');
     }
 
-    // Get responses within the specified range
-    const adminClient = createAdminClient();
-    const { data: responses, error } = await adminClient
-      .from('responses')
-      .select('id')
-      .gte('id', 1424)
-      .lte('id', 2733)
-      .order('id');
-
-    if (error) {
-      throw error;
-    }
-
-    const totalResponses = responses?.length || 0;
-    console.log(`Found ${totalResponses} responses in range 1424-2733`);
-
-    // Start processing
-    const companyId = parseInt(searchParams.get('companyId') || '0');
-    await queue.processQueue(1424, 2733, companyId);
+    // Try direct scraping
+    const directResult = await firecrawl.scrapeUrl(testCitation.citation_url);
     
-    // Get final stats
-    const stats = await queue.getQueueStats();
-
-    // Try to retry failed responses if any
-    if (stats.failedResponses > 0) {
-      await queue.retryFailed();
-      // Get updated stats after retry
-      const finalStats = await queue.getQueueStats();
-      return NextResponse.json({
-        message: "Queue processing completed with retries",
-        totalResponsesInRange: totalResponses,
-        initialStats: stats,
-        finalStats
-      });
+    if (!directResult) {
+      throw new Error('Direct scraping failed to return content');
     }
 
+    // Return successful response
     return NextResponse.json({
-      message: "Queue processing completed",
-      totalResponsesInRange: totalResponses,
-      stats
+      success: true,
+      apiStatus,
+      directResult: {
+        success: true,
+        contentLength: directResult.length,
+        sample: directResult.substring(0, 100)
+      },
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Test endpoint error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    // Detailed error logging
+    console.error('Test endpoint error:', {
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : error,
+      timestamp: new Date().toISOString()
+    });
+
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, { status: 500 });
   }
 }
 
-// Add POST endpoint to test with specific configuration
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const batchSize = body.batchSize || 100;
-    const retryLimit = body.retryLimit || 3;
-    const shouldRetry = body.shouldRetry || false;
-    const responseId = body.responseId; // Optional specific response ID
-    const companyId = body.companyId || 0;
-
-    const queue = new ResponseAnalysisQueue(batchSize, retryLimit);
-    
-    // Process specific response or range
-    if (responseId) {
-      await queue.processQueue(responseId, responseId, companyId);
-      
-      // Fetch the analysis result
-      const adminClient = createAdminClient();
-      const { data: analysis, error: analysisError } = await adminClient
-        .from('response_analysis')
-        .select('*')
-        .eq('response_id', responseId)
-        .single();
-
-      if (analysisError) {
-        throw analysisError;
-      }
-
-      return NextResponse.json({
-        message: "Single response processed",
-        responseId,
-        analysis: {
-          ranking_position: analysis?.ranking_position,
-          rank_list: analysis?.rank_list,
-          response_text: analysis?.response_text
-        }
-      });
-    }
-
-    // Process initial queue with range
-    await queue.processQueue(1424, 2733, companyId);
-    const initialStats = await queue.getQueueStats();
-
-    // Retry if requested and there are failed responses
-    if (shouldRetry && initialStats.failedResponses > 0) {
-      await queue.retryFailed();
-    }
-
-    // Get final stats
-    const finalStats = await queue.getQueueStats();
-
-    return NextResponse.json({
-      message: "Queue processing completed",
-      config: {
-        batchSize,
-        retryLimit,
-        shouldRetry,
-        range: "1424-2733"
-      },
-      initialStats,
-      finalStats: shouldRetry ? finalStats : undefined
-    });
-
-  } catch (error) {
-    console.error('Test endpoint error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+export async function GET(request: Request) {
+  return NextResponse.json({ message: 'Test endpoint is working' });
 } 

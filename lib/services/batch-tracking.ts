@@ -16,7 +16,7 @@ export class SupabaseBatchTrackingService implements BatchTrackingService {
       .from('batch_metadata')
       .insert({
         batch_id: batchId,
-        batch_type: type,
+        batch_type: String(type),
         company_id: companyId,
         status: 'pending',
         metadata

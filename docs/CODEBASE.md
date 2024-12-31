@@ -23,6 +23,7 @@
     processor.ts    # Processing pipeline
     queue.ts        # Processing queue management
     citation-processor.ts # Citation processing system
+    moz-queue.ts    # Handles Moz API integration
 
 /hooks/            # Custom React hooks
   use-model-selection.ts
@@ -62,6 +63,16 @@
     - Categorizes by region, industry, persona
     - Processes citation metadata
 
+  - `lib/batch-processing/moz-queue.ts`
+    - Handles Moz API integration
+    - Processes domain authority metrics
+    - Manages empty timestamp values
+    - Tracks spam scores
+    - URL normalization for matching
+    - Handles nested Moz API response structure
+    - Accurate logging and monitoring
+    - Error handling and validation
+
 ### 2. Dashboard Components
 - **Analysis Views**
   - `buying-journey-analysis.tsx`
@@ -84,6 +95,13 @@
   - Server components for initial data
   - Real-time updates via hooks
   - Optimistic updates for UI
+
+### Content Analysis Service
+  - `lib/services/content-analysis-service.ts`
+    - Strict JSON validation
+    - Claude response formatting rules
+    - Error handling for malformed responses
+    - Detailed logging
 
 ## Database Schema
 
@@ -110,6 +128,11 @@
      - Source type classification
      - Query text
      - Content analysis
+     - Domain authority metrics
+       - Moz API data
+       - Last crawled timestamps
+       - Page and domain authority
+       - Spam score tracking
    - Automatic timestamp management
      - Created at with default
      - Updated at with trigger
@@ -231,3 +254,50 @@ export async function processCitationsTransaction(
 - User flows
 - Dashboard interactions
 - Data visualization 
+
+## Key Components
+
+### FirecrawlClient
+- Location: `lib/clients/firecrawl.ts`
+- Handles web content scraping
+- Features:
+  - Exponential backoff retry logic
+  - Rate limit handling
+  - Detailed error logging
+  - Response validation
+  - Timeout configuration
+
+### ContentScrapingQueue
+- Location: `lib/batch-processing/content-queue.ts`
+- Manages content scraping pipeline
+- Features:
+  - Document type filtering
+  - Content analysis
+  - Error handling and logging
+  - Database updates 
+
+### URL Classifier
+- Location: `lib/utils/url-classifier.ts`
+- Features:
+  - Domain extraction and normalization
+  - UGC domain list management
+  - Fuzzy name matching
+  - Detailed classification logging
+  - Enhanced functionality:
+    - Exported normalizeCompanyName function
+    - Improved period handling
+    - Better special character management
+    - More accurate fuzzy matching
+
+### Citation Processor
+- Location: `lib/batch-processing/citation-processor.ts`
+- Enhanced with:
+  - URL source classification
+  - Company name lookup
+  - Competitor matching
+  - Preserved enrichment processes
+  - New features:
+    - Better company name normalization
+    - Enhanced Moz metrics handling
+    - Improved error logging
+    - Transaction safety 

@@ -1,10 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIService, ICPGenerationResponse, QuestionGenerationResponse } from './types';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY,
-});
-
 function cleanMarkdownJSON(text: string): string {
   // Remove markdown code block markers and any whitespace around them
   return text
@@ -14,6 +10,16 @@ function cleanMarkdownJSON(text: string): string {
 }
 
 export class ClaudeService implements AIService {
+  private client: Anthropic;
+  public messages: Anthropic['messages'];
+
+  constructor() {
+    this.client = new Anthropic({
+      apiKey: process.env.CLAUDE_API_KEY || '',
+    });
+    this.messages = this.client.messages;
+  }
+
   async generateICPs(
     systemPrompt: string,
     userPrompt: string,
@@ -28,7 +34,7 @@ export class ClaudeService implements AIService {
         }
       });
 
-      const message = await anthropic.messages.create({
+      const message = await this.messages.create({
         model: 'claude-3-sonnet-20240229',
         max_tokens: 4096,
         system: systemPrompt,
@@ -57,7 +63,7 @@ export class ClaudeService implements AIService {
     context: Record<string, any>
   ): Promise<QuestionGenerationResponse> {
     try {
-      const message = await anthropic.messages.create({
+      const message = await this.messages.create({
         model: 'claude-3-sonnet-20240229',
         max_tokens: 4096,
         system: systemPrompt,

@@ -22,6 +22,13 @@ create table public.citations (
   region text null,
   ranking_position integer null,
   updated_at timestamp with time zone null default current_timestamp,
+  domain_authority numeric null,
+  page_authority numeric null,
+  spam_score numeric null,
+  root_domains_to_root_domain integer null,
+  external_links_to_root_domain integer null,
+  moz_last_crawled timestamp with time zone null,
+  moz_last_updated timestamp with time zone null,
   constraint citations_pkey primary key (id)
 );
 
@@ -45,6 +52,14 @@ execute function update_updated_at_column();
      - Metadata enrichment
      - Transaction handling
      - Error handling and logging
+     - Enhanced company name handling
+     - Improved URL classification
+   - Moz API Integration
+     - ✅ Nested response handling
+     - ✅ Accurate logging
+     - ✅ Error monitoring
+     - ✅ Enhanced metrics tracking
+     - ✅ Better data validation
 
 2. Integration Points
    - `processor.ts`:
@@ -81,6 +96,12 @@ execute function update_updated_at_column();
    - Error recovery
    - Logging and monitoring
 
+5. Content Analysis
+   - ✅ Claude response validation
+   - ✅ Strict JSON formatting
+   - ✅ Error handling
+   - ✅ Detailed logging
+
 ### Success Metrics
 - All citations properly extracted and stored
 - URLs validated and normalized
@@ -88,3 +109,23 @@ execute function update_updated_at_column();
 - No orphaned citation records
 - Proper error handling and logging
 - Transaction integrity maintained 
+- Accurate Moz API response logging
+- Valid Claude JSON responses
+- Proper error handling and recovery
+- Accurate company name matching
+- Correct URL classification
+- Enhanced Moz metrics tracking
+
+## Implemented Features
+
+### URL Classification
+- ✅ Automatic source type detection
+- ✅ UGC site recognition
+- ✅ Company domain matching
+- ✅ Competitor identification
+
+## Future Enhancements
+- [ ] Expand UGC domain list
+- [ ] Improve fuzzy matching accuracy
+- [ ] Add classification statistics
+- [ ] Source type analytics 
