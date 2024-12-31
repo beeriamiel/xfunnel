@@ -198,8 +198,8 @@ function getMetricStatus(value: number | null, metricType: 'sentiment' | 'positi
   
   switch (metricType) {
     case 'mentions':
-      return value >= 10 ? { color: 'green', icon: '🟢' } :
-             value >= 5 ? { color: 'yellow', icon: '🟡' } :
+      return value >= 40 ? { color: 'green', icon: '🟢' } :
+             value >= 15 ? { color: 'yellow', icon: '🟡' } :
              { color: 'red', icon: '🔴' };
     case 'position':
       return value < 3 ? { color: 'green', icon: '🟢' } :
@@ -1825,8 +1825,8 @@ function PhaseMetrics({ phase, queries }: { phase: string; queries: Query[] }) {
   const getStatusIndicator = (value: number, type: 'mention' | 'rank' | 'feature') => {
     switch (type) {
       case 'mention':
-        if (value >= 70) return { icon: '✨', color: 'text-green-600' };
-        if (value >= 30) return { icon: '⚡', color: 'text-orange-500' };
+        if (value >= 40) return { icon: '✨', color: 'text-green-600' };
+        if (value >= 15) return { icon: '⚡', color: 'text-orange-500' };
         return { icon: '⚠️', color: 'text-red-500' };
       case 'rank':
         if (value <= 3) return { icon: '🏆', color: 'text-amber-500' };

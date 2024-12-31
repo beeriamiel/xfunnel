@@ -85,6 +85,7 @@ export const SourcesAnalysisRankings = memo(function SourcesAnalysisRankings({
             buyer_journey_phase,
             rank_list,
             mentioned_companies,
+            mentioned_companies_count,
             icp_vertical,
             response_text,
             region,

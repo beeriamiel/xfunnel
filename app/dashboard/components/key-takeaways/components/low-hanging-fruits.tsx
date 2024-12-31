@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { Lightbulb, ChevronRight, ArrowUpRight, Clock, Target } from "lucide-react"
+import { Lightbulb, ChevronRight, ArrowUpRight, Clock, Target, Link as LinkIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -122,6 +122,17 @@ export function LowHangingFruits({ opportunities }: LowHangingFruitsProps) {
                   </div>
                   <SheetTitle>{opportunity.title}</SheetTitle>
                   <SheetDescription>{opportunity.description}</SheetDescription>
+                  {opportunity.sourceUrl && (
+                    <a 
+                      href={opportunity.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-2 text-sm text-blue-500 hover:text-blue-600 transition-colors"
+                    >
+                      <LinkIcon className="h-4 w-4" />
+                      View Source
+                    </a>
+                  )}
                 </SheetHeader>
                 <div className="mt-6 space-y-6">
                   <div className="flex items-center gap-4">

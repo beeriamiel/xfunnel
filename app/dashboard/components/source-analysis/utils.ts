@@ -13,6 +13,7 @@ export interface RawCitation {
   buyer_journey_phase: string | null;
   rank_list: string | null;
   mentioned_companies: string[] | null;
+  mentioned_companies_count: string[] | null;
   icp_vertical: string | null;
   response_text: string | null;
   region: string | null;
@@ -102,7 +103,7 @@ export function groupCitationsByUrl(citations: RawCitation[]): GroupedCitation[]
 export function convertToSourceData(groupedCitation: GroupedCitation): SourceData {
   const latestCitation = groupedCitation.latestCitation;
   
-  // Convert all citations to Query objects
+  // Process mentioned companies to include counts
   const queries: Query[] = groupedCitation.citations
     .filter(citation => citation.query_text || citation.response_text) // Only include citations with query or response
     .map(citation => ({
@@ -112,9 +113,6 @@ export function convertToSourceData(groupedCitation: GroupedCitation): SourceDat
     }))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date descending
 
-  // Process mentioned companies to include counts
-  const mentionedCompaniesCount = latestCitation.mentioned_companies?.map(company => `${company}:1`) || undefined;
-
   return {
     domain: groupedCitation.domain,
     citation_url: groupedCitation.url,
@@ -122,7 +120,7 @@ export function convertToSourceData(groupedCitation: GroupedCitation): SourceDat
     domain_authority: latestCitation.domain_authority || undefined,
     source_type: (latestCitation.source_type as 'owned' | 'ugc' | 'affiliate') || undefined,
     buyer_journey_phase: latestCitation.buyer_journey_phase || undefined,
-    mentioned_companies_count: mentionedCompaniesCount,
+    mentioned_companies_count: latestCitation.mentioned_companies_count || undefined,
     rank_list: latestCitation.rank_list || undefined,
     content_analysis: parseContentAnalysis(latestCitation.content_analysis),
     queries
