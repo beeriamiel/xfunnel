@@ -22,18 +22,53 @@ interface GroundingMetadata {
 }
 
 async function resolveRedirectUrl(redirectUrl: string): Promise<string> {
-  try {
-    console.log('Resolving redirect URL:', redirectUrl);
-    const response = await fetch(redirectUrl, {
-      method: 'HEAD',
-      redirect: 'follow'
-    });
-    console.log('Resolved to:', response.url);
-    return response.url;
-  } catch (error) {
-    console.error('Failed to resolve redirect URL:', redirectUrl, error);
-    return redirectUrl;
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 2000;
+  const BACKOFF_MS = 500;
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (compatible; XFunnelBot/1.0)',
+    'Accept': '*/*'
+  };
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, BACKOFF_MS * attempt));
+      }
+
+      console.log(`Resolution attempt ${attempt + 1}/${MAX_RETRIES + 1} for:`, redirectUrl);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      const response = await fetch(redirectUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        console.log('URL resolution successful:', response.url);
+        return response.url;
+      }
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
+      
+      // If it's the last attempt, throw the error
+      if (attempt === MAX_RETRIES) {
+        console.error('All resolution attempts failed for:', redirectUrl);
+        return redirectUrl;
+      }
+    }
   }
+
+  // Fallback to original URL if all retries fail
+  return redirectUrl;
 }
 
 async function processCitationsWithRedirects(urls: string[]): Promise<string[]> {

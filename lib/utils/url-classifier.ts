@@ -1,4 +1,5 @@
 export type SourceType = 'OWNED' | 'COMPETITOR' | 'UGC' | 'EARNED';
+import { TLD_CONFIG } from './tld-config';
 
 const UGC_DOMAINS = new Set([
   'reddit.com',
@@ -56,20 +57,62 @@ function extractBaseDomain(url: string): string {
   try {
     const urlObj = new URL(url);
     const parts = urlObj.hostname.split('.');
+    
     // Remove 'www' if present
     if (parts[0] === 'www') {
       parts.shift();
     }
+
+    // Join remaining parts back for TLD checking
     const domain = parts.join('.');
     
-    console.log('Domain extraction:', {
+    // Try multi-level TLDs first
+    for (const multiTld of Array.from(TLD_CONFIG.multiLevel)) {
+      if (domain.endsWith(`.${multiTld}`)) {
+        const withoutTld = domain.slice(0, -(multiTld.length + 1)); // +1 for the dot
+        const remainingParts = withoutTld.split('.');
+        const mainDomain = remainingParts[remainingParts.length - 1];
+        
+        console.log('Domain extraction (multi-TLD):', {
+          originalUrl: url,
+          extractedDomain: mainDomain,
+          detectedTld: multiTld,
+          allParts: parts,
+          timestamp: new Date().toISOString()
+        });
+        
+        return mainDomain;
+      }
+    }
+    
+    // Check single-level TLDs
+    const lastPart = parts[parts.length - 1];
+    if (TLD_CONFIG.singleLevel.has(lastPart)) {
+      const mainDomain = parts[parts.length - 2];
+      
+      console.log('Domain extraction (single-TLD):', {
+        originalUrl: url,
+        extractedDomain: mainDomain,
+        detectedTld: lastPart,
+        allParts: parts,
+        timestamp: new Date().toISOString()
+      });
+      
+      return mainDomain;
+    }
+    
+    // Fallback: return the last non-TLD part
+    const mainDomain = parts[parts.length - 2] || parts[0];
+    
+    console.log('Domain extraction (fallback):', {
       originalUrl: url,
-      extractedDomain: domain,
-      parts: parts,
+      extractedDomain: mainDomain,
+      allParts: parts,
       timestamp: new Date().toISOString()
     });
     
-    return domain;
+    return mainDomain;
+    
   } catch (error) {
     console.error('Error extracting domain:', { url, error });
     return '';
@@ -86,19 +129,37 @@ function fuzzyMatch(domain: string, name: string): boolean {
   const normalizedDomain = normalizeText(domain);
   const normalizedName = normalizeText(name);
   
-  // Direct match
+  console.log('Fuzzy match check:', {
+    normalizedDomain,
+    normalizedName,
+    directMatch: normalizedDomain.includes(normalizedName)
+  });
+  
+  // Direct match - only check if domain contains the name
   if (normalizedDomain.includes(normalizedName)) {
     return true;
   }
   
-  // Domain parts match
   const domainParts = normalizedDomain.split('.');
   const nameParts = normalizedName.split(/[\s-_]+/);
   
+  console.log('Parts comparison:', {
+    domainParts,
+    nameParts
+  });
+
   return nameParts.some(part => 
-    domainParts.some(domainPart => 
-      domainPart.includes(part) || part.includes(domainPart)
-    )
+    domainParts.some(domainPart => {
+      // Only check if domain contains the name part, not vice versa
+      const matches = domainPart.includes(part);
+      if (matches) {
+        console.log('Match found:', {
+          domainPart,
+          namePart: part
+        });
+      }
+      return matches;
+    })
   );
 }
 

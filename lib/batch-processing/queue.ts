@@ -259,7 +259,7 @@ export class ResponseAnalysisQueue {
           const { data: insertedAnalysis } = await adminClient
             .from('response_analysis')
             .select('*')
-            .eq('response_id', analysisData.response_id)
+            .eq('response_id', analysisData.response_id!)
             .single();
 
           if (!insertedAnalysis) {
