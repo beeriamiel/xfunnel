@@ -1,5 +1,6 @@
 import { createGeminiClient } from "../clients/gemini";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, DynamicRetrievalMode } from "@google/generative-ai";
+import { resolveUrlWithFirecrawl } from '../utils/url-resolver';
 
 interface GeminiCitation {
   startIndex?: number;
@@ -59,15 +60,15 @@ async function resolveRedirectUrl(redirectUrl: string): Promise<string> {
     } catch (error) {
       console.error(`Attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
       
-      // If it's the last attempt, throw the error
+      // If it's the last attempt, try Firecrawl as fallback
       if (attempt === MAX_RETRIES) {
-        console.error('All resolution attempts failed for:', redirectUrl);
-        return redirectUrl;
+        console.log('All standard resolution attempts failed, trying Firecrawl fallback for:', redirectUrl);
+        return resolveUrlWithFirecrawl(redirectUrl);
       }
     }
   }
 
-  // Fallback to original URL if all retries fail
+  // If everything fails, return original URL
   return redirectUrl;
 }
 
@@ -76,9 +77,10 @@ async function processCitationsWithRedirects(urls: string[]): Promise<string[]> 
   const resolvedUrls = await Promise.all(
     urls.map(async (url) => {
       if (url.includes('vertexaisearch.cloud.google.com/grounding-api-redirect')) {
-        return resolveRedirectUrl(url);
+        console.log('Detected Vertex AI redirect URL, attempting resolution:', url);
+        return resolveUrlWithFirecrawl(url);
       }
-      return url;
+      return resolveRedirectUrl(url);
     })
   );
   console.log('Resolved URLs:', resolvedUrls);

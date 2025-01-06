@@ -47,7 +47,7 @@ interface CitationMetadata {
   external_links_to_root_domain?: number | null;
 }
 
-interface ParsedCitation {
+export interface ParsedCitation {
   urls: string[];
   context: string[];
   relevance: number[];
@@ -307,8 +307,7 @@ export async function processCitationsTransaction(
     });
 
     if (newUrls.length === 0) {
-      console.log('All citations already exist in database');
-      return;
+      console.log('All citations will be reused from existing database entries');
     }
 
     // Prepare reusable citations with data from originals
@@ -351,7 +350,7 @@ export async function processCitationsTransaction(
       };
     });
 
-    // Combine all citations for processing
+    // Combine all citations and proceed with insertion
     const allCitations = [...newCitations, ...reusableCitationsData];
 
     console.log('Starting citations transaction:', {
@@ -382,6 +381,11 @@ export async function processCitationsTransaction(
     // RESTORE: Insert citations and get their IDs
     const citationIds = await insertCitationBatch(citationsWithSourceType);
 
+    console.log('Initial citation pool:', {
+      citationIds,
+      count: citationIds.length
+    });
+
     try {
       console.log('Starting parallel enrichment processes:', {
         responseAnalysisId: responseAnalysis.id,
@@ -390,7 +394,7 @@ export async function processCitationsTransaction(
         reusableCitationsCount: reusableCitationsData.length
       });
 
-      // Get only the new citations we just inserted (is_original = true)
+      // Get only new citations for content scraping
       const { data: citationsToProcess, error } = await adminClient
         .from('citations')
         .select('id, citation_url, query_text, response_text, content_markdown')
@@ -401,9 +405,9 @@ export async function processCitationsTransaction(
         throw error;
       }
 
+      // Run content scraping and Moz enrichment for new citations if any
       if (citationsToProcess && citationsToProcess.length > 0) {
         try {
-          // Run Moz enrichment and content scraping in parallel for new citations only
           const mozQueue = new MozEnrichmentQueue();
           const contentQueue = new ContentScrapingQueue();
 
@@ -413,137 +417,10 @@ export async function processCitationsTransaction(
             timestamp: new Date().toISOString()
           });
 
-          // Process only new citations through queues
           await Promise.all([
             mozQueue.processBatch(citationsToProcess, responseAnalysis.company_id),
             contentQueue.processBatch(citationsToProcess, responseAnalysis.company_id)
           ]);
-
-          console.log('Enrichment processes completed, waiting for content to be saved...');
-          
-          // Add delay to ensure content is saved
-          await waitForContentScraping(citationIds, adminClient);
-
-          // Get all citations that have content (both new and reused)
-          const { data: citationsWithContent, error: contentError } = await adminClient
-            .from('citations')
-            .select(`
-              id,
-              citation_url,
-              query_text,
-              response_text,
-              content_markdown,
-              is_original,
-              content_analysis
-            `)
-            .in('id', citationIds)
-            .filter('content_markdown', 'not.is', null);
-
-          if (contentError) {
-            throw contentError;
-          }
-
-          // Process content analysis if we have citations with content
-          if (citationsWithContent && citationsWithContent.length > 0) {
-            console.log('Starting content analysis phase:', {
-              totalCitations: citationsWithContent.length,
-              citationIds: citationsWithContent.map(c => c.id),
-              timestamp: new Date().toISOString()
-            });
-
-            // Process each citation
-            for (const citation of citationsWithContent) {
-              try {
-                // Count company mentions for all citations (new and reused)
-                if (citation.content_markdown && (responseAnalysis.mentioned_companies?.length ?? 0) > 0) {
-                  console.log('Counting company mentions for citation:', {
-                    citationId: citation.id,
-                    isOriginal: citation.is_original,
-                    companiesCount: responseAnalysis.mentioned_companies?.length ?? 0
-                  });
-
-                  const mentionCounts = countCompanyMentions(
-                    citation.content_markdown,
-                    responseAnalysis.mentioned_companies ?? []
-                  );
-
-                  // Update the citation with mention counts
-                  const { error: updateError } = await adminClient
-                    .from('citations')
-                    .update({ mentioned_companies_count: mentionCounts })
-                    .eq('id', citation.id);
-
-                  if (updateError) {
-                    console.error('Failed to update mention counts:', {
-                      citationId: citation.id,
-                      error: updateError
-                    });
-                  } else {
-                    console.log('Updated mention counts:', {
-                      citationId: citation.id,
-                      counts: mentionCounts
-                    });
-                  }
-                }
-
-                // Only run content analysis for new citations
-                if (citation.is_original) {
-                  const contentAnalysisService = new ContentAnalysisService();
-                  const analysis = await contentAnalysisService.analyzeContent(
-                    citation.query_text || '',
-                    citation.response_text || '',
-                    citation.content_markdown || ''
-                  );
-
-                  // Update citation with analysis
-                  const { error: updateError } = await adminClient
-                    .from('citations')
-                    .update({ 
-                      content_analysis: JSON.stringify(analysis),
-                      content_analysis_updated_at: new Date().toISOString()
-                    })
-                    .eq('id', citation.id);
-
-                  if (updateError) {
-                    throw updateError;
-                  }
-
-                  console.log('Content analysis completed for new citation:', {
-                    citationId: citation.id,
-                    analysisWordCount: analysis.analysis_details.total_words,
-                    timestamp: new Date().toISOString()
-                  });
-                } else {
-                  console.log('Skipping content analysis for reused citation:', {
-                    citationId: citation.id,
-                    hasExistingAnalysis: Boolean(citation.content_analysis)
-                  });
-                }
-
-              } catch (analysisError) {
-                console.error('Content analysis failed for citation:', {
-                  citationId: citation.id,
-                  isOriginal: citation.is_original,
-                  error: analysisError,
-                  timestamp: new Date().toISOString()
-                });
-                // Continue with other citations
-              }
-            }
-          }
-
-          console.log('All enrichment processes completed:', {
-            responseAnalysisId: responseAnalysis.id,
-            citationStats: {
-              total: allCitations.length,
-              new: newCitations.length,
-              reused: reusableCitationsData.length
-            },
-            mozStats: await mozQueue.getQueueStats(),
-            contentStats: await contentQueue.getQueueStats(),
-            timestamp: new Date().toISOString()
-          });
-
         } catch (enrichmentError) {
           console.error('Enrichment error:', {
             error: enrichmentError,
@@ -552,15 +429,53 @@ export async function processCitationsTransaction(
               total: allCitations.length,
               new: newCitations.length,
               reused: reusableCitationsData.length
-            },
-            timestamp: new Date().toISOString()
+            }
           });
-          // Don't throw - we want to keep the citations even if enrichment fails
         }
       }
-    } catch (enrichmentError) {
-      console.error('Enrichment error:', {
-        error: enrichmentError,
+
+      // Always wait for content scraping to complete, regardless of citation type
+      console.log('Waiting for any content scraping to complete...');
+      await waitForContentScraping(citationIds, adminClient, responseAnalysis);
+
+      // Process content analysis for new citations
+      if (citationsToProcess && citationsToProcess.length > 0) {
+        for (const citation of citationsToProcess) {
+          try {
+            const contentAnalysisService = new ContentAnalysisService();
+            const analysis = await contentAnalysisService.analyzeContent(
+              citation.query_text || '',
+              citation.response_text || '',
+              citation.content_markdown || ''
+            );
+
+            const { error: updateError } = await adminClient
+              .from('citations')
+              .update({ 
+                content_analysis: JSON.stringify(analysis),
+                content_analysis_updated_at: new Date().toISOString()
+              })
+              .eq('id', citation.id);
+
+            if (updateError) {
+              throw updateError;
+            }
+          } catch (analysisError) {
+            console.error('Content analysis failed for citation:', {
+              citationId: citation.id,
+              error: analysisError,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      }
+
+      // Process company mentions for all citations with content
+      await processCompanyMentions(citationIds, responseAnalysis, adminClient);
+
+    } catch (error) {
+      console.error('Processing error:', {
+        error,
         responseAnalysisId: responseAnalysis.id,
         citationStats: {
           total: allCitations.length,
@@ -568,7 +483,7 @@ export async function processCitationsTransaction(
           reused: reusableCitationsData.length
         }
       });
-      // Don't throw - we want to keep the citations even if enrichment fails
+      // Don't throw - we want to keep the citations even if processing fails
     }
 
     console.log('Successfully completed citations transaction');
@@ -631,13 +546,95 @@ async function checkExistingCitation(
 
   return existingCitation;
 }
+async function processCompanyMentions(
+  citationIds: number[],
+  responseAnalysis: ResponseAnalysis,
+  adminClient: SupabaseClient<Database>
+): Promise<void> {
+  try {
+    // Query all citations with content
+    const { data: citationsWithContent, error: contentError } = await adminClient
+      .from('citations')
+      .select(`
+        id,
+        citation_url,
+        query_text,
+        response_text,
+        content_markdown,
+        is_original,
+        content_analysis
+      `)
+      .in('id', citationIds)
+      .not('content_markdown', 'is', null);
 
+    if (contentError) {
+      throw contentError;
+    }
+
+    if (citationsWithContent && citationsWithContent.length > 0) {
+      console.log('Processing company mentions for citations:', {
+        total: citationsWithContent.length,
+        new: citationsWithContent.filter(c => c.is_original).length,
+        reused: citationsWithContent.filter(c => !c.is_original).length
+      });
+
+      // Process each citation
+      for (const citation of citationsWithContent) {
+        try {
+          if (citation.content_markdown && (responseAnalysis.mentioned_companies?.length ?? 0) > 0) {
+            console.log('Counting company mentions for citation:', {
+              citationId: citation.id,
+              isOriginal: citation.is_original,
+              companiesCount: responseAnalysis.mentioned_companies?.length ?? 0
+            });
+
+            const mentionCounts = countCompanyMentions(
+              citation.content_markdown,
+              responseAnalysis.mentioned_companies ?? []
+            );
+
+            // Update the citation with mention counts
+            const { error: updateError } = await adminClient
+              .from('citations')
+              .update({ mentioned_companies_count: mentionCounts })
+              .eq('id', citation.id);
+
+            if (updateError) {
+              console.error('Failed to update mention counts:', {
+                citationId: citation.id,
+                error: updateError
+              });
+            } else {
+              console.log('Updated mention counts:', {
+                citationId: citation.id,
+                counts: mentionCounts
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to process company mentions for citation:', {
+            citationId: citation.id,
+            error
+          });
+          // Continue with other citations
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Company mention processing failed:', {
+      error,
+      citationIds
+    });
+    // Don't throw - keep processing pipeline running
+  }
+}
 // Add this helper function at the bottom of the file
 async function waitForContentScraping(
   citationIds: number[],
   adminClient: SupabaseClient<Database>,
-  maxAttempts = 30, // 30 seconds max wait
-  pollInterval = 1000 // 1 second between checks
+  responseAnalysis: ResponseAnalysis,
+  maxAttempts = 30,
+  pollInterval = 1000
 ): Promise<void> {
   console.log('Waiting for content scraping to complete:', {
     citationCount: citationIds.length,
@@ -677,3 +674,4 @@ async function waitForContentScraping(
 
   throw new Error(`Timeout waiting for content scraping after ${maxAttempts} attempts`);
 }
+

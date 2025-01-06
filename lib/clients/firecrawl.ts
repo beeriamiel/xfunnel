@@ -33,7 +33,7 @@ export class FirecrawlClient {
 
     this.apiKey = apiKey;
     this.baseUrl = 'https://api.firecrawl.dev/v1';
-    this.maxRetries = 3;
+    this.maxRetries = 2;
     this.retryDelay = 1000; // 1 second
   }
 
@@ -178,6 +178,35 @@ export class FirecrawlClient {
       const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000; // Default to 60s
       console.log(`Rate limited, waiting ${waitTime}ms before retry`);
       await this.sleep(waitTime);
+    }
+  }
+
+  async getMetadata(url: string): Promise<Record<string, any> | null> {
+    try {
+      const response = await this.fetchWithRetry(url);
+      
+      if (!response.success || !response.data?.metadata) {
+        console.warn('No metadata available from Firecrawl:', {
+          url,
+          success: response.success,
+          hasData: !!response.data,
+          hasMetadata: !!response.data?.metadata
+        });
+        return null;
+      }
+
+      return response.data.metadata;
+    } catch (error) {
+      console.error('Failed to get metadata from Firecrawl:', {
+        url,
+        error: error instanceof Error ? {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        } : error
+      });
+      
+      return null;
     }
   }
 } 

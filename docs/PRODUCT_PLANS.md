@@ -51,9 +51,13 @@ execute function update_updated_at_column();
      - URL validation and normalization
      - Metadata enrichment
      - Transaction handling
-     - Error handling and logging
-     - Enhanced company name handling
-     - Improved URL classification
+     - Decoupled processing stages:
+       - Citation creation
+       - Content/Moz enrichment
+       - Content analysis
+       - Company mention counting
+     - Enhanced error isolation
+     - Improved content processing flow
    - Moz API Integration
      - ✅ Nested response handling
      - ✅ Accurate logging
@@ -115,6 +119,10 @@ execute function update_updated_at_column();
 - Accurate company name matching
 - Correct URL classification
 - Enhanced Moz metrics tracking
+- ✅ Decoupled processing stages
+- ✅ Independent error handling
+- ✅ Company mention counting for all citations
+- ✅ Proper content processing order
 
 ## Implemented Features
 
