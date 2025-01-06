@@ -86,6 +86,8 @@ export type Database = {
           source_type: CitationSourceType
           spam_score: number | null
           updated_at: string | null
+          is_original: boolean | null
+          origin_citation_id: number | null
         }
         Insert: {
           buyer_journey_phase?: string | null
@@ -120,6 +122,8 @@ export type Database = {
           source_type?: CitationSourceType
           spam_score?: number | null
           updated_at?: string | null
+          is_original?: boolean | null
+          origin_citation_id?: number | null
         }
         Update: {
           buyer_journey_phase?: string | null
@@ -154,6 +158,8 @@ export type Database = {
           source_type?: CitationSourceType
           spam_score?: number | null
           updated_at?: string | null
+          is_original?: boolean | null
+          origin_citation_id?: number | null
         }
         Relationships: []
       }
@@ -833,3 +839,12 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+type CitationRow = Database['public']['Tables']['citations']['Row'];
+
+export interface ExistingCitationData extends CitationRow {
+  page_authority: number | null;
+  spam_score: number | null;
+  root_domains_to_root_domain: number | null;
+  external_links_to_root_domain: number | null;
+}

@@ -1,5 +1,6 @@
 import { createGeminiClient } from "../clients/gemini";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, DynamicRetrievalMode } from "@google/generative-ai";
+import { resolveUrlWithFirecrawl } from '../utils/url-resolver';
 
 interface GeminiCitation {
   startIndex?: number;
@@ -22,18 +23,53 @@ interface GroundingMetadata {
 }
 
 async function resolveRedirectUrl(redirectUrl: string): Promise<string> {
-  try {
-    console.log('Resolving redirect URL:', redirectUrl);
-    const response = await fetch(redirectUrl, {
-      method: 'HEAD',
-      redirect: 'follow'
-    });
-    console.log('Resolved to:', response.url);
-    return response.url;
-  } catch (error) {
-    console.error('Failed to resolve redirect URL:', redirectUrl, error);
-    return redirectUrl;
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 2000;
+  const BACKOFF_MS = 500;
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (compatible; XFunnelBot/1.0)',
+    'Accept': '*/*'
+  };
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, BACKOFF_MS * attempt));
+      }
+
+      console.log(`Resolution attempt ${attempt + 1}/${MAX_RETRIES + 1} for:`, redirectUrl);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      const response = await fetch(redirectUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        console.log('URL resolution successful:', response.url);
+        return response.url;
+      }
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
+      
+      // If it's the last attempt, try Firecrawl as fallback
+      if (attempt === MAX_RETRIES) {
+        console.log('All standard resolution attempts failed, trying Firecrawl fallback for:', redirectUrl);
+        return resolveUrlWithFirecrawl(redirectUrl);
+      }
+    }
   }
+
+  // If everything fails, return original URL
+  return redirectUrl;
 }
 
 async function processCitationsWithRedirects(urls: string[]): Promise<string[]> {
@@ -41,9 +77,10 @@ async function processCitationsWithRedirects(urls: string[]): Promise<string[]> 
   const resolvedUrls = await Promise.all(
     urls.map(async (url) => {
       if (url.includes('vertexaisearch.cloud.google.com/grounding-api-redirect')) {
-        return resolveRedirectUrl(url);
+        console.log('Detected Vertex AI redirect URL, attempting resolution:', url);
+        return resolveUrlWithFirecrawl(url);
       }
-      return url;
+      return resolveRedirectUrl(url);
     })
   );
   console.log('Resolved URLs:', resolvedUrls);

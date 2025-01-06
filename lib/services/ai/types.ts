@@ -42,4 +42,17 @@ export interface AIService {
     userPrompt: string,
     context: Record<string, any>
   ): Promise<QuestionGenerationResponse>;
-} 
+}
+
+export interface ContentAnalysisProvider {
+  messages: {
+    create: (params: {
+      model: string;
+      system: string;
+      messages: Array<{ role: 'user' | 'system'; content: string }>;
+      max_tokens: number;
+    }) => Promise<{
+      content: Array<{ type: 'text'; text: string }>;
+    }>;
+  };
+}
