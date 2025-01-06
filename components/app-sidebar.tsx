@@ -18,7 +18,7 @@ import {
 import { usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
-import { useDashboardStore } from "@/app/dashboard/store"
+import { useDashboardStore, type DashboardView } from "@/app/dashboard/store"
 import { ProBadge } from "@/components/ui/pro-badge"
 import { Badge } from "@/components/ui/badge"
 
@@ -29,7 +29,7 @@ interface NavItem {
   href: string
   active: boolean
   icon: React.ReactNode
-  onClick?: () => void
+  view: DashboardView
   badge?: React.ReactNode
 }
 
@@ -59,21 +59,21 @@ export function AppSidebar({ className }: SidebarProps) {
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'engine',
           icon: <Activity className="h-4 w-4" />,
-          onClick: () => setActiveView('engine'),
+          view: 'engine',
         },
         {
           title: "ICP & Buying Journey",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'journey',
           icon: <Route className="h-4 w-4" />,
-          onClick: () => setActiveView('journey'),
+          view: 'journey',
         },
         {
           title: "Citation Analysis",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'citation',
           icon: <Link2 className="h-4 w-4" />,
-          onClick: () => setActiveView('citation'),
+          view: 'citation',
           badge: <ProBadge />,
         },
         {
@@ -81,7 +81,7 @@ export function AppSidebar({ className }: SidebarProps) {
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'takeaways',
           icon: <Lightbulb className="h-4 w-4" />,
-          onClick: () => setActiveView('takeaways'),
+          view: 'takeaways',
           badge: <ProBadge />,
         },
       ],
@@ -90,11 +90,11 @@ export function AppSidebar({ className }: SidebarProps) {
       title: "Generate",
       items: [
         {
-          title: "Response Analysis",
+          title: "Generate Analysis",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'response',
           icon: <FileText className="h-4 w-4" />,
-          onClick: () => setActiveView('response'),
+          view: 'response',
         },
       ],
     },
@@ -106,18 +106,23 @@ export function AppSidebar({ className }: SidebarProps) {
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'personal',
           icon: <UserCircle className="h-4 w-4" />,
-          onClick: () => setActiveView('personal'),
+          view: 'personal',
         },
         {
           title: "FAQs",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'faqs',
           icon: <HelpCircle className="h-4 w-4" />,
-          onClick: () => setActiveView('faqs'),
+          view: 'faqs',
         },
       ],
     },
   ]
+
+  const handleNavigation = (item: NavItem, e: React.MouseEvent) => {
+    e.preventDefault()
+    setActiveView(item.view)
+  }
 
   const SidebarContent = () => (
     <ScrollArea className="h-full">
@@ -139,9 +144,11 @@ export function AppSidebar({ className }: SidebarProps) {
                     isCollapsed && "justify-center px-2"
                   )}
                   asChild
-                  onClick={item.onClick}
                 >
-                  <Link href={item.href}>
+                  <Link 
+                    href={item.href} 
+                    onClick={(e) => handleNavigation(item, e)}
+                  >
                     {item.icon}
                     {!isCollapsed && (
                       <span className="ml-2 flex items-center">

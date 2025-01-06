@@ -524,3 +524,19 @@ export interface QueryDB {
   persona_id: number | null;
   user_id: string;
 } 
+
+export interface Query {
+  id: string;
+  text: string;
+  icp: ICP;
+  persona: Persona;
+  status: 'pending' | 'analyzing' | 'complete';
+} 
+
+export interface ICP {
+  id: string;
+  region: string;
+  vertical: string;
+  company_size: string;
+  personas: Persona[];
+} 

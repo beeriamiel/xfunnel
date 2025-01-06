@@ -12,7 +12,7 @@ import { BuyingJourneyAnalysis } from './buying-journey-analysis'
 import { CompetitorAnalysis } from './competitor-analysis'
 import { CitationAnalysis } from './citation-analysis'
 import { KeyTakeaways } from './key-takeaways/key-takeaways'
-import { ResponseAnalysis } from './response-analysis'
+import { GenerateAnalysis } from './generate-analysis'
 import { PersonalSettings } from './personal-settings'
 import { FAQs } from './faqs'
 import { useDashboardStore } from '../store'
@@ -73,7 +73,7 @@ function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
           ) : activeView === 'takeaways' ? (
             <KeyTakeaways companyId={selectedCompany.id} />
           ) : activeView === 'response' ? (
-            <ResponseAnalysis companyId={selectedCompany.id} />
+            <GenerateAnalysis companyId={selectedCompany.id} />
           ) : activeView === 'personal' ? (
             <PersonalSettings />
           ) : (
@@ -106,7 +106,7 @@ export function DashboardContent({ selectedCompany }: Props) {
                 : activeView === 'takeaways'
                 ? 'Key Takeaways'
                 : activeView === 'response'
-                ? 'Response Analysis'
+                ? 'Generate Analysis'
                 : activeView === 'personal'
                 ? 'Personal Settings'
                 : 'FAQs'
