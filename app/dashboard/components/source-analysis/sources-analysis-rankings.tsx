@@ -105,7 +105,7 @@ export const SourcesAnalysisRankings = memo(function SourcesAnalysisRankings({
         if (!isMounted) return
 
         // Safely type and filter the raw data
-        const validCitations = (citationData || []).filter((citation): citation is RawCitation => {
+        const validCitations = (citationData || []).filter((citation): citation is CitationRow => {
           if (!citation) return false;
           return isValidCitation(citation);
         });
