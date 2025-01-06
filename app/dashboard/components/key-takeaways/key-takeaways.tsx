@@ -5,7 +5,11 @@ import { TechnicalChanges } from "./components/technical-changes"
 import { ContentSuggestions } from "./components/content-suggestions"
 import { MOCK_DATA } from "./types"
 
-export function KeyTakeaways() {
+interface KeyTakeawaysProps {
+  companyId: number
+}
+
+export function KeyTakeaways({ companyId }: KeyTakeawaysProps) {
   return (
     <div className="space-y-8 p-8">
       <LowHangingFruits opportunities={MOCK_DATA.lowHangingFruits} />
