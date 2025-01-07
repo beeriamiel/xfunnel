@@ -2,9 +2,15 @@
   "deno.enablePaths": [
     "supabase/functions"
   ],
-  "deno.lint": true,
-  "deno.unstable": true,
+  "deno.lint": false,
   "[typescript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
-  }
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/.next": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib"
 }
