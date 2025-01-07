@@ -1,11 +1,4 @@
 {
-  "deno.enablePaths": [
-    "supabase/functions"
-  ],
-  "deno.lint": false,
-  "[typescript]": {
-    "editor.defaultFormatter": "vscode.typescript-language-features"
-  },
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,
