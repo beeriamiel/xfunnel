@@ -295,9 +295,104 @@ export async function processCitationsTransaction(
   - URL source classification
   - Company name lookup
   - Competitor matching
-  - Preserved enrichment processes
-  - New features:
-    - Better company name normalization
-    - Enhanced Moz metrics handling
-    - Improved error logging
-    - Transaction safety 
+  - Decoupled processing stages:
+    1. Citation Creation & Insertion
+    2. Content/Moz Processing (new citations)
+    3. Content Analysis (new citations)
+    4. Company Mention Counting (all citations)
+  - Independent error handling:
+    - Stage-specific error boundaries
+    - Non-blocking company mention processing
+    - Preserved citation data on failures
+  - Enhanced content processing:
+    - Waits for content scraping completion
+    - Processes company mentions after content
+    - Handles both new and reused citations 
+
+## Citation Processing System
+
+### Core Files
+```
+lib/batch-processing/
+├── citation-processor.ts     # Main citation processing logic
+├── content-queue.ts         # Content scraping management
+├── moz-queue.ts            # Domain metrics enrichment
+└── analysis.ts             # Content analysis coordination
+```
+
+### Citation Processor (citation-processor.ts)
+Main pipeline coordinator handling:
+- URL extraction and validation
+- Citation reuse (120-day window)
+- Batch processing
+- Enrichment coordination
+- Company mention processing
+
+Key Functions:
+```typescript
+processCitationsTransaction()  // Main entry point
+extractCitationMetadata()     // URL validation
+insertCitationBatch()         // Database insertion
+processCompanyMentions()      // Mention counting
+waitForContentScraping()      // Content completion check
+```
+
+### Integration Points
+1. AI Response Generation
+```typescript
+// generate-claude-response.ts or generate-gemini-response.ts
+const citations = await processCitationsTransaction(
+  responseAnalysis,
+  citationsParsed
+);
+```
+
+2. Content Scraping
+```typescript
+// content-queue.ts
+await contentQueue.processBatch(
+  citationsToProcess,
+  responseAnalysis.company_id
+);
+```
+
+3. Moz Enrichment
+```typescript
+// moz-queue.ts
+await mozQueue.processBatch(
+  citationsToProcess,
+  responseAnalysis.company_id
+);
+```
+
+### Error Handling
+- Transaction-level boundaries
+- Independent failure domains
+- Non-blocking enrichment
+- Graceful degradation
+
+### Data Flow
+1. Response Generation
+   - Claude/Gemini generates response
+   - Citations extracted and parsed
+
+2. Citation Processing
+   - URL validation
+   - Reuse check
+   - Batch insertion
+
+3. Enrichment
+   - Content scraping (Firecrawl)
+   - Domain metrics (Moz)
+   - Content analysis
+
+4. Company Mentions
+   - Content scanning
+   - Mention counting
+   - Stats update
+
+### Testing
+- Unit tests for each component
+- Integration tests for full pipeline
+- Mock external services
+- Error case coverage 

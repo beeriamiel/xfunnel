@@ -1,4 +1,5 @@
 import { ClaudeService } from './ai/claude-service';
+import { DeepSeekService } from './ai/deepseek-service';
 import { createAdminClient } from '@/app/supabase/server';
 
 interface ContentAnalysisResponse {
@@ -33,10 +34,12 @@ interface MetricScore {
 
 export class ContentAnalysisService {
   private claudeService: ClaudeService;
+  private deepseekService: DeepSeekService;
   private adminClient;
 
   constructor() {
     this.claudeService = new ClaudeService();
+    this.deepseekService = new DeepSeekService();
     this.adminClient = createAdminClient();
   }
 
@@ -118,18 +121,53 @@ export class ContentAnalysisService {
 <markdown>${contentMarkdown}</markdown>
       `.trim();
 
-      // Use the same pattern as claude-service.ts
-      const message = await this.claudeService.messages.create({
-        model: 'claude-3-sonnet-20240229',
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt + '\n\n' + formattedContent }
-        ]
-      });
+      // Select model based on environment variable
+      const selectedModel = process.env.CONTENT_ANALYSIS_MODEL || 'claude';
+      
+      let message;
+      try {
+        if (selectedModel === 'deepseek') {
+          message = await this.deepseekService.messages.create({
+            model: 'deepseek-chat',
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: [
+              { role: 'user', content: userPrompt + '\n\n' + formattedContent }
+            ]
+          });
+        } else {
+          message = await this.claudeService.messages.create({
+            model: 'claude-3-sonnet-20240229',
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: [
+              { role: 'user', content: userPrompt + '\n\n' + formattedContent }
+            ]
+          });
+        }
+      } catch (modelError) {
+        console.error('Model API error:', {
+          model: selectedModel,
+          error: modelError,
+          timestamp: new Date().toISOString(),
+          errorDetails: modelError instanceof Error ? {
+            message: modelError.message,
+            name: modelError.name,
+            stack: modelError.stack
+          } : 'Unknown error type'
+        });
+        throw new Error(`${selectedModel.toUpperCase()} API error: ${modelError instanceof Error ? modelError.message : 'Unknown error'}`);
+      }
 
       if (!message.content[0] || message.content[0].type !== 'text') {
-        throw new Error('Invalid response from Claude');
+        const errorDetails = {
+          model: selectedModel,
+          contentLength: message.content?.length || 0,
+          contentType: message.content[0]?.type,
+          timestamp: new Date().toISOString()
+        };
+        console.error('Invalid model response structure:', errorDetails);
+        throw new Error(`Invalid response from ${selectedModel.toUpperCase()}`);
       }
 
       // Use the same cleaning function from claude-service.ts
@@ -158,6 +196,7 @@ export class ContentAnalysisService {
     } catch (error) {
       console.error('Content analysis failed:', {
         error,
+        model: process.env.CONTENT_ANALYSIS_MODEL || 'claude',
         queryTextLength: queryText?.length || 0,
         responseTextLength: responseText?.length || 0,
         markdownLength: contentMarkdown?.length || 0,

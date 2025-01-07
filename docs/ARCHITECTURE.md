@@ -150,6 +150,22 @@
   - Better period and special character handling
   - More accurate domain matching
 
+### Citation Processing Flow
+1. Initial Processing
+   - Citation insertion
+   - URL classification
+   - Metadata preparation
+
+2. Content Processing
+   - Content scraping for new citations
+   - Moz enrichment for new citations
+   - Wait for content completion
+
+3. Analysis
+   - Content analysis for new citations only
+   - Company mention counting for ALL citations with content
+   - Independent error handling for each stage
+
 ### Moz Integration
 - Enhanced metrics tracking:
   - Domain authority
@@ -157,3 +173,16 @@
   - Spam score
   - Root domains
   - External links 
+
+### Pipeline Components
+- Citation Processor: Core processing logic and coordination
+- Content Queue: Manages Firecrawl content scraping
+- Moz Queue: Handles domain metrics enrichment
+- Analysis Service: Coordinates content analysis
+
+### Data Flow
+1. URL Extraction & Validation
+2. Citation Reuse Check (120-day window)
+3. Batch Processing (new + reused citations)
+4. Content Enrichment (scraping, Moz, analysis)
+5. Company Mention Processing 

@@ -114,6 +114,18 @@
   - Consistent domain matching
   - Improved fuzzy matching
 
+### Processing Pipeline
+- Decoupled processing stages:
+  1. Citation Creation
+  2. Content/Moz Processing
+  3. Content Analysis
+  4. Company Mention Counting
+
+- Enhanced error isolation:
+  - Separate error handling per stage
+  - Non-blocking company mention processing
+  - Preserved citation data on failures
+
 ### Database Schema
 Citations table includes:
 - source_type: ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED')
@@ -138,3 +150,46 @@ Citations table includes:
     - Proper quote usage
     - Exact property names
   - Error handling for malformed responses 
+
+# Citation Processing Pipeline
+
+## Overview
+The citation processing pipeline handles extraction, enrichment, and analysis of citations from AI responses.
+
+## Flow
+1. URL Extraction & Validation
+   - Clean and validate URLs
+   - Remove formatting artifacts
+   - Check URL validity
+
+2. Citation Reuse Check
+   - Check for existing citations within 120 days
+   - Split into new vs reusable citations
+   - Copy enrichment data for reuse
+
+3. Batch Processing
+   - Insert new citations
+   - Create references to existing citations
+   - Maintain citation order and metadata
+
+4. Content Enrichment
+   - Moz data enrichment (domain authority, spam score, etc)
+   - Content scraping via Firecrawl
+   - Content analysis and metrics calculation
+
+5. Company Mention Processing
+   - Count company mentions in content
+   - Update mention statistics
+   - Track mention context
+
+## Integration Points
+- Called from generate-claude-response.ts
+- Called from generate-gemini-response.ts
+- Integrated with analysis.ts
+- Uses Firecrawl for content
+- Uses Moz for domain metrics
+
+## Error Handling
+- Transaction-level error boundaries
+- Content scraping retry logic
+- Non-blocking enrichment failures 
