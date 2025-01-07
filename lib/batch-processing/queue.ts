@@ -3,6 +3,7 @@ import { Database } from "@/types/supabase";
 import { analyzeResponse, Response } from "./analysis";
 import { SupabaseBatchTrackingService } from '@/lib/services/batch-tracking'
 import { processCitationsTransaction } from './citation-processor';
+import { CitationRecoveryQueue } from './citation-recovery-queue';
 
 type ResponseAnalysisInsert = Omit<Database['public']['Tables']['response_analysis']['Insert'], 'id'> & {
   citations_parsed: JSON;
@@ -259,7 +260,7 @@ export class ResponseAnalysisQueue {
           const { data: insertedAnalysis } = await adminClient
             .from('response_analysis')
             .select('*')
-            .eq('response_id', analysisData.response_id)
+            .eq('response_id', analysisData.response_id!)
             .single();
 
           if (!insertedAnalysis) {
@@ -302,7 +303,6 @@ export class ResponseAnalysisQueue {
       this.processing = true;
       this.stats.inProgress = true;
       
-      // Create one analysis batch ID for this entire processing run
       const analysisBatchId = await batchTracker.createBatch('response_analysis', companyId, {
         startId,
         endId,
@@ -328,7 +328,11 @@ export class ResponseAnalysisQueue {
         console.log(`Moving to next batch starting at ${currentId}`);
       }
 
-      console.log('Completed processing all responses in range');
+      // After all batches are processed, run citation recovery
+      const recoveryQueue = new CitationRecoveryQueue();
+      await recoveryQueue.runRecovery(analysisBatchId);
+
+      console.log('Completed processing all responses in range, including citation recovery');
     } catch (error) {
       console.error('Queue processing error:', error);
       throw error;
