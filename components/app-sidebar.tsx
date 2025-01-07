@@ -24,6 +24,7 @@ import { useState } from "react"
 import { useDashboardStore, type DashboardView } from "@/app/dashboard/store"
 import { ProBadge } from "@/components/ui/pro-badge"
 import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
@@ -65,6 +66,7 @@ export function AppSidebar({ className }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const { activeView, setActiveView } = useDashboardStore()
   const isDashboard = pathname === "/dashboard"
+  const router = useRouter()
 
   const getHref = (basePath: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -143,6 +145,10 @@ export function AppSidebar({ className }: SidebarProps) {
   const handleNavigation = (item: NavItem, e: React.MouseEvent) => {
     e.preventDefault()
     setActiveView(item.view)
+    
+    // Preserve existing search params and navigate
+    const params = new URLSearchParams(searchParams.toString())
+    router.push(`/dashboard${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
   const SidebarContent = () => (
