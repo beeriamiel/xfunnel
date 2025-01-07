@@ -15,7 +15,8 @@ import type {
 
 export async function getCompanyById(id: number): Promise<Company | null> {
   try {
-    const supabase = createServerComponentClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
     
     const { data, error } = await supabase
       .from('companies')
@@ -76,7 +77,8 @@ function getQueryState(queries: Query[]): QueryState {
 
 export async function getCompanyProfile(companyId: number): Promise<CompanyProfile | null> {
   try {
-    const supabase = createServerComponentClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
     
     // Fetch ICPs with their personas and queries in a single query
     const { data: icps, error: icpsError } = await supabase
