@@ -1,102 +1,71 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-
-// Define protected and auth routes
-const protectedRoutes = ['/dashboard']
-const authRoutes = ['/login', '/signup']
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
-
   try {
-    // Create supabase server client
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          async get(name: string) {
-            return request.cookies.get(name)?.value
-          },
-          async set(name: string, value: string, options: CookieOptions) {
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            })
-          },
-          async remove(name: string, options: CookieOptions) {
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
-          },
-        },
-      }
-    )
+    // Create a response early to modify cookies
+    const res = NextResponse.next()
+    
+    // Create supabase client
+    const supabase = createMiddlewareClient({ req: request, res })
 
-    // Get session
-    const { data: { user } } = await supabase.auth.getUser()
+    // Auth condition for protected routes
+    const isLoginRoute = request.nextUrl.pathname === '/login'
+    const isSignupRoute = request.nextUrl.pathname === '/signup'
+    const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback')
+    const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
+                            request.nextUrl.pathname.startsWith('/personal')
 
-    // Handle protected routes
-    if (protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
-      if (!user) {
-        const redirectUrl = new URL('/login', request.url)
-        redirectUrl.searchParams.set('redirect_to', request.nextUrl.pathname + request.nextUrl.search)
-        return NextResponse.redirect(redirectUrl)
-      }
+    // Skip middleware for auth-related routes
+    if (isAuthCallback) {
+      return res
     }
 
-    // Handle auth routes
-    if (authRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
-      if (user) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
+    // Refresh session if expired - must be awaited
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError)
     }
 
-    // Set session user in request headers
-    if (user) {
-      response.headers.set('x-session-user', JSON.stringify({
-        id: user.id,
-        email: user.email,
-        role: user.role
+    // Redirect if not authenticated
+    if (isProtectedRoute && !session) {
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('redirect_to', request.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Redirect if authenticated and trying to access login/signup
+    if ((isLoginRoute || isSignupRoute) && session) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Set session user in headers if needed
+    if (session?.user) {
+      res.headers.set('x-session-user', JSON.stringify({
+        id: session.user.id,
+        email: session.user.email,
+        role: session.user.role
       }))
     }
 
-    return response
+    return res
   } catch (error) {
     console.error('Middleware error:', error)
     
-    // Clear session on error
-    response.cookies.set({
-      name: 'supabase-auth-token',
-      value: '',
-      maxAge: 0
-    })
-
     // Only redirect to login if on a protected route
-    if (protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
+    if (request.nextUrl.pathname.startsWith('/dashboard') || 
+        request.nextUrl.pathname.startsWith('/personal')) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-
-    return response
+    
+    return NextResponse.next()
   }
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

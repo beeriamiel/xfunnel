@@ -13,15 +13,18 @@ interface CompanySelectorWrapperProps {
 }
 
 export async function CompanySelectorWrapper({ selectedCompany }: CompanySelectorWrapperProps) {
-  const supabase = await createClient()
-  
   try {
+    const supabase = await createClient()
+    
     const { data: companies, error } = await supabase
       .from('companies')
       .select('id, name, industry')
       .order('name')
 
-    if (error) throw error
+    if (error) {
+      console.error('Error fetching companies:', error)
+      throw error
+    }
 
     return (
       <ClientWrapper>
@@ -32,7 +35,7 @@ export async function CompanySelectorWrapper({ selectedCompany }: CompanySelecto
       </ClientWrapper>
     )
   } catch (error) {
-    console.error('Error fetching companies:', error)
+    console.error('Error in CompanySelectorWrapper:', error)
     // Return empty state instead of null
     return (
       <ClientWrapper>

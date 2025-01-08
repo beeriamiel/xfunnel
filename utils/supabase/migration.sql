@@ -1,300 +1,329 @@
 ##tables
 | table_schema | table_name              | columns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| auth         | audit_log_entries       | instance_id uuid,
-    payload json,
-    id uuid NOT NULL,
+| auth         | audit_log_entries       | payload json,
+    ip_address character varying(64) NOT NULL DEFAULT ''::character varying,
     created_at timestamp with time zone,
-    ip_address character varying(64) NOT NULL DEFAULT ''::character varying                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| auth         | flow_state              | provider_access_token text,
+    id uuid NOT NULL,
+    instance_id uuid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| auth         | flow_state              | code_challenge_method USER-DEFINED NOT NULL,
     user_id uuid,
-    authentication_method text NOT NULL,
-    id uuid NOT NULL,
-    auth_code_issued_at timestamp with time zone,
-    provider_type text NOT NULL,
-    created_at timestamp with time zone,
-    auth_code text NOT NULL,
-    updated_at timestamp with time zone,
     code_challenge text NOT NULL,
-    code_challenge_method USER-DEFINED NOT NULL,
-    provider_refresh_token text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| auth         | identities              | user_id uuid NOT NULL,
+    id uuid NOT NULL,
+    authentication_method text NOT NULL,
+    auth_code text NOT NULL,
+    provider_access_token text,
+    provider_refresh_token text,
+    provider_type text NOT NULL,
+    auth_code_issued_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| auth         | identities              | id uuid NOT NULL DEFAULT gen_random_uuid(),
+    provider_id text NOT NULL,
+    updated_at timestamp with time zone,
     created_at timestamp with time zone,
-    provider text NOT NULL,
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    identity_data jsonb NOT NULL,
     last_sign_in_at timestamp with time zone,
-    updated_at timestamp with time zone,
+    identity_data jsonb NOT NULL,
+    user_id uuid NOT NULL,
     email text,
-    provider_id text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+    provider text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | auth         | instances               | raw_base_config text,
+    uuid uuid,
     created_at timestamp with time zone,
     updated_at timestamp with time zone,
-    uuid uuid,
     id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | auth         | mfa_amr_claims          | session_id uuid NOT NULL,
-    id uuid NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
     authentication_method text NOT NULL,
-    created_at timestamp with time zone NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| auth         | mfa_challenges          | otp_code text,
-    id uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| auth         | mfa_challenges          | web_authn_session_data jsonb,
+    otp_code text,
     verified_at timestamp with time zone,
-    ip_address inet NOT NULL,
-    web_authn_session_data jsonb,
     created_at timestamp with time zone NOT NULL,
-    factor_id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| auth         | mfa_factors             | user_id uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    friendly_name text,
+    factor_id uuid NOT NULL,
+    id uuid NOT NULL,
+    ip_address inet NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| auth         | mfa_factors             | friendly_name text,
+    status USER-DEFINED NOT NULL,
     phone text,
+    created_at timestamp with time zone NOT NULL,
     web_authn_credential jsonb,
+    web_authn_aaguid uuid,
+    updated_at timestamp with time zone NOT NULL,
+    last_challenged_at timestamp with time zone,
     id uuid NOT NULL,
     secret text,
-    factor_type USER-DEFINED NOT NULL,
-    status USER-DEFINED NOT NULL,
-    web_authn_aaguid uuid,
-    last_challenged_at timestamp with time zone,
-    updated_at timestamp with time zone NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| auth         | one_time_tokens         | updated_at timestamp without time zone NOT NULL DEFAULT now(),
     user_id uuid NOT NULL,
+    factor_type USER-DEFINED NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| auth         | one_time_tokens         | user_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL DEFAULT now(),
-    token_type USER-DEFINED NOT NULL,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
     relates_to text NOT NULL,
+    token_hash text NOT NULL,
     id uuid NOT NULL,
-    token_hash text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| auth         | refresh_tokens          | revoked boolean,
-    parent character varying(255),
-    id bigint NOT NULL DEFAULT nextval('auth.refresh_tokens_id_seq'::regclass),
-    user_id character varying(255),
-    session_id uuid,
+    token_type USER-DEFINED NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| auth         | refresh_tokens          | id bigint NOT NULL DEFAULT nextval('auth.refresh_tokens_id_seq'::regclass),
     instance_id uuid,
+    revoked boolean,
     created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    session_id uuid,
+    user_id character varying(255),
     token character varying(255),
-    updated_at timestamp with time zone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+    parent character varying(255)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | auth         | saml_providers          | created_at timestamp with time zone,
-    sso_provider_id uuid NOT NULL,
-    metadata_url text,
-    attribute_mapping jsonb,
-    metadata_xml text NOT NULL,
-    name_id_format text,
     updated_at timestamp with time zone,
     entity_id text NOT NULL,
-    id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| auth         | saml_relay_states       | id uuid NOT NULL,
+    name_id_format text,
+    metadata_xml text NOT NULL,
+    metadata_url text,
+    id uuid NOT NULL,
+    sso_provider_id uuid NOT NULL,
+    attribute_mapping jsonb                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| auth         | saml_relay_states       | for_email text,
+    id uuid NOT NULL,
+    sso_provider_id uuid NOT NULL,
     created_at timestamp with time zone,
-    for_email text,
     updated_at timestamp with time zone,
     flow_state_id uuid,
-    redirect_to text,
     request_id text NOT NULL,
-    sso_provider_id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+    redirect_to text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | auth         | schema_migrations       | version character varying(255) NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| auth         | sessions                | ip inet,
-    aal USER-DEFINED,
-    user_agent text,
-    factor_id uuid,
-    tag text,
-    updated_at timestamp with time zone,
-    created_at timestamp with time zone,
-    not_after timestamp with time zone,
+| auth         | sessions                | not_after timestamp with time zone,
     refreshed_at timestamp without time zone,
-    user_id uuid NOT NULL,
-    id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| auth         | sso_domains             | sso_provider_id uuid NOT NULL,
-    domain text NOT NULL,
-    updated_at timestamp with time zone,
+    ip inet,
+    user_agent text,
     id uuid NOT NULL,
-    created_at timestamp with time zone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| auth         | sso_providers           | resource_id text,
+    tag text,
+    user_id uuid NOT NULL,
     created_at timestamp with time zone,
     updated_at timestamp with time zone,
-    id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| auth         | users                   | email_change character varying(255),
-    invited_at timestamp with time zone,
-    confirmed_at timestamp with time zone,
-    banned_until timestamp with time zone,
+    factor_id uuid,
+    aal USER-DEFINED                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| auth         | sso_domains             | id uuid NOT NULL,
+    sso_provider_id uuid NOT NULL,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    domain text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| auth         | sso_providers           | resource_id text,
+    id uuid NOT NULL,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| auth         | users                   | is_anonymous boolean NOT NULL DEFAULT false,
+    id uuid NOT NULL,
     email_confirmed_at timestamp with time zone,
+    invited_at timestamp with time zone,
+    confirmation_sent_at timestamp with time zone,
+    recovery_sent_at timestamp with time zone,
+    email_change_sent_at timestamp with time zone,
+    last_sign_in_at timestamp with time zone,
+    raw_app_meta_data jsonb,
+    raw_user_meta_data jsonb,
+    is_super_admin boolean,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    phone_confirmed_at timestamp with time zone,
+    phone_change_sent_at timestamp with time zone,
+    confirmed_at timestamp with time zone,
+    email_change_confirm_status smallint DEFAULT 0,
+    banned_until timestamp with time zone,
+    reauthentication_sent_at timestamp with time zone,
+    is_sso_user boolean NOT NULL DEFAULT false,
+    deleted_at timestamp with time zone,
+    email character varying(255),
+    role character varying(255),
+    aud character varying(255),
+    reauthentication_token character varying(255) DEFAULT ''::character varying,
     email_change_token_current character varying(255) DEFAULT ''::character varying,
     phone_change_token character varying(255) DEFAULT ''::character varying,
-    recovery_token character varying(255),
-    phone_change_sent_at timestamp with time zone,
-    reauthentication_token character varying(255) DEFAULT ''::character varying,
-    confirmation_token character varying(255),
-    created_at timestamp with time zone,
-    is_sso_user boolean NOT NULL DEFAULT false,
-    raw_app_meta_data jsonb,
-    is_anonymous boolean NOT NULL DEFAULT false,
-    encrypted_password character varying(255),
-    email_change_confirm_status smallint DEFAULT 0,
-    aud character varying(255),
-    raw_user_meta_data jsonb,
-    instance_id uuid,
-    deleted_at timestamp with time zone,
-    recovery_sent_at timestamp with time zone,
-    phone text DEFAULT NULL::character varying,
-    reauthentication_sent_at timestamp with time zone,
-    email_change_sent_at timestamp with time zone,
-    email_change_token_new character varying(255),
-    confirmation_sent_at timestamp with time zone,
-    role character varying(255),
     phone_change text DEFAULT ''::character varying,
-    phone_confirmed_at timestamp with time zone,
-    last_sign_in_at timestamp with time zone,
-    email character varying(255),
-    updated_at timestamp with time zone,
-    id uuid NOT NULL,
-    is_super_admin boolean |
-| public       | batch_metadata          | completed_at timestamp with time zone,
-    error_message text,
+    phone text DEFAULT NULL::character varying,
+    email_change character varying(255),
+    email_change_token_new character varying(255),
+    recovery_token character varying(255),
+    confirmation_token character varying(255),
+    encrypted_password character varying(255),
+    instance_id uuid |
+| public       | account_users           | role text NOT NULL,
+    user_id uuid NOT NULL,
+    account_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    batch_type text NOT NULL,
-    company_id bigint,
-    status text NOT NULL,
-    metadata jsonb,
-    batch_id uuid NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| public       | citations               | icp_vertical text,
-    company_mentioned boolean,
-    domain_authority bigint,
-    ranking_position integer,
-    external_links_to_root_domain integer,
-    rank_list text,
-    moz_last_updated timestamp with time zone,
-    response_analysis_id bigint NOT NULL,
-    id bigint NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    response_text text,
-    query_text text,
-    page_authority integer,
-    moz_last_crawled timestamp with time zone,
-    source_type text,
-    root_domains_to_root_domain integer,
-    spam_score integer,
-    buyer_journey_phase text,
-    mentioned_companies ARRAY,
-    company_id bigint NOT NULL,
-    buyer_persona text,
-    content_analysis text,
-    citation_order integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    citation_url text NOT NULL,
-    region text,
-    recommended boolean                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| public       | companies               | markets_operating_in ARRAY DEFAULT '{}'::text[],
-    created_at timestamp with time zone DEFAULT now(),
-    industry text,
-    main_products ARRAY DEFAULT '{}'::text[],
-    product_category text,
-    number_of_employees integer,
+    id uuid NOT NULL DEFAULT gen_random_uuid()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| public       | accounts                | id uuid NOT NULL DEFAULT gen_random_uuid(),
+    monthly_credits_available integer NOT NULL DEFAULT 0,
+    monthly_credits_used integer NOT NULL DEFAULT 0,
+    credits_renewal_date timestamp with time zone,
+    last_update_date timestamp with time zone DEFAULT now(),
     name text NOT NULL,
-    annual_revenue text,
-    id bigint NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| public       | competitors             | competitor_name text NOT NULL,
-    id bigint NOT NULL,
-    company_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| public       | generation_progress     | updated_at timestamp with time zone DEFAULT now(),
-    created_at timestamp with time zone DEFAULT now(),
-    id bigint NOT NULL,
-    progress integer NOT NULL,
-    company_id bigint NOT NULL,
+    account_type text NOT NULL,
+    plan_type text NOT NULL,
+    created_at timestamp with time zone DEFAULT now()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| public       | batch_metadata          | status text NOT NULL,
     error_message text,
-    status text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| public       | ideal_customer_profiles | created_by_batch boolean DEFAULT false,
-    region text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    icp_batch_id uuid DEFAULT gen_random_uuid(),
-    company_size text NOT NULL,
+    completed_at timestamp with time zone,
+    account_id uuid,
+    metadata jsonb,
+    batch_id uuid NOT NULL,
     company_id bigint,
+    batch_type text NOT NULL,
+    created_at timestamp with time zone DEFAULT now()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| public       | citations               | mentioned_companies_count ARRAY,
+    content_scraped_at timestamp with time zone,
+    content_analysis_updated_at timestamp with time zone,
+    is_original boolean DEFAULT true,
+    origin_citation_id bigint,
+    account_id uuid,
     id bigint NOT NULL,
-    vertical text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| public       | persona_response_stats  | total_batches bigint,
-    persona_title text,
-    persona_id bigint,
-    questions_with_responses bigint,
-    latest_response_date timestamp with time zone,
-    total_questions bigint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| public       | personas                | title text NOT NULL,
-    icp_id bigint,
-    id bigint NOT NULL,
-    seniority_level text NOT NULL,
-    department text NOT NULL,
-    created_at timestamp with time zone DEFAULT now()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| public       | prompt_logs             | created_at timestamp with time zone DEFAULT now(),
-    prompt_template_ids ARRAY NOT NULL,
-    context_data jsonb,
-    id bigint NOT NULL,
-    system_prompt text NOT NULL,
-    persona_id bigint,
-    user_prompt text NOT NULL,
-    company_id bigint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| public       | prompts                 | name text NOT NULL,
-    prompt_type text,
-    is_active boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
-    prompt_text text NOT NULL,
-    updated_at timestamp with time zone DEFAULT now(),
-    id bigint NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| public       | queries                 | prompt_id bigint,
-    buyer_journey_phase ARRAY,
-    persona_id bigint,
-    created_at timestamp with time zone DEFAULT now(),
-    query_batch_id uuid DEFAULT gen_random_uuid(),
-    query_text text NOT NULL,
-    company_id bigint,
-    id bigint NOT NULL,
-    created_by_batch boolean DEFAULT false,
-    user_id uuid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| public       | response_analysis       | created_at timestamp with time zone DEFAULT now(),
-    geographic_region text,
-    buyer_persona text,
-    response_id bigint,
-    query_id bigint,
-    solution_analysis jsonb,
-    answer_engine text NOT NULL,
-    company_mentioned boolean DEFAULT false,
-    query_text text,
-    competitors_list ARRAY DEFAULT '{}'::text[],
-    created_by_batch boolean DEFAULT false,
+    citation_order integer NOT NULL,
+    response_analysis_id bigint NOT NULL,
+    company_id bigint NOT NULL,
     recommended boolean,
+    company_mentioned boolean,
+    ranking_position integer,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    domain_authority bigint,
+    source_type USER-DEFINED NOT NULL DEFAULT 'EARNED'::citation_source_type,
+    page_authority integer,
+    spam_score integer,
+    root_domains_to_root_domain integer,
+    external_links_to_root_domain integer,
+    moz_last_crawled timestamp with time zone,
+    moz_last_updated timestamp with time zone,
+    citation_url text NOT NULL,
+    buyer_persona text,
+    buyer_journey_phase text,
+    rank_list text,
+    mentioned_companies ARRAY,
+    icp_vertical text,
+    response_text text,
+    region text,
+    query_text text,
+    content_analysis text,
+    content_markdown text,
+    content_scraping_error text                                                                                                                                                                                                                                                                                                                                                                                           |
+| public       | companies               | account_id uuid,
+    name text NOT NULL,
+    product_category text,
+    industry text,
+    markets_operating_in ARRAY DEFAULT '{}'::text[],
+    id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    main_products ARRAY DEFAULT '{}'::text[],
+    number_of_employees integer,
+    annual_revenue text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| public       | competitors             | created_at timestamp with time zone DEFAULT now(),
+    company_id bigint NOT NULL,
+    id bigint NOT NULL,
+    competitor_name text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| public       | generation_progress     | id bigint NOT NULL,
+    progress integer NOT NULL,
+    updated_at timestamp with time zone DEFAULT now(),
+    created_at timestamp with time zone DEFAULT now(),
+    status text NOT NULL,
+    error_message text,
+    company_id bigint NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| public       | ideal_customer_profiles | created_at timestamp with time zone DEFAULT now(),
+    company_id bigint,
+    icp_batch_id uuid DEFAULT gen_random_uuid(),
+    created_by_batch boolean DEFAULT false,
+    account_id uuid,
+    vertical text NOT NULL,
+    company_size text NOT NULL,
+    region text NOT NULL,
+    id bigint NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| public       | persona_response_stats  | questions_with_responses bigint,
+    latest_response_date timestamp with time zone,
+    persona_title text,
+    total_batches bigint,
+    persona_id bigint,
+    total_questions bigint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| public       | personas                | department text NOT NULL,
+    id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    icp_id bigint,
+    seniority_level text NOT NULL,
+    title text NOT NULL,
+    account_id uuid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| public       | prompt_logs             | persona_id bigint,
+    context_data jsonb,
+    user_prompt text NOT NULL,
+    system_prompt text NOT NULL,
+    id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    company_id bigint,
+    prompt_template_ids ARRAY NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| public       | prompts                 | prompt_type text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    name text NOT NULL,
+    id bigint NOT NULL,
+    prompt_text text NOT NULL,
+    is_active boolean DEFAULT false                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| public       | queries                 | buyer_journey_phase ARRAY,
+    created_at timestamp with time zone DEFAULT now(),
+    company_id bigint,
+    id bigint NOT NULL,
+    prompt_id bigint,
+    persona_id bigint,
+    user_id uuid,
+    query_batch_id uuid DEFAULT gen_random_uuid(),
+    created_by_batch boolean DEFAULT false,
+    account_id uuid,
+    query_text text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| public       | response_analysis       | query_id bigint,
+    prompt_name text,
+    company_name text NOT NULL,
+    query_text text,
+    answer_engine text NOT NULL,
+    id bigint NOT NULL,
+    response_id bigint,
+    citations_parsed jsonb,
+    recommended boolean,
+    cited boolean,
+    created_at timestamp with time zone DEFAULT now(),
+    sentiment_score double precision,
+    ranking_position integer,
+    company_mentioned boolean DEFAULT false,
+    company_id bigint NOT NULL,
+    geographic_region text,
+    prompt_id bigint,
+    solution_analysis jsonb,
+    analysis_batch_id uuid,
+    created_by_batch boolean DEFAULT false,
+    account_id uuid,
+    buyer_persona text,
+    buying_journey_stage text,
+    industry_vertical text,
+    response_text text,
     rank_list text,
     icp_vertical text,
-    citations_parsed jsonb,
-    buying_journey_stage text,
-    ranking_position integer,
-    sentiment_score double precision,
-    response_text text,
     mentioned_companies ARRAY DEFAULT '{}'::text[],
-    company_id bigint NOT NULL,
-    prompt_id bigint,
-    company_name text NOT NULL,
-    prompt_name text,
-    cited boolean,
-    id bigint NOT NULL,
-    industry_vertical text,
-    analysis_batch_id uuid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| public       | response_analysis_view  | industry_vertical text,
-    buyer_persona text,
-    sentiment_score double precision,
-    recommended boolean,
+    competitors_list ARRAY DEFAULT '{}'::text[]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| public       | response_analysis_view  | sentiment_score double precision,
     company_mentioned boolean,
-    ranking_position integer,
-    id bigint,
+    recommended boolean,
+    citations_parsed jsonb,
     created_at timestamp with time zone,
     response_id bigint,
-    citations_parsed jsonb,
+    buying_journey_stage text,
     geographic_region text,
-    buying_journey_stage text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| public       | responses               | response_batch_id uuid DEFAULT gen_random_uuid(),
-    created_by_batch boolean DEFAULT false,
-    answer_engine text,
-    url text,
-    id bigint NOT NULL,
+    industry_vertical text,
+    buyer_persona text,
+    ranking_position integer,
+    id bigint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| public       | responses               | query_id bigint,
+    response_text text NOT NULL,
     citations ARRAY,
+    answer_engine text,
     created_at timestamp with time zone DEFAULT now(),
-    query_id bigint,
+    url text,
     websearchqueries ARRAY,
-    response_text text NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+    response_batch_id uuid DEFAULT gen_random_uuid(),
+    account_id uuid,
+    created_by_batch boolean DEFAULT false,
+    id bigint NOT NULL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 ##indexes
 | section  | table_schema | table_name              | indexes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -430,52 +459,150 @@ generation_progress_status_check CHECK ((status = ANY (ARRAY['generating_icps'::
 
 ##rls Policies
 
-| schema_name | table_name              | policy_name                                  | permissive | roles         | command | using_expression                                                                                                    | with_check_expression                 |
-| ----------- | ----------------------- | -------------------------------------------- | ---------- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| public      | citations               | Enable insert for authenticated users        | PERMISSIVE | authenticated | INSERT  |                                                                                                                     | true                                  |
-| public      | citations               | Enable read access for authenticated users   | PERMISSIVE | authenticated | SELECT  | true                                                                                                                |                                       |
-| public      | citations               | Enable update for authenticated users        | PERMISSIVE | authenticated | UPDATE  | true                                                                                                                | true                                  |
-| public      | companies               | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
-| public      | companies               | Users can insert companies                   | PERMISSIVE | authenticated | INSERT  |                                                                                                                     | true                                  |
-| public      | generation_progress     | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
-| public      | ideal_customer_profiles | Enable insert access for authenticated users | PERMISSIVE |               | INSERT  |                                                                                                                     | true                                  |
-| public      | ideal_customer_profiles | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
-| public      | personas                | Enable insert access for authenticated users | PERMISSIVE |               | INSERT  |                                                                                                                     | true                                  |
-| public      | personas                | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
-| public      | prompts                 | Allow reading prompts                        | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
-| public      | prompts                 | Authenticated users can manage prompts       | PERMISSIVE | authenticated | ALL     | true                                                                                                                | true                                  |
-| public      | queries                 | Allow reading queries                        | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
-| public      | queries                 | Users can insert their own data              | PERMISSIVE |               | INSERT  |                                                                                                                     | (user_id = auth.uid())                |
-| public      | queries                 | Users can update their own queries           | PERMISSIVE |               | UPDATE  | (user_id = auth.uid())                                                                                              | (user_id = auth.uid())                |
-| public      | response_analysis       | Allow viewing all response analyses          | PERMISSIVE |               | ALL     | true                                                                                                                |                                       |
-| public      | responses               | Enable insert for authenticated users        | PERMISSIVE |               | INSERT  |                                                                                                                     | (auth.role() = 'authenticated'::text) |
-| public      | responses               | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                |                                       |
+| schema_name | table_name              | policy_name                                  | permissive | roles         | command | using_expression                                                                                                                                                     | with_check_expression                                                                                                                                                |
+| ----------- | ----------------------- | -------------------------------------------- | ---------- | ------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| public      | account_users           | admin_account_access                         | PERMISSIVE | authenticated | ALL     | ((user_id = auth.uid()) AND (role = 'admin'::text))                                                                                                                  |                                                                                                                                                                      |
+| public      | account_users           | superadmin_access                            | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_user_meta_data ->> 'is_super_admin'::text) = 'true'::text))))                 |                                                                                                                                                                      |
+| public      | account_users           | user_account_access                          | PERMISSIVE | authenticated | SELECT  | (user_id = auth.uid())                                                                                                                                               |                                                                                                                                                                      |
+| public      | accounts                | Users can view their accounts                | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = accounts.id) AND (account_users.user_id = auth.uid()))))                               |                                                                                                                                                                      |
+| public      | accounts                | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | batch_metadata          | Users can access their account's batches     | PERMISSIVE |               | ALL     | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = batch_metadata.account_id) AND (account_users.user_id = auth.uid()))))                 |                                                                                                                                                                      |
+| public      | batch_metadata          | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | citations               | Enable insert for authenticated users        | PERMISSIVE | authenticated | INSERT  |                                                                                                                                                                      | true                                                                                                                                                                 |
+| public      | citations               | Enable read access for authenticated users   | PERMISSIVE | authenticated | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | citations               | Enable update for authenticated users        | PERMISSIVE | authenticated | UPDATE  | true                                                                                                                                                                 | true                                                                                                                                                                 |
+| public      | citations               | Users can create citations in their accounts | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = citations.account_id) AND (account_users.user_id = auth.uid()))))                      |
+| public      | citations               | Users can view their account's citations     | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = citations.account_id) AND (account_users.user_id = auth.uid()))))                      |                                                                                                                                                                      |
+| public      | citations               | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | companies               | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | companies               | Users can access their account's companies   | PERMISSIVE |               | ALL     | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = companies.account_id) AND (account_users.user_id = auth.uid()))))                      |                                                                                                                                                                      |
+| public      | companies               | Users can create companies in their accounts | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = companies.account_id) AND (account_users.user_id = auth.uid()))))                      |
+| public      | companies               | Users can insert companies                   | PERMISSIVE | authenticated | INSERT  |                                                                                                                                                                      | true                                                                                                                                                                 |
+| public      | companies               | Users can view their account's companies     | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = companies.account_id) AND (account_users.user_id = auth.uid()))))                      |                                                                                                                                                                      |
+| public      | companies               | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | competitors             | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | generation_progress     | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | generation_progress     | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | ideal_customer_profiles | Enable insert access for authenticated users | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | true                                                                                                                                                                 |
+| public      | ideal_customer_profiles | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | ideal_customer_profiles | Users can create ICPs in their accounts      | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = ideal_customer_profiles.account_id) AND (account_users.user_id = auth.uid()))))        |
+| public      | ideal_customer_profiles | Users can view their account's ICPs          | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = ideal_customer_profiles.account_id) AND (account_users.user_id = auth.uid()))))        |                                                                                                                                                                      |
+| public      | ideal_customer_profiles | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | personas                | Enable insert access for authenticated users | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | true                                                                                                                                                                 |
+| public      | personas                | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | personas                | Users can create personas in their accounts  | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = personas.account_id) AND (account_users.user_id = auth.uid()))))                       |
+| public      | personas                | Users can view their account's personas      | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = personas.account_id) AND (account_users.user_id = auth.uid()))))                       |                                                                                                                                                                      |
+| public      | personas                | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | prompt_logs             | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | prompts                 | Allow reading prompts                        | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | prompts                 | Authenticated users can manage prompts       | PERMISSIVE | authenticated | ALL     | true                                                                                                                                                                 | true                                                                                                                                                                 |
+| public      | prompts                 | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | queries                 | Allow reading queries                        | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | queries                 | Users can create queries in their accounts   | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = queries.account_id) AND (account_users.user_id = auth.uid()))))                        |
+| public      | queries                 | Users can insert their own data              | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (user_id = auth.uid())                                                                                                                                               |
+| public      | queries                 | Users can update their own queries           | PERMISSIVE |               | UPDATE  | (user_id = auth.uid())                                                                                                                                               | (user_id = auth.uid())                                                                                                                                               |
+| public      | queries                 | Users can view their account's queries       | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = queries.account_id) AND (account_users.user_id = auth.uid()))))                        |                                                                                                                                                                      |
+| public      | queries                 | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | response_analysis       | Allow viewing all response analyses          | PERMISSIVE |               | ALL     | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | response_analysis       | Users can create analyses in their accounts  | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = response_analysis.account_id) AND (account_users.user_id = auth.uid()))))              |
+| public      | response_analysis       | Users can view their account's analyses      | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = response_analysis.account_id) AND (account_users.user_id = auth.uid()))))              |                                                                                                                                                                      |
+| public      | response_analysis       | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+| public      | responses               | Enable insert for authenticated users        | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (auth.role() = 'authenticated'::text)                                                                                                                                |
+| public      | responses               | Enable read access for all users             | PERMISSIVE |               | SELECT  | true                                                                                                                                                                 |                                                                                                                                                                      |
+| public      | responses               | Users can create responses in their accounts | PERMISSIVE |               | INSERT  |                                                                                                                                                                      | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = responses.account_id) AND (account_users.user_id = auth.uid()))))                      |
+| public      | responses               | Users can update their account's responses   | PERMISSIVE |               | UPDATE  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = responses.account_id) AND (account_users.user_id = auth.uid()))))                      |                                                                                                                                                                      |
 | public      | responses               | Users can view responses to their queries    | PERMISSIVE |               | ALL     | (EXISTS ( SELECT 1
    FROM queries
-  WHERE ((queries.id = responses.query_id) AND (queries.user_id = auth.uid())))) |                                       |
-
--- First create the enum type
-CREATE TYPE citation_source_type AS ENUM ('OWNED', 'COMPETITOR', 'UGC', 'EARNED');
-
--- Map existing values to new enum values
-UPDATE citations 
-SET source_type = CASE 
-    WHEN source_type IS NULL OR source_type = '' THEN 'EARNED'
-    WHEN source_type = 'Affiliate' THEN 'EARNED'
-    WHEN source_type = 'Documentation' THEN 'EARNED'
-    WHEN source_type = 'Blog' THEN 'EARNED'
-    WHEN source_type = 'GitHub' THEN 'EARNED'
-    WHEN source_type = 'Guide' THEN 'EARNED'
-    WHEN source_type = 'Tutorial' THEN 'EARNED'
-    ELSE 'EARNED'
-END;
-
--- Now we can safely alter the column
-ALTER TABLE citations 
-  ALTER COLUMN source_type TYPE citation_source_type 
-  USING source_type::citation_source_type;
-
--- Add NOT NULL constraint with default
-ALTER TABLE citations 
-  ALTER COLUMN source_type SET NOT NULL,
-  ALTER COLUMN source_type SET DEFAULT 'EARNED';
+  WHERE ((queries.id = responses.query_id) AND (queries.user_id = auth.uid()))))                                                  |                                                                                                                                                                      |
+| public      | responses               | Users can view their account's responses     | PERMISSIVE |               | SELECT  | (EXISTS ( SELECT 1
+   FROM account_users
+  WHERE ((account_users.account_id = responses.account_id) AND (account_users.user_id = auth.uid()))))                      |                                                                                                                                                                      |
+| public      | responses               | super_admin_policy                           | PERMISSIVE | authenticated | ALL     | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
