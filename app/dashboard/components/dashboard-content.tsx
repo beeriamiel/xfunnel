@@ -12,11 +12,10 @@ import { CompetitorAnalysis } from './competitor-analysis'
 import { CitationAnalysis } from './citation-analysis'
 import { KeyTakeaways } from './key-takeaways/key-takeaways'
 import { GenerateAnalysis } from './generate-analysis'
-import { PersonalSettings } from './personal-settings'
 import { FAQs } from './faqs'
 import { useDashboardStore } from '../store'
 import { NewICPAnalysis } from "./new-icp-analysis"
-import { usePathname } from 'next/navigation'
+import { PersonalSettings } from "./personal-settings"
 
 interface Company {
   id: number
@@ -62,23 +61,23 @@ function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
     <div className="space-y-4 p-8">
       <div className="grid gap-4">
         <Suspense fallback={<MetricsSkeleton />}>
-          {activeView === 'engine' ? (
-            <>
-              <EngineMetricsChart companyId={selectedCompany.id} />
-              <CompetitorAnalysis companyId={selectedCompany.id} />
-            </>
+          {activeView === 'response' ? (
+            <GenerateAnalysis />
+          ) : activeView === 'faqs' ? (
+            <FAQs />
           ) : activeView === 'icp' ? (
             <NewICPAnalysis companyId={selectedCompany.id} />
           ) : activeView === 'citation' ? (
             <CitationAnalysis companyId={selectedCompany.id} />
           ) : activeView === 'takeaways' ? (
             <KeyTakeaways companyId={selectedCompany.id} />
-          ) : activeView === 'response' ? (
-            <GenerateAnalysis />
           ) : activeView === 'personal' ? (
             <PersonalSettings />
           ) : (
-            <FAQs />
+            <>
+              <EngineMetricsChart companyId={selectedCompany.id} />
+              <CompetitorAnalysis companyId={selectedCompany.id} />
+            </>
           )}
         </Suspense>
       </div>
@@ -110,7 +109,9 @@ export function DashboardContent({ selectedCompany }: Props) {
                 ? 'Generate Analysis'
                 : activeView === 'personal'
                 ? 'Personal Settings'
-                : 'FAQs'
+                : activeView === 'faqs'
+                ? 'FAQs'
+                : 'Dashboard'
             }
           />
           <Suspense fallback={<div className="p-8"><MetricsSkeleton /></div>}>

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Company } from './components/generate-analysis/types/company'
 
-export type DashboardView = 'engine' | 'citation' | 'takeaways' | 'response' | 'personal' | 'faqs' | 'icp'
+export type DashboardView = 'engine' | 'citation' | 'takeaways' | 'response' | 'personal' | 'faqs' | 'icp' | 'journey' | 'new-journey'
 export type TimePeriod = 'weekly' | 'monthly'
 
 interface ICP {

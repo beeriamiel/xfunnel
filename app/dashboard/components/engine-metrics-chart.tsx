@@ -1102,20 +1102,18 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
       )
     );
 
+    // Sort data chronologically
     const sortedData = [...data].sort((a, b) => {
-      const dateA = parseDate(a.created_at);
-      const dateB = parseDate(b.created_at);
-      if (!dateA || !dateB) return 0;
-      return dateA.getTime() - dateB.getTime();
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateA - dateB;
     });
 
-    sortedData.forEach(record => {
-      const date = parseDate(record.created_at);
-      if (!date) {
-        console.warn('Invalid date in record:', record);
-        return;
-      }
-
+    // Process each record
+    sortedData.forEach((record: ExtendedResponseAnalysis) => {
+      const recordDate = new Date(record.created_at);
+      
+      // Process batch groups
       if (record.analysis_batch_id) {
         const batchKey = record.analysis_batch_id;
         if (!batchGroups[batchKey]) {
@@ -1124,80 +1122,75 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
             type: 'batch',
             batchId: batchKey,
             date: record.created_at,
-            metrics: {},
+            metrics: processGroup(batchRecords, uniqueEngines),
             records: batchRecords
           };
-          batchGroups[batchKey].metrics = processGroup(batchRecords, uniqueEngines);
         }
       }
 
-      try {
-        const weekStart = getWeekStart(date);
-        const weekEnd = getWeekEnd(date);
-        const weekKey = weekStart.toISOString();
+      // Process week groups
+      const weekStart = new Date(recordDate);
+      weekStart.setUTCHours(0, 0, 0, 0);
+      weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay() + 1); // Start from Monday
+      const weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+      weekEnd.setUTCHours(23, 59, 59, 999);
+      
+      const weekKey = weekStart.toISOString();
 
-        if (!weekGroups[weekKey]) {
-          const weekRecords = data.filter(r => {
-            const recordDate = parseDate(r.created_at);
-            if (!recordDate) return false;
-            return recordDate >= weekStart && recordDate <= weekEnd;
-          });
+      if (!weekGroups[weekKey]) {
+        const weekRecords = data.filter((r: ExtendedResponseAnalysis) => {
+          const rDate = new Date(r.created_at);
+          return rDate >= weekStart && rDate <= weekEnd;
+        });
+        
+        if (weekRecords.length > 0) {
           weekGroups[weekKey] = {
             type: 'time',
             startDate: weekStart.toISOString(),
             endDate: weekEnd.toISOString(),
-            label: getWeekLabel(date),
-            metrics: {},
+            label: getWeekLabel(recordDate),
+            metrics: processGroup(weekRecords, uniqueEngines),
             records: weekRecords
           };
-          weekGroups[weekKey].metrics = processGroup(weekRecords, uniqueEngines);
         }
+      }
 
-        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-        const monthKey = monthStart.toISOString();
+      // Process month groups
+      const monthStart = new Date(recordDate.getUTCFullYear(), recordDate.getUTCMonth(), 1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const monthEnd = new Date(recordDate.getUTCFullYear(), recordDate.getUTCMonth() + 1, 0);
+      monthEnd.setUTCHours(23, 59, 59, 999);
+      
+      const monthKey = monthStart.toISOString();
 
-        if (!monthGroups[monthKey]) {
-          const monthRecords = data.filter(r => {
-            const recordDate = parseDate(r.created_at);
-            if (!recordDate) return false;
-            return recordDate >= monthStart && recordDate <= monthEnd;
-          });
+      if (!monthGroups[monthKey]) {
+        const monthRecords = data.filter((r: ExtendedResponseAnalysis) => {
+          const rDate = new Date(r.created_at);
+          return rDate >= monthStart && rDate <= monthEnd;
+        });
+        
+        if (monthRecords.length > 0) {
           monthGroups[monthKey] = {
             type: 'time',
             startDate: monthStart.toISOString(),
             endDate: monthEnd.toISOString(),
-            label: getMonthLabel(date),
-            metrics: {},
+            label: getMonthLabel(monthStart),
+            metrics: processGroup(monthRecords, uniqueEngines),
             records: monthRecords
           };
-          monthGroups[monthKey].metrics = processGroup(monthRecords, uniqueEngines);
         }
-      } catch (error) {
-        console.error('Error processing date groups:', error);
       }
     });
 
+    // Update state with processed data
     setProcessedDataByMode({
       batch: Object.values(batchGroups)
-        .sort((a, b) => {
-          const dateA = parseDate(a.date);
-          const dateB = parseDate(b.date);
-          if (!dateA || !dateB) return 0;
-          return dateA.getTime() - dateB.getTime();
-        }),
+        .sort((a: BatchGroup, b: BatchGroup) => new Date(a.date).getTime() - new Date(b.date).getTime()),
       week: Object.values(weekGroups)
-        .sort((a, b) => {
-          const dateA = new Date(a.startDate);
-          const dateB = new Date(b.startDate);
-          return dateA.getTime() - dateB.getTime();
-        }),
+        .sort((a: TimeGroup, b: TimeGroup) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()),
       month: Object.values(monthGroups)
-        .sort((a, b) => {
-          const dateA = new Date(a.startDate);
-          const dateB = new Date(b.startDate);
-          return dateA.getTime() - dateB.getTime();
-        })
+        .sort((a: TimeGroup, b: TimeGroup) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     });
   }, []);
 
@@ -1230,7 +1223,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
             buyer_persona
           `)
           .eq('company_id', effectiveCompanyId)
-          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: true });
 
         if (supabaseError) throw supabaseError;
