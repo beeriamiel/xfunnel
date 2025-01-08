@@ -29,21 +29,28 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
       : activeView === 'citation'
       ? 'Citation Analysis'
       : activeView === 'response'
-      ? 'Response Analysis'
+      ? 'Generate Analysis'
+      : activeView === 'icp'
+      ? 'ICP Analysis'
+      : activeView === 'takeaways'
+      ? 'Key Takeaways'
       : activeView === 'personal'
       ? 'Personal Settings'
       : activeView === 'faqs'
       ? 'FAQs'
-      : 'Key Takeaways'
+      : 'Dashboard'
   )
 
   // Determine the section based on activeView
   const section = 
     activeView === 'response' 
       ? 'Generate'
-      : activeView === 'personal' || activeView === 'faqs'
+      : activeView === 'faqs' || activeView === 'personal'
       ? 'System'
       : 'Dashboard'
+
+  // Determine if we should show the section link
+  const showSectionLink = section !== 'Dashboard' || activeView !== 'engine'
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -51,10 +58,14 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
       <Separator orientation="vertical" className="mr-2 h-4" />
       <Breadcrumb>
         <BreadcrumbList>
-          <BreadcrumbItem className="hidden md:block">
-            <BreadcrumbLink href="/dashboard">{section}</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator className="hidden md:block" />
+          {showSectionLink && (
+            <>
+              <BreadcrumbItem className="hidden md:block">
+                <BreadcrumbLink href="/dashboard">{section}</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden md:block" />
+            </>
+          )}
           <BreadcrumbItem>
             <BreadcrumbPage>{viewTitle}</BreadcrumbPage>
           </BreadcrumbItem>

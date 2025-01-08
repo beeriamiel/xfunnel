@@ -1,8 +1,8 @@
 {
-  "deno.enablePaths": [
-    "supabase/functions"
-  ],
-  "deno.lint": false,
+  // "deno.enablePaths": [
+  //   "supabase/functions"
+  // ],
+  // "deno.lint": false,
   "[typescript]": {
     "editor.defaultFormatter": "vscode.typescript-language-features"
   },

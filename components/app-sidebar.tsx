@@ -143,6 +143,11 @@ export function AppSidebar({ className }: SidebarProps) {
   ]
 
   const handleNavigation = (item: NavItem, e: React.MouseEvent) => {
+    // Allow direct navigation for external routes
+    if (!item.href.startsWith('/dashboard')) {
+      return;
+    }
+
     e.preventDefault()
     setActiveView(item.view)
     
