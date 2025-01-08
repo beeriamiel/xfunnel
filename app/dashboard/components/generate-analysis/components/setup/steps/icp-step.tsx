@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import { design } from '../../../lib/design-system'
 import { generateICPSuggestions } from '../../../utils/mock-suggestions'
 import type { ICP } from '../../../types/analysis'
 
@@ -32,7 +34,7 @@ interface ICPStepProps {
   icps: ICP[];
   onAddICP: (icp: Omit<ICP, 'id'>) => void;
   onEditICP: (icp: ICP) => void;
-  onDeleteICP: (id: string) => void;
+  onDeleteICP: (id: number) => void;
   onNext: () => void;
 }
 
@@ -105,37 +107,56 @@ export function ICPStep({
     setDialogOpen(true)
   }
 
+  const handleCreateICP = () => {
+    setEditingICP(null)
+    setNewICP({
+      region: '',
+      vertical: '',
+      company_size: '',
+      personas: []
+    })
+    setDialogOpen(true)
+  }
+
   const handleUpdateICP = () => {
-    if (!editingICP || !newICP.vertical || !newICP.region || !newICP.company_size) return
-    onEditICP({ ...editingICP, ...newICP as ICP })
+    if (!newICP.vertical || !newICP.region || !newICP.company_size) return
+
+    if (editingICP) {
+      onEditICP({ ...editingICP, ...newICP as ICP })
+    } else {
+      onAddICP(newICP as Omit<ICP, 'id'>)
+    }
+
     setEditingICP(null)
     setNewICP({ region: '', vertical: '', company_size: '', personas: [] })
     setDialogOpen(false)
   }
 
   return (
-    <Card className="w-full max-w-xl p-4">
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-[#30035e]">Ideal Customer Profile (ICP)</h3>
-          <p className="text-sm text-muted-foreground">Define your target customer segments</p>
+    <Card className={cn(design.layout.card, design.spacing.card)}>
+      <div className={design.layout.container}>
+        <div className={design.layout.header}>
+          <div className={design.layout.headerContent}>
+            <h3 className={design.typography.title}>Ideal Customer Profile (ICP)</h3>
+            <p className={design.typography.subtitle}>Define your target customer segments</p>
+          </div>
         </div>
 
         <AnimatePresence>
           <div className="min-h-[100px] flex flex-col gap-2">
             {icps.map((icp) => (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={design.animations.listItem.initial}
+                animate={design.animations.listItem.animate}
+                exit={design.animations.listItem.exit}
                 key={icp.id}
-                className="group flex items-center justify-between p-3 hover:bg-[#f6efff]/50 rounded-md transition-colors border"
+                className={design.components.listItem.base}
               >
                 <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-[#f9a8c9]" />
+                  <Users className={design.components.listItem.icon} />
                   <div className="flex flex-col">
                     <span className="font-medium">{icp.vertical}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={design.typography.subtitle}>
                       {icp.region} · {icp.company_size} employees
                     </span>
                   </div>
@@ -144,110 +165,119 @@ export function ICPStep({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className={design.components.button.icon}
                     onClick={() => handleEditICP(icp)}
                   >
-                    <Pencil className="h-3 w-3" />
+                    <Pencil className={design.components.button.iconSize} />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-destructive"
+                    className={cn(design.components.button.icon, "text-destructive")}
                     onClick={() => onDeleteICP(icp.id)}
                   >
-                    <X className="h-3 w-3" />
+                    <X className={design.components.button.iconSize} />
                   </Button>
                 </div>
               </motion.div>
             ))}
             {icps.length === 0 && !isGenerating && (
-              <div className="h-[100px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                <Sparkles className="h-8 w-8 text-[#f9a8c9]" />
-                <p className="text-sm">Generating your ideal customer profiles...</p>
+              <div className="h-[100px] flex flex-col items-center justify-center gap-2">
+                <Sparkles className={cn(design.components.listItem.icon, "h-8 w-8")} />
+                <p className={design.typography.subtitle}>Generating your ideal customer profiles...</p>
               </div>
             )}
             {isGenerating && (
               <div className="h-[100px] flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-[#30035e]" />
-                <p className="ml-2 text-sm text-muted-foreground">Generating suggestions...</p>
+                <p className={cn("ml-2", design.typography.subtitle)}>Generating suggestions...</p>
               </div>
             )}
           </div>
         </AnimatePresence>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Edit ICP</DialogTitle>
-              <DialogDescription>
-                Customize your ideal customer profile.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Region</Label>
-                <Select 
-                  value={newICP.region} 
-                  onValueChange={(value) => setNewICP({ ...newICP, region: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REGIONS.map((region) => (
-                      <SelectItem key={region} value={region}>
-                        {region}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Vertical/Industry</Label>
-                <Input
-                  placeholder="e.g., SaaS, Healthcare, E-commerce"
-                  value={newICP.vertical}
-                  onChange={(e) => setNewICP({ ...newICP, vertical: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Company Size</Label>
-                <Select 
-                  value={newICP.company_size} 
-                  onValueChange={(value) => setNewICP({ ...newICP, company_size: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select company size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMPANY_SIZES.map((size) => (
-                      <SelectItem key={size} value={size}>
-                        {size} employees
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
+        <div className="flex justify-between items-center pt-2">
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
               <Button 
-                onClick={handleUpdateICP}
-                disabled={!newICP.vertical || !newICP.region || !newICP.company_size}
-                className="bg-[#30035e] hover:bg-[#30035e]/90"
+                variant="outline" 
+                className={design.components.button.outline}
+                onClick={handleCreateICP}
               >
-                Update ICP
+                Add ICP <Plus className={cn("ml-2", design.components.button.iconSize)} />
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <div className="flex justify-end pt-2">
+            </DialogTrigger>
+            <DialogContent className={design.components.dialog.content}>
+              <DialogHeader>
+                <DialogTitle>{editingICP ? 'Edit ICP' : 'Create ICP'}</DialogTitle>
+                <DialogDescription>
+                  {editingICP ? 'Customize your ideal customer profile.' : 'Create a new ideal customer profile.'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className={design.components.dialog.body}>
+                <div className={design.spacing.element}>
+                  <Label className={design.typography.label}>Region</Label>
+                  <Select 
+                    value={newICP.region} 
+                    onValueChange={(value) => setNewICP({ ...newICP, region: value })}
+                  >
+                    <SelectTrigger className={design.components.input.base}>
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REGIONS.map((region) => (
+                        <SelectItem key={region} value={region}>
+                          {region}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className={design.spacing.element}>
+                  <Label className={design.typography.label}>Vertical/Industry</Label>
+                  <Input
+                    placeholder="e.g., SaaS, Healthcare, E-commerce"
+                    value={newICP.vertical}
+                    onChange={(e) => setNewICP({ ...newICP, vertical: e.target.value })}
+                    className={design.components.input.base}
+                  />
+                </div>
+                <div className={design.spacing.element}>
+                  <Label className={design.typography.label}>Company Size</Label>
+                  <Select 
+                    value={newICP.company_size} 
+                    onValueChange={(value) => setNewICP({ ...newICP, company_size: value })}
+                  >
+                    <SelectTrigger className={design.components.input.base}>
+                      <SelectValue placeholder="Select company size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_SIZES.map((size) => (
+                        <SelectItem key={size} value={size}>
+                          {size} employees
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button 
+                  onClick={handleUpdateICP}
+                  disabled={!newICP.vertical || !newICP.region || !newICP.company_size}
+                  className={design.components.button.primary}
+                >
+                  {editingICP ? 'Update' : 'Create'} ICP
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button
             onClick={onNext}
             disabled={icps.length === 0 || isGenerating}
-            className="bg-[#30035e] hover:bg-[#30035e]/90"
+            className={design.components.button.primary}
           >
-            Continue <ChevronRight className="ml-2 h-4 w-4" />
+            Continue <ChevronRight className={cn("ml-2", design.components.button.iconSize)} />
           </Button>
         </div>
       </div>

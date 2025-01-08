@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import { design } from '../../../lib/design-system'
 import { generatePersonaSuggestions } from '../../../utils/mock-suggestions'
 import type { ICP, Persona } from '../../../types/analysis'
 
@@ -31,7 +33,7 @@ interface PersonaStepProps {
   personas: Persona[];
   onAddPersona: (persona: Omit<Persona, 'id'>, icpId: string) => void;
   onEditPersona: (persona: Persona) => void;
-  onDeletePersona: (id: string) => void;
+  onDeletePersona: (id: number) => void;
   onComplete: () => void;
 }
 
@@ -58,7 +60,7 @@ export function PersonaStep({
       if (selectedICP && !personas.length) {
         setIsGenerating(true)
         try {
-          const icp = icps.find(i => i.id === selectedICP)
+          const icp = icps.find(i => i.id.toString() === selectedICP)
           if (icp) {
             const suggestions = await generatePersonaSuggestions(icp)
             suggestions.forEach(persona => {
@@ -101,25 +103,28 @@ export function PersonaStep({
   }
 
   return (
-    <Card className="w-full max-w-xl p-4">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-[#30035e]">Buyer Personas</h3>
-            <p className="text-sm text-muted-foreground">Define your target buyer personas for each ICP</p>
+    <Card className={cn(design.layout.card, design.spacing.card)}>
+      <div className={design.layout.container}>
+        <div className={design.layout.header}>
+          <div className={design.layout.headerContent}>
+            <h3 className={design.typography.title}>Buyer Personas</h3>
+            <p className={design.typography.subtitle}>Define your target buyer personas for each ICP</p>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Select ICP</Label>
-            <Select value={selectedICP} onValueChange={setSelectedICP}>
-              <SelectTrigger>
+        <div className={design.spacing.section}>
+          <div className={design.spacing.element}>
+            <Label className={design.typography.label}>Select ICP</Label>
+            <Select 
+              value={selectedICP} 
+              onValueChange={setSelectedICP}
+            >
+              <SelectTrigger className={design.components.input.base}>
                 <SelectValue placeholder="Choose an ICP to add personas" />
               </SelectTrigger>
               <SelectContent>
                 {icps.map((icp) => (
-                  <SelectItem key={icp.id} value={icp.id}>
+                  <SelectItem key={icp.id} value={icp.id.toString()}>
                     {icp.vertical} ({icp.region})
                   </SelectItem>
                 ))}
@@ -128,20 +133,20 @@ export function PersonaStep({
           </div>
 
           <AnimatePresence>
-            <div className="min-h-[100px] flex flex-col">
+            <div className="min-h-[100px] flex flex-col gap-2">
               {personas.map((persona) => (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
+                  initial={design.animations.listItem.initial}
+                  animate={design.animations.listItem.animate}
+                  exit={design.animations.listItem.exit}
                   key={persona.id}
-                  className="group flex items-center justify-between p-2 hover:bg-[#f6efff]/50 rounded-md transition-colors"
+                  className={design.components.listItem.base}
                 >
                   <div className="flex items-center gap-2">
-                    <UserCircle2 className="h-4 w-4 text-[#f9a8c9]" />
+                    <UserCircle2 className={design.components.listItem.icon} />
                     <div className="flex flex-col">
                       <span className="font-medium">{persona.title}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className={design.typography.subtitle}>
                         {persona.department} · {persona.seniority_level}
                       </span>
                     </div>
@@ -150,36 +155,36 @@ export function PersonaStep({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className={design.components.button.icon}
                       onClick={() => handleEditPersona(persona)}
                     >
-                      <Pencil className="h-3 w-3" />
+                      <Pencil className={design.components.button.iconSize} />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-destructive"
+                      className={cn(design.components.button.icon, "text-destructive")}
                       onClick={() => onDeletePersona(persona.id)}
                     >
-                      <X className="h-3 w-3" />
+                      <X className={design.components.button.iconSize} />
                     </Button>
                   </div>
                 </motion.div>
               ))}
               {!selectedICP && (
                 <div className="h-[100px] flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground">Select an ICP to add personas</p>
+                  <p className={design.typography.subtitle}>Select an ICP to add personas</p>
                 </div>
               )}
               {selectedICP && personas.length === 0 && !isGenerating && (
                 <div className="h-[100px] flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground">Add your first persona</p>
+                  <p className={design.typography.subtitle}>Add your first persona</p>
                 </div>
               )}
               {isGenerating && (
                 <div className="h-[100px] flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-[#30035e]" />
-                  <p className="ml-2 text-sm text-muted-foreground">Generating suggestions...</p>
+                  <p className={cn("ml-2", design.typography.subtitle)}>Generating suggestions...</p>
                 </div>
               )}
             </div>
@@ -191,43 +196,45 @@ export function PersonaStep({
             <DialogTrigger asChild>
               <Button 
                 variant="outline" 
-                className="border-[#30035e] text-[#30035e] hover:bg-[#30035e]/10"
+                className={design.components.button.outline}
                 disabled={!selectedICP}
               >
-                Add Persona <Plus className="ml-2 h-4 w-4" />
+                Add Persona <Plus className={cn("ml-2", design.components.button.iconSize)} />
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className={design.components.dialog.content}>
               <DialogHeader>
                 <DialogTitle>{editingPersona ? 'Edit' : 'Add'} Persona</DialogTitle>
                 <DialogDescription>
                   Define your buyer persona. All fields are required.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Title</Label>
+              <div className={design.components.dialog.body}>
+                <div className={design.spacing.element}>
+                  <Label className={design.typography.label}>Title</Label>
                   <Input
                     placeholder="e.g., Product Manager, CTO"
                     value={newPersona.title}
                     onChange={(e) => setNewPersona({ ...newPersona, title: e.target.value })}
+                    className={design.components.input.base}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Department</Label>
+                <div className={design.spacing.element}>
+                  <Label className={design.typography.label}>Department</Label>
                   <Input
                     placeholder="e.g., Engineering, Marketing"
                     value={newPersona.department}
                     onChange={(e) => setNewPersona({ ...newPersona, department: e.target.value })}
+                    className={design.components.input.base}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Seniority Level</Label>
+                <div className={design.spacing.element}>
+                  <Label className={design.typography.label}>Seniority Level</Label>
                   <Select 
                     value={newPersona.seniority_level} 
                     onValueChange={(value) => setNewPersona({ ...newPersona, seniority_level: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={design.components.input.base}>
                       <SelectValue placeholder="Select seniority level" />
                     </SelectTrigger>
                     <SelectContent>
@@ -247,7 +254,7 @@ export function PersonaStep({
                 <Button 
                   onClick={editingPersona ? handleUpdatePersona : handleAddPersona}
                   disabled={!newPersona.title || !newPersona.seniority_level || !newPersona.department}
-                  className="bg-[#30035e] hover:bg-[#30035e]/90"
+                  className={design.components.button.primary}
                 >
                   {editingPersona ? 'Update' : 'Add'} Persona
                 </Button>
@@ -256,10 +263,10 @@ export function PersonaStep({
           </Dialog>
           <Button
             onClick={onComplete}
-            disabled={!personas.length || isGenerating}
-            className="bg-[#30035e] hover:bg-[#30035e]/90"
+            disabled={personas.length === 0 || isGenerating}
+            className={design.components.button.primary}
           >
-            Complete <ChevronRight className="ml-2 h-4 w-4" />
+            Complete <ChevronRight className={cn("ml-2", design.components.button.iconSize)} />
           </Button>
         </div>
       </div>

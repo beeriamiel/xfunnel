@@ -13,6 +13,7 @@ type Step = 'initial' | 'product' | 'competitors' | 'icps' | 'personas'
 
 interface StepIndicatorProps {
   currentStep: Step
+  onStepClick: (step: Step) => void
 }
 
 const STAGE_EXPLANATIONS = {
@@ -23,7 +24,7 @@ const STAGE_EXPLANATIONS = {
   personas: "Create detailed buyer personas aligned with your ICPs."
 } as const;
 
-export function StepIndicator({ currentStep }: StepIndicatorProps) {
+export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) {
   const steps = [
     { id: 'initial' as const, label: 'Company' },
     { id: 'product' as const, label: 'Product' },
@@ -34,64 +35,79 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
 
   return (
     <div className="flex items-center justify-center mb-8">
-      {steps.map((step, index) => (
-        <div key={step.id} className="flex items-center">
-          <HoverCard>
-            <HoverCardTrigger asChild>
-              <div className="flex items-center">
-                <div
+      {steps.map((step, index) => {
+        const isCompleted = steps.indexOf(step) < steps.findIndex(s => s.id === currentStep)
+        const isCurrent = currentStep === step.id
+        const isClickable = isCompleted || isCurrent
+
+        return (
+          <div key={step.id} className="flex items-center">
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <div 
                   className={cn(
-                    "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-200",
-                    currentStep === step.id
-                      ? "border-[#30035e] bg-[#30035e] text-white hover:bg-[#30035e]/90"
-                      : steps.indexOf(step) < steps.findIndex(s => s.id === currentStep)
-                      ? "border-[#f9a8c9] bg-[#f9a8c9] text-white hover:bg-[#f9a8c9]/90"
-                      : "border-muted-foreground/30 text-muted-foreground hover:bg-[#f6efff]/50"
+                    "flex items-center cursor-default transition-all duration-200",
+                    isClickable && "cursor-pointer"
                   )}
+                  onClick={() => isClickable && onStepClick(step.id)}
+                  role={isClickable ? "button" : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
                 >
-                  {steps.indexOf(step) < steps.findIndex(s => s.id === currentStep) ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <CircleDot className="h-4 w-4" />
-                  )}
+                  <div
+                    className={cn(
+                      "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-200",
+                      isCurrent
+                        ? "border-[#30035e] bg-[#30035e] text-white hover:bg-[#30035e]/90"
+                        : isCompleted
+                        ? "border-[#f9a8c9] bg-[#f9a8c9] text-white hover:bg-[#f9a8c9]/90"
+                        : "border-muted-foreground/30 text-muted-foreground"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <CircleDot className="h-4 w-4" />
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "mx-2 text-sm transition-colors duration-200",
+                      isCurrent
+                        ? "text-[#30035e] font-medium"
+                        : isCompleted
+                        ? "text-[#f9a8c9]"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {step.label}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    "mx-2 text-sm transition-colors duration-200",
-                    currentStep === step.id
-                      ? "text-[#30035e] font-medium"
-                      : steps.indexOf(step) < steps.findIndex(s => s.id === currentStep)
-                      ? "text-[#f9a8c9]"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {step.label}
-                </span>
-              </div>
-            </HoverCardTrigger>
-            <HoverCardContent className="w-80">
-              <div className="flex justify-between space-x-4">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-semibold">{step.label}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {STAGE_EXPLANATIONS[step.id]}
-                  </p>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80">
+                <div className="flex justify-between space-x-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold">{step.label}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {STAGE_EXPLANATIONS[step.id]}
+                      {isCompleted && " Click to edit."}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-          {index < steps.length - 1 && (
-            <Separator
-              className={cn(
-                "w-8 mx-2 transition-colors duration-200",
-                steps.indexOf(step) < steps.findIndex(s => s.id === currentStep)
-                  ? "bg-[#f9a8c9]"
-                  : "bg-muted-foreground/30"
-              )}
-            />
-          )}
-        </div>
-      ))}
+              </HoverCardContent>
+            </HoverCard>
+            {index < steps.length - 1 && (
+              <Separator
+                className={cn(
+                  "w-8 mx-2 transition-colors duration-200",
+                  steps.indexOf(step) < steps.findIndex(s => s.id === currentStep)
+                    ? "bg-[#f9a8c9]"
+                    : "bg-muted-foreground/30"
+                )}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 } 
