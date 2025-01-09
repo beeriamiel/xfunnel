@@ -10,6 +10,7 @@ import { ICPStep } from './steps/icp-step'
 import { PersonaStep } from './steps/persona-step'
 import type { CompanySetupProps } from '../../types/setup'
 import type { ICP, Persona } from '../../types/analysis'
+import type { Product } from '../../types/setup'
 
 type Step = 'initial' | 'product' | 'competitors' | 'icps' | 'personas'
 
@@ -17,24 +18,44 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
   const [step, setStep] = useState<Step>('initial')
   const [companyName, setCompanyName] = useState('')
   const [industry, setIndustry] = useState('')
-  const [products, setProducts] = useState<Array<{ id: string; name: string }>>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [competitors, setCompetitors] = useState<Array<{ id: string; name: string; website?: string; description?: string }>>([])
   const [icps, setICPs] = useState<ICP[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
+
+  // Track completed steps using an array instead of Set for better compatibility
+  const [completedSteps, setCompletedSteps] = useState<Step[]>([])
+
+  const handleStepComplete = (completedStep: Step, nextStep: Step) => {
+    setCompletedSteps(prev => [...prev, completedStep])
+    setStep(nextStep)
+  }
+
+  const handleStepClick = (selectedStep: Step) => {
+    const stepOrder: Step[] = ['initial', 'product', 'competitors', 'icps', 'personas']
+    const currentStepIndex = stepOrder.indexOf(step)
+    const selectedStepIndex = stepOrder.indexOf(selectedStep)
+
+    // Only allow navigation to completed steps or current step
+    if (selectedStepIndex <= currentStepIndex) {
+      setStep(selectedStep)
+    }
+  }
 
   const handleComplete = () => {
     onTransitionStart()
     onComplete(icps, personas)
   }
 
-  const handleAddProduct = (product: Omit<{ id: string; name: string }, 'id'>) => {
-    setProducts([...products, { 
-      ...product, 
-      id: crypto.randomUUID()
-    }])
+  const handleAddProduct = (product: Omit<Product, 'id'>) => {
+    const newProduct: Product = {
+      ...product,
+      id: Math.random().toString(),
+    }
+    setProducts([...products, newProduct])
   }
 
-  const handleEditProduct = (product: { id: string; name: string }) => {
+  const handleEditProduct = (product: Product) => {
     setProducts(products.map(p => 
       p.id === product.id ? product : p
     ))
@@ -47,7 +68,7 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
   const handleAddCompetitor = (competitor: Omit<{ id: string; name: string; website?: string; description?: string }, 'id'>) => {
     setCompetitors([...competitors, { 
       ...competitor, 
-      id: crypto.randomUUID()
+      id: Math.random().toString()
     }])
   }
 
@@ -62,9 +83,10 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
   }
 
   const handleAddICP = (icp: Omit<ICP, 'id'>) => {
+    const newId = Date.now()
     setICPs([...icps, { 
       ...icp, 
-      id: crypto.randomUUID()
+      id: newId
     }])
   }
 
@@ -74,22 +96,23 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
     ))
   }
 
-  const handleDeleteICP = (id: string) => {
+  const handleDeleteICP = (id: number) => {
     setICPs(icps.filter(i => i.id !== id))
     // Remove personas associated with this ICP
     setPersonas(personas.filter(p => !icps.find(i => i.id === id)?.personas.some(ip => ip.id === p.id)))
   }
 
   const handleAddPersona = (persona: Omit<Persona, 'id'>, icpId: string) => {
-    const newPersona = { 
+    const newId = Date.now()
+    const newPersona: Persona = { 
       ...persona, 
-      id: crypto.randomUUID()
+      id: newId
     }
     setPersonas([...personas, newPersona])
     
     // Add persona to ICP
     setICPs(icps.map(icp => 
-      icp.id === icpId 
+      icp.id === parseInt(icpId, 10)
         ? { ...icp, personas: [...icp.personas, newPersona] }
         : icp
     ))
@@ -109,7 +132,7 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
     })))
   }
 
-  const handleDeletePersona = (id: string) => {
+  const handleDeletePersona = (id: number) => {
     setPersonas(personas.filter(p => p.id !== id))
     
     // Remove persona from ICPs
@@ -121,13 +144,16 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
 
   return (
     <div className="flex flex-col items-center w-full space-y-6">
-      <StepIndicator currentStep={step} />
+      <StepIndicator 
+        currentStep={step} 
+        onStepClick={handleStepClick}
+      />
       
       {step === 'initial' && (
         <InitialStep
           companyName={companyName}
           onCompanyNameChange={(e: ChangeEvent<HTMLInputElement>) => setCompanyName(e.target.value)}
-          onNext={() => setStep('product')}
+          onNext={() => handleStepComplete('initial', 'product')}
         />
       )}
 
@@ -137,7 +163,7 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
           onAddProduct={handleAddProduct}
           onEditProduct={handleEditProduct}
           onDeleteProduct={handleDeleteProduct}
-          onNext={() => setStep('competitors')}
+          onNext={() => handleStepComplete('product', 'competitors')}
         />
       )}
 
@@ -147,9 +173,8 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
           products={products}
           competitors={competitors}
           onAddCompetitor={handleAddCompetitor}
-          onEditCompetitor={handleEditCompetitor}
           onDeleteCompetitor={handleDeleteCompetitor}
-          onNext={() => setStep('icps')}
+          onNext={() => handleStepComplete('competitors', 'icps')}
         />
       )}
 
@@ -161,7 +186,7 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
           onAddICP={handleAddICP}
           onEditICP={handleEditICP}
           onDeleteICP={handleDeleteICP}
-          onNext={() => setStep('personas')}
+          onNext={() => handleStepComplete('icps', 'personas')}
         />
       )}
 

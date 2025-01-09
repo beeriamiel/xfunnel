@@ -7,6 +7,8 @@ import { useDashboardStore } from '@/app/dashboard/store'
 import { CompanySetup } from './components/setup/company-setup'
 import { CompanyProfileHeader } from './components/company-profile-header'
 import { SuccessAnimation } from './components/shared/success-animation'
+import { Button } from '@/components/ui/button'
+import { AlertCircle } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { getCompanyProfile } from './utils/actions'
 import type { ICP, Persona } from './types/analysis'
@@ -15,7 +17,10 @@ export function GenerateAnalysis() {
   const { 
     selectedCompanyId,
     companyProfile,
-    setCompanyProfile
+    setCompanyProfile,
+    isDevMode,
+    setIsDevMode,
+    resetCompanyProfile
   } = useDashboardStore()
 
   const [isLoading, setIsLoading] = useState(false)
@@ -23,6 +28,9 @@ export function GenerateAnalysis() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
   const [showNewContent, setShowNewContent] = useState(false)
+
+  // Only show dev mode toggle in development
+  const isDevelopment = process.env.NODE_ENV === 'development'
 
   useEffect(() => {
     async function fetchCompanyProfile() {
@@ -122,6 +130,25 @@ export function GenerateAnalysis() {
     <div className="space-y-6">
       <CompanyProfileHeader companyId={selectedCompanyId} />
       
+      {isDevelopment && (
+        <div className="flex items-center gap-4 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+          <AlertCircle className="w-5 h-5 text-yellow-600" />
+          <span className="text-sm text-yellow-700">Development Mode</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsDevMode(!isDevMode)
+              if (!isDevMode) {
+                resetCompanyProfile()
+              }
+            }}
+          >
+            {isDevMode ? 'Exit Dev Mode' : 'Enter Dev Mode'}
+          </Button>
+        </div>
+      )}
+      
       {isLoading ? (
         <Card className="p-6">
           <div className="animate-pulse space-y-4">
@@ -133,37 +160,49 @@ export function GenerateAnalysis() {
         <Card className="p-6">
           <div className="text-red-500">{error}</div>
         </Card>
-      ) : companyProfile ? (
-        <div className={`transition-all duration-800 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <Card className="p-6">
-            <div className={`space-y-4 transition-all duration-1000 delay-300 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <ResponseTable
-                icps={companyProfile.icps}
-                companyId={selectedCompanyId}
-                onGenerateQuestions={async (selectedIds: string[]) => {
-                  console.log('Generating questions for:', selectedIds)
-                }}
-                onGenerateResponses={async (selectedIds: string[]) => {
-                  console.log('Generating responses for:', selectedIds)
-                }}
-              />
+      ) : (
+        <>
+          {/* Show setup in dev mode or when no profile exists */}
+          {(isDevMode || !companyProfile) && !isTransitioning && (
+            <Card className="p-6 transition-all duration-500 ease-in-out">
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">
+                    {isDevMode ? 'Dev Mode: Company Setup' : 'Generate Analysis'}
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Set up your company profile and generate AI responses
+                  </p>
+                </div>
+                <CompanySetup 
+                  onComplete={handleSetupComplete}
+                  onTransitionStart={handleTransitionStart}
+                />
+              </div>
+            </Card>
+          )}
+
+          {/* Show existing profile if it exists */}
+          {companyProfile && (
+            <div className={`transition-all duration-800 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <Card className="p-6">
+                <div className={`space-y-4 transition-all duration-1000 delay-300 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                  <ResponseTable
+                    icps={companyProfile.icps}
+                    companyId={selectedCompanyId}
+                    onGenerateQuestions={async (selectedIds: string[]) => {
+                      console.log('Generating questions for:', selectedIds)
+                    }}
+                    onGenerateResponses={async (selectedIds: string[]) => {
+                      console.log('Generating responses for:', selectedIds)
+                    }}
+                  />
+                </div>
+              </Card>
             </div>
-          </Card>
-        </div>
-      ) : !isTransitioning ? (
-        <Card className="p-6 transition-all duration-500 ease-in-out">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Generate Analysis</h2>
-              <p className="text-muted-foreground">Set up your company profile and generate AI responses</p>
-            </div>
-            <CompanySetup 
-              onComplete={handleSetupComplete}
-              onTransitionStart={handleTransitionStart}
-            />
-          </div>
-        </Card>
-      ) : null}
+          )}
+        </>
+      )}
 
       {showSuccessAnimation && (
         <SuccessAnimation title="Setup Complete!" />

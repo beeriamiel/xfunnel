@@ -16,6 +16,7 @@ export interface Product {
   id: string
   name: string
   description?: string
+  businessModel: 'B2B' | 'B2C'
 }
 
 export interface Competitor {

@@ -47,6 +47,9 @@ interface DashboardStore {
   setCompanyProfile: (profile: CompanyProfile | null) => void
   timePeriod: TimePeriod
   setTimePeriod: (period: TimePeriod) => void
+  isDevMode: boolean
+  setIsDevMode: (isDevMode: boolean) => void
+  resetCompanyProfile: () => void
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -57,5 +60,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   companyProfile: null,
   setCompanyProfile: (profile) => set({ companyProfile: profile }),
   timePeriod: 'weekly',
-  setTimePeriod: (period) => set({ timePeriod: period })
+  setTimePeriod: (period) => set({ timePeriod: period }),
+  isDevMode: false,
+  setIsDevMode: (isDevMode) => set({ isDevMode }),
+  resetCompanyProfile: () => set({ companyProfile: null })
 })) 
