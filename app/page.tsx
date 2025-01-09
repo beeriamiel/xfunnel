@@ -1,17 +1,22 @@
-import { createClient } from "@/app/supabase/server"
-import { redirect } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import type { Database } from '@/types/supabase'
 
 export default async function LandingPage() {
-  const supabase = await createClient()
+  const cookieStore = cookies()
+  const supabase = createServerComponentClient<Database>({
+    cookies: () => cookieStore
+  })
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect("/protected")
+    redirect('/protected')
   }
 
   return (

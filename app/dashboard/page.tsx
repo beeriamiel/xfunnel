@@ -1,9 +1,11 @@
 import { Suspense } from 'react'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { DashboardWrapper } from './components/dashboard-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'
-import { createClient } from '@/app/supabase/server'
 import { ClientWrapper } from './components/client-wrapper'
 import { unstable_noStore as noStore } from 'next/cache'
+import type { Database } from '@/types/supabase'
 
 type SearchParams = { [key: string]: string | string[] | undefined }
 
@@ -13,36 +15,49 @@ type Props = {
 }
 
 async function getCompanyData(searchParamsPromise: Promise<SearchParams>) {
-  const searchParams = await searchParamsPromise
-  const companyName = typeof searchParams.company === 'string' ? searchParams.company : undefined
-  
-  if (!companyName) {
-    return { selectedCompany: null }
+  try {
+    const searchParams = await searchParamsPromise
+    const companyName = typeof searchParams.company === 'string' ? searchParams.company : undefined
+    
+    if (!companyName) {
+      return { selectedCompany: null }
+    }
+
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient<Database>({
+      cookies: () => cookieStore
+    })
+    
+    // Get company data with proper error handling
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('id, name, industry')
+      .eq('name', companyName)
+      .single()
+
+    if (error) {
+      console.error('Error fetching company:', error)
+      return { selectedCompany: null, error: error.message }
+    }
+
+    return { selectedCompany: company }
+  } catch (error) {
+    console.error('Unexpected error in getCompanyData:', error)
+    return { selectedCompany: null, error: 'Failed to fetch company data' }
   }
-
-  const supabase = await createClient()
-  
-  // Get company data
-  const { data: company, error } = await supabase
-    .from('companies')
-    .select('id, name, industry')
-    .eq('name', companyName)
-    .single()
-
-  console.log('Company data:', company, 'Error:', error)
-
-  if (error || !company) {
-    return { selectedCompany: null }
-  }
-
-  return { selectedCompany: company }
 }
 
 export default async function Page({ params, searchParams }: Props) {
   noStore()
   
   const searchParamsPromise = Promise.resolve(searchParams)
-  const { selectedCompany } = await getCompanyData(searchParamsPromise)
+  const { selectedCompany, error } = await getCompanyData(searchParamsPromise)
+
+  // Add error handling at the page level
+  if (error) {
+    // You might want to handle this differently, perhaps showing an error UI
+    console.error('Error in dashboard page:', error)
+  }
 
   return (
     <ClientWrapper>

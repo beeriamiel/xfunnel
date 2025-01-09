@@ -1,70 +1,34 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/supabase'
 
-export async function createClient() {
-  const cookieStore = await cookies()
-
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // Handle cookies.set error in middleware
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
-            // Handle cookies.delete error in middleware
-          }
-        },
-      },
-    }
-  )
+export const createClient = async () => {
+  const cookieStore = cookies()
+  return createServerComponentClient<Database>({
+    cookies: () => cookieStore
+  })
 }
 
 // Create a direct client for server-side operations that don't need cookies
 export function createDirectClient() {
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: () => undefined,
-        set: () => {},
-        remove: () => {},
-      },
-    }
-  )
+  return createServerComponentClient<Database>({
+    cookies: () => new Map()
+  })
 }
 
 // Admin client for server-side operations with full access
 export function createAdminClient() {
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get: () => undefined,
-        set: () => {},
-        remove: () => {},
-      },
+  return createServerComponentClient<Database>({
+    cookies: () => new Map()
+  }, {
+    supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    options: {
       auth: {
         autoRefreshToken: false,
-        persistSession: false,
-      },
+        persistSession: false
+      }
     }
-  )
+  })
 }
 
-// Export both clients
-export { createServerClient }; 
+export { createServerComponentClient } 

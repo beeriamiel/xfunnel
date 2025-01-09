@@ -11,6 +11,81 @@ export type CitationSourceType = 'OWNED' | 'COMPETITOR' | 'UGC' | 'EARNED';
 export type Database = {
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          id: string
+          name: string
+          account_type: 'internal' | 'agency' | 'company'
+          plan_type: 'free' | 'pro' | 'enterprise'
+          monthly_credits_available: number
+          monthly_credits_used: number
+          credits_renewal_date: string | null
+          last_update_date: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          account_type: 'internal' | 'agency' | 'company'
+          plan_type: 'free' | 'pro' | 'enterprise'
+          monthly_credits_available?: number
+          monthly_credits_used?: number
+          credits_renewal_date?: string | null
+          last_update_date?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          account_type?: 'internal' | 'agency' | 'company'
+          plan_type?: 'free' | 'pro' | 'enterprise'
+          monthly_credits_available?: number
+          monthly_credits_used?: number
+          credits_renewal_date?: string | null
+          last_update_date?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      account_users: {
+        Row: {
+          id: string
+          account_id: string
+          user_id: string
+          role: 'admin' | 'user'
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          user_id: string
+          role: 'admin' | 'user'
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          user_id?: string
+          role?: 'admin' | 'user'
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_users_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       batch_metadata: {
         Row: {
           batch_id: string
@@ -21,6 +96,7 @@ export type Database = {
           error_message: string | null
           metadata: Json | null
           status: string
+          account_id: string | null
         }
         Insert: {
           batch_id: string
@@ -31,6 +107,7 @@ export type Database = {
           error_message?: string | null
           metadata?: Json | null
           status: string
+          account_id?: string | null
         }
         Update: {
           batch_id?: string
@@ -41,6 +118,7 @@ export type Database = {
           error_message?: string | null
           metadata?: Json | null
           status?: string
+          account_id?: string | null
         }
         Relationships: [
           {
@@ -50,6 +128,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "batch_metadata_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
       citations: {
@@ -88,6 +173,7 @@ export type Database = {
           updated_at: string | null
           is_original: boolean | null
           origin_citation_id: number | null
+          account_id: string | null
         }
         Insert: {
           buyer_journey_phase?: string | null
@@ -124,6 +210,7 @@ export type Database = {
           updated_at?: string | null
           is_original?: boolean | null
           origin_citation_id?: number | null
+          account_id?: string | null
         }
         Update: {
           buyer_journey_phase?: string | null
@@ -160,8 +247,17 @@ export type Database = {
           updated_at?: string | null
           is_original?: boolean | null
           origin_citation_id?: number | null
+          account_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "citations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       companies: {
         Row: {
@@ -174,6 +270,7 @@ export type Database = {
           name: string
           number_of_employees: number | null
           product_category: string | null
+          account_id: string | null
         }
         Insert: {
           annual_revenue?: string | null
@@ -185,6 +282,7 @@ export type Database = {
           name: string
           number_of_employees?: number | null
           product_category?: string | null
+          account_id?: string | null
         }
         Update: {
           annual_revenue?: string | null
@@ -196,8 +294,17 @@ export type Database = {
           name?: string
           number_of_employees?: number | null
           product_category?: string | null
+          account_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       competitors: {
         Row: {
@@ -276,6 +383,7 @@ export type Database = {
           id: number
           region: string
           vertical: string
+          account_id: string | null
         }
         Insert: {
           company_id?: number | null
@@ -286,6 +394,7 @@ export type Database = {
           id?: number
           region: string
           vertical: string
+          account_id?: string | null
         }
         Update: {
           company_id?: number | null
@@ -296,6 +405,7 @@ export type Database = {
           id?: number
           region?: string
           vertical?: string
+          account_id?: string | null
         }
         Relationships: [
           {
@@ -305,6 +415,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ideal_customer_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
       personas: {
@@ -315,6 +432,7 @@ export type Database = {
           id: number
           seniority_level: string
           title: string
+          account_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -323,6 +441,7 @@ export type Database = {
           id?: number
           seniority_level: string
           title: string
+          account_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -331,6 +450,7 @@ export type Database = {
           id?: number
           seniority_level?: string
           title?: string
+          account_id?: string | null
         }
         Relationships: [
           {
@@ -340,6 +460,13 @@ export type Database = {
             referencedRelation: "ideal_customer_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "personas_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
       prompt_logs: {
@@ -460,6 +587,7 @@ export type Database = {
           query_batch_id: string | null
           query_text: string
           user_id: string | null
+          account_id: string | null
         }
         Insert: {
           buyer_journey_phase?: string[] | null
@@ -472,6 +600,7 @@ export type Database = {
           query_batch_id?: string | null
           query_text: string
           user_id?: string | null
+          account_id?: string | null
         }
         Update: {
           buyer_journey_phase?: string[] | null
@@ -484,6 +613,7 @@ export type Database = {
           query_batch_id?: string | null
           query_text?: string
           user_id?: string | null
+          account_id?: string | null
         }
         Relationships: [
           {
@@ -514,6 +644,13 @@ export type Database = {
             referencedRelation: "prompts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "queries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
       response_analysis: {
@@ -546,6 +683,7 @@ export type Database = {
           response_text: string | null
           sentiment_score: number | null
           solution_analysis: Json | null
+          account_id: string | null
         }
         Insert: {
           analysis_batch_id?: string | null
@@ -576,6 +714,7 @@ export type Database = {
           response_text?: string | null
           sentiment_score?: number | null
           solution_analysis?: Json | null
+          account_id?: string | null
         }
         Update: {
           analysis_batch_id?: string | null
@@ -606,6 +745,7 @@ export type Database = {
           response_text?: string | null
           sentiment_score?: number | null
           solution_analysis?: Json | null
+          account_id?: string | null
         }
         Relationships: [
           {
@@ -643,6 +783,13 @@ export type Database = {
             referencedRelation: "responses"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "response_analysis_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
       responses: {
@@ -657,6 +804,7 @@ export type Database = {
           response_text: string
           url: string | null
           websearchqueries: string[] | null
+          account_id: string | null
         }
         Insert: {
           answer_engine?: string | null
@@ -669,6 +817,7 @@ export type Database = {
           response_text: string
           url?: string | null
           websearchqueries?: string[] | null
+          account_id?: string | null
         }
         Update: {
           answer_engine?: string | null
@@ -681,6 +830,7 @@ export type Database = {
           response_text?: string
           url?: string | null
           websearchqueries?: string[] | null
+          account_id?: string | null
         }
         Relationships: [
           {
@@ -690,6 +840,13 @@ export type Database = {
             referencedRelation: "queries"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
     }

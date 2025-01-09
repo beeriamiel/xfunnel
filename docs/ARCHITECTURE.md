@@ -186,3 +186,52 @@
 3. Batch Processing (new + reused citations)
 4. Content Enrichment (scraping, Moz, analysis)
 5. Company Mention Processing 
+
+## Authentication Architecture
+
+### 1. Auth Components
+- Middleware Layer
+  - Route protection
+  - Session refresh
+  - Cookie management
+  - Auth state verification
+
+- Server Components
+  - SSR auth checks
+  - Data access control
+  - Role verification
+
+- Client Components
+  - Auth UI elements
+  - Session management
+  - Role-based rendering
+
+### 2. Authorization System
+- RLS Policies
+  ```sql
+  - Account-based access control
+  - Role-based permissions
+  - Super admin overrides
+  ```
+
+- Access Control
+  ```typescript
+  - Protected routes
+  - Data access boundaries
+  - Role enforcement
+  ```
+
+### 3. Session Management
+- Cookie Handling
+  ```typescript
+  - Async operations
+  - SSR compatibility
+  - Secure defaults
+  ```
+
+- State Management
+  ```typescript
+  - Server-side verification
+  - Client-side context
+  - Role propagation
+  ``` 

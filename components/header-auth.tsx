@@ -1,16 +1,17 @@
 'use client'
 
-import { createClient } from '@/app/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { Button } from './ui/button'
 import Link from 'next/link'
 import { useSession } from '@/app/providers/session-provider'
 import { Skeleton } from './ui/skeleton'
+import type { Database } from '@/types/supabase'
 
 export default function AuthButton() {
   const router = useRouter()
   const { user, isLoading } = useSession()
-  const supabase = createClient()
+  const supabase = createClientComponentClient<Database>()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

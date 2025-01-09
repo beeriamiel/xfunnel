@@ -1,44 +1,87 @@
-import { createClient } from '@/app/supabase/server'
-import { NextResponse } from "next/server";
-import { Database } from "@/types/supabase";
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import type { Database } from '@/types/supabase'
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const requestUrl = new URL(request.url);
-    const code = requestUrl.searchParams.get("code");
-    const origin = requestUrl.origin;
-    const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
+    const requestUrl = new URL(request.url)
+    const code = requestUrl.searchParams.get('code')
+    const redirectTo = requestUrl.searchParams.get('redirect_to')
 
-    // Handle missing code parameter
     if (!code) {
-      return NextResponse.redirect(`${origin}/login?error=missing_code`);
+      return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))
     }
 
-    const supabase = await createClient();
-
-    // Exchange the code for a session
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    // Await cookies() as it's a dynamic API
+    const cookieStore = await cookies()
     
-    if (exchangeError) {
-      console.error("Auth callback error:", exchangeError);
-      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies: () => cookieStore 
+    })
+
+    // Exchange code for session and get session data directly
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (exchangeError || !data?.session) {
+      console.error('Session exchange error:', exchangeError)
+      return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
     }
 
-    // Verify session exists
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error('User error:', userError);
-      return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+    const { session } = data
+
+    // Use session.user directly for account operations
+    const { data: accountUser, error: accountError } = await supabase
+      .from('account_users')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (accountError && accountError.code !== 'PGRST116') {
+      console.error('Account check error:', accountError)
+      return NextResponse.redirect(new URL('/login?error=account_check_failed', requestUrl.origin))
     }
 
-    // Handle successful auth
-    if (redirectTo) {
-      return NextResponse.redirect(`${origin}${redirectTo}`);
+    if (!accountUser) {
+      const { data: newAccount, error: createAccountError } = await supabase
+        .from('accounts')
+        .insert([{ 
+          name: `${session.user.email}'s Account`,
+          account_type: 'company' as const,
+          plan_type: 'free' as const,
+          monthly_credits_available: 0,
+          monthly_credits_used: 0
+        }])
+        .select()
+        .single()
+
+      if (createAccountError) {
+        console.error('Account creation error:', createAccountError)
+        return NextResponse.redirect(new URL('/login?error=account_creation_failed', requestUrl.origin))
+      }
+
+      const { error: linkError } = await supabase
+        .from('account_users')
+        .insert([{
+          user_id: session.user.id,
+          account_id: newAccount.id,
+          role: 'admin'
+        }])
+
+      if (linkError) {
+        console.error('Account linking error:', linkError)
+        return NextResponse.redirect(new URL('/login?error=account_linking_failed', requestUrl.origin))
+      }
     }
 
-    return NextResponse.redirect(`${origin}/protected`);
+    return NextResponse.redirect(
+      redirectTo 
+        ? new URL(redirectTo, requestUrl.origin)
+        : new URL('/dashboard', requestUrl.origin)
+    )
   } catch (error) {
-    console.error("Unexpected auth callback error:", error);
-    return NextResponse.redirect(`${origin}/login?error=unexpected`);
+    console.error('Unexpected auth callback error:', error)
+    return NextResponse.redirect(new URL('/login?error=unexpected', request.url))
   }
 }

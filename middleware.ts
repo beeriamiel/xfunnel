@@ -1,65 +1,67 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-
-// Define protected and auth routes
-const protectedRoutes = ['/dashboard']
-const authRoutes = ['/login', '/signup']
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+  let response = NextResponse.next()
 
   try {
-    // Create supabase server client
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
+    const supabase = createMiddlewareClient({ 
+      req: request, 
+      res: response,
+      options: {
         cookies: {
-          async get(name: string) {
+          get(name: string) {
             return request.cookies.get(name)?.value
           },
-          async set(name: string, value: string, options: CookieOptions) {
+          set(name: string, value: string, options: any) {
             response.cookies.set({
               name,
               value,
               ...options,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
             })
           },
-          async remove(name: string, options: CookieOptions) {
+          remove(name: string, options: any) {
             response.cookies.set({
               name,
               value: '',
               ...options,
+              maxAge: 0,
             })
           },
         },
-      }
-    )
+      },
+    })
 
-    // Get session
+    // Get user without throwing errors
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Handle protected routes
-    if (protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
-      if (!user) {
-        const redirectUrl = new URL('/login', request.url)
-        redirectUrl.searchParams.set('redirect_to', request.nextUrl.pathname + request.nextUrl.search)
-        return NextResponse.redirect(redirectUrl)
-      }
+    // Auth condition for protected routes
+    const isLoginRoute = request.nextUrl.pathname === '/login'
+    const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback')
+    const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
+                            request.nextUrl.pathname.startsWith('/personal')
+
+    // Skip middleware for callback route
+    if (isAuthCallback) {
+      return response
     }
 
-    // Handle auth routes
-    if (authRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
-      if (user) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
+    // Redirect if not authenticated on protected routes
+    if (isProtectedRoute && !user) {
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('redirect_to', request.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
     }
 
-    // Set session user in request headers
+    // Redirect if authenticated and trying to access login
+    if (isLoginRoute && user) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Only set user in headers if it exists
     if (user) {
       response.headers.set('x-session-user', JSON.stringify({
         id: user.id,
@@ -70,33 +72,18 @@ export async function middleware(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Middleware error:', error)
-    
-    // Clear session on error
-    response.cookies.set({
-      name: 'supabase-auth-token',
-      value: '',
-      maxAge: 0
-    })
-
     // Only redirect to login if on a protected route
-    if (protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
+    if (request.nextUrl.pathname.startsWith('/dashboard') || 
+        request.nextUrl.pathname.startsWith('/personal')) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-
+    
     return response
   }
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

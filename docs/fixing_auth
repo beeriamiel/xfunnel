@@ -1,0 +1,23 @@
+Here's a step-by-step transition plan to fix the SSR and auth handling issues while maintaining our RLS policies:
+Phase 1: Fix Middleware and Auth Handling
+Update middleware to properly handle async cookie operations
+Ensure session refresh is working correctly
+Keep existing RLS policies as they are (they're correct)
+Phase 2: Update Client Types
+Audit and update all Supabase client instances:
+Server Components → createServerComponentClient
+Route Handlers → createRouteHandlerClient
+Client Components → createClientComponentClient
+Phase 3: Fix Auth Flow Components
+Update callback route to properly handle async operations
+Update login/signup flows to use correct client types
+Ensure protected routes are using server components correctly
+Phase 4: Dashboard and Data Access
+Update dashboard components to use correct client types
+Ensure company selector and other data fetching components use proper SSR patterns
+Keep existing RLS policies for data access
+Phase 5: Testing
+Test auth flows (login, signup, callback)
+Test protected routes
+Test data access with RLS
+Test super admin functionality

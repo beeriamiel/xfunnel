@@ -193,3 +193,46 @@ The citation processing pipeline handles extraction, enrichment, and analysis of
 - Transaction-level error boundaries
 - Content scraping retry logic
 - Non-blocking enrichment failures 
+
+## Authentication & Authorization
+
+### Auth System
+1. Session Management
+   - Cookie-based auth with SSR support
+   - Async cookie operations for Next.js
+   - Session refresh in middleware
+   - Protected route enforcement
+
+2. Auth Endpoints
+   - GET `/auth/callback`
+     - Handles OAuth and email verification
+     - Establishes sessions
+     - Creates account associations
+     - Role-based redirects
+   - POST `/api/test-auth`
+     - Validates auth state
+     - Returns user context
+
+3. Authorization Flow
+   - RLS policy enforcement
+   - Account-scoped data access
+   - Role-based permissions:
+     ```sql
+     - Regular users: Account-scoped access
+     - Account admins: Account management
+     - Super admins: Global access
+     ```
+
+4. Data Access Control
+   - Companies table:
+     ```sql
+     - Account-based filtering
+     - User role verification
+     - Super admin bypass
+     ```
+   - Analysis data:
+     ```sql
+     - Account-scoped queries
+     - Role-based limitations
+     - Audit logging
+     ``` 

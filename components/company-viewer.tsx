@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/app/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { Database } from '@/types/supabase'
 import { SimpleCompanySelector } from './simple-company-selector';
 import { CompanyDetails, DetailedCompany } from './company-details';
 import { CompanyICPsTable } from './company-icps-table';
@@ -39,7 +40,7 @@ export function CompanyViewer() {
   const [icps, setIcps] = useState<ICP[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
-  const supabase = createClient();
+  const supabase = createClientComponentClient<Database>();
 
   // Fetch basic company data on mount
   useEffect(() => {
