@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { Database } from '@/types/supabase'
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -16,7 +18,6 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/hooks/use-toast"
-import { createClient } from "@/app/supabase/client"
 import { OAuthButtons } from "./oauth-buttons"
 import { Separator } from "@/components/ui/separator"
 import Link from "next/link"
@@ -36,6 +37,7 @@ export function SignUpForm() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const supabase = createClientComponentClient<Database>()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,7 +50,6 @@ export function SignUpForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    const supabase = createClient()
 
     try {
       const { error } = await supabase.auth.signUp({

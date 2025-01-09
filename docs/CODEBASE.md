@@ -32,6 +32,16 @@
   /supabase/       # Database utilities
     migration.sql
     test-connection.ts
+
+/app
+  /auth/
+    callback/route.ts    # Auth callback handling
+  middleware.ts         # Route protection
+  
+/components/auth/
+  login-form.tsx       # Email auth
+  oauth-buttons.tsx    # OAuth providers
+  signup-form.tsx      # Registration
 ```
 
 ## Core Modules
@@ -396,3 +406,73 @@ await mozQueue.processBatch(
 - Integration tests for full pipeline
 - Mock external services
 - Error case coverage 
+
+## Authentication Implementation
+
+### Directory Structure
+```typescript
+/app
+  /auth/
+    callback/route.ts    # Auth callback handling
+  middleware.ts         # Route protection
+  
+/components/auth/
+  login-form.tsx       # Email auth
+  oauth-buttons.tsx    # OAuth providers
+  signup-form.tsx      # Registration
+```
+
+### Auth Patterns
+
+1. Server Components
+```typescript
+// Server auth pattern
+const cookieStore = await cookies()
+const supabase = createServerComponentClient<Database>({
+  cookies: () => cookieStore
+})
+```
+
+2. Route Handlers
+```typescript
+// Route handler pattern
+const cookieStore = await cookies()
+const supabase = createRouteHandlerClient<Database>({
+  cookies: () => cookieStore
+})
+```
+
+3. Client Components
+```typescript
+// Client auth pattern
+const supabase = createClientComponentClient<Database>()
+```
+
+### RLS Implementation
+```sql
+-- Companies access policy
+create policy "users_companies_policy" on companies
+  for all using (
+    exists (
+      select 1 from account_users
+      where account_users.account_id = companies.account_id
+      and account_users.user_id = auth.uid()
+    )
+  )
+```
+
+### Auth Flow
+1. Route Protection
+   - Middleware checks
+   - Session verification
+   - Role validation
+
+2. Data Access
+   - RLS enforcement
+   - Account scoping
+   - Role checking
+
+3. Error Handling
+   - Auth failures
+   - Session expiry
+   - Permission denied 

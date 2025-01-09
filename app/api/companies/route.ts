@@ -1,9 +1,15 @@
-import { createClient } from '@/app/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import type { Database } from '@/types/supabase'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient<Database>({
+      cookies: () => cookieStore
+    })
+    
     const { data, error } = await supabase
       .from('companies')
       .select('id, name, industry')

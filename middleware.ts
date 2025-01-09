@@ -3,64 +3,82 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  let response = NextResponse.next()
+
   try {
-    // Create a response early to modify cookies
-    const res = NextResponse.next()
-    
-    // Create supabase client
-    const supabase = createMiddlewareClient({ req: request, res })
+    const supabase = createMiddlewareClient({ 
+      req: request, 
+      res: response,
+      options: {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+            })
+          },
+          remove(name: string, options: any) {
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+              maxAge: 0,
+            })
+          },
+        },
+      },
+    })
+
+    // Get user without throwing errors
+    const { data: { user } } = await supabase.auth.getUser()
 
     // Auth condition for protected routes
     const isLoginRoute = request.nextUrl.pathname === '/login'
-    const isSignupRoute = request.nextUrl.pathname === '/signup'
     const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback')
     const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
                             request.nextUrl.pathname.startsWith('/personal')
 
-    // Skip middleware for auth-related routes
+    // Skip middleware for callback route
     if (isAuthCallback) {
-      return res
+      return response
     }
 
-    // Refresh session if expired - must be awaited
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      console.error('Session error:', sessionError)
-    }
-
-    // Redirect if not authenticated
-    if (isProtectedRoute && !session) {
+    // Redirect if not authenticated on protected routes
+    if (isProtectedRoute && !user) {
       const redirectUrl = new URL('/login', request.url)
       redirectUrl.searchParams.set('redirect_to', request.nextUrl.pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect if authenticated and trying to access login/signup
-    if ((isLoginRoute || isSignupRoute) && session) {
+    // Redirect if authenticated and trying to access login
+    if (isLoginRoute && user) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Set session user in headers if needed
-    if (session?.user) {
-      res.headers.set('x-session-user', JSON.stringify({
-        id: session.user.id,
-        email: session.user.email,
-        role: session.user.role
+    // Only set user in headers if it exists
+    if (user) {
+      response.headers.set('x-session-user', JSON.stringify({
+        id: user.id,
+        email: user.email,
+        role: user.role
       }))
     }
 
-    return res
+    return response
   } catch (error) {
-    console.error('Middleware error:', error)
-    
     // Only redirect to login if on a protected route
     if (request.nextUrl.pathname.startsWith('/dashboard') || 
         request.nextUrl.pathname.startsWith('/personal')) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     
-    return NextResponse.next()
+    return response
   }
 }
 

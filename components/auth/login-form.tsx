@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/hooks/use-toast"
-import { createClient } from "@/app/supabase/client"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { Database } from '@/types/supabase'
 import { OAuthButtons } from "./oauth-buttons"
 import { Separator } from "@/components/ui/separator"
 
@@ -39,10 +40,11 @@ export function LoginForm() {
     },
   })
 
+  const supabase = createClientComponentClient<Database>()
+
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
-      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         router.push('/dashboard')
@@ -53,7 +55,6 @@ export function LoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    const supabase = createClient()
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
