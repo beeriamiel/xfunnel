@@ -5,11 +5,8 @@ import type { Database } from '@/types/supabase'
 
 export async function GET() {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient<Database>({
-      cookies: () => cookieStore
-    })
-    
+    const supabase = createRouteHandlerClient<Database>({ cookies })
+
     const { data, error } = await supabase
       .from('companies')
       .select('id, name, industry')

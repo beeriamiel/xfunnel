@@ -8,32 +8,11 @@ export async function middleware(request: NextRequest) {
   try {
     const supabase = createMiddlewareClient({ 
       req: request, 
-      res: response,
-      options: {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-              sameSite: 'lax',
-              secure: process.env.NODE_ENV === 'production',
-            })
-          },
-          remove(name: string, options: any) {
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-              maxAge: 0,
-            })
-          },
-        },
-      },
+      res: response
     })
+
+    // Refresh session if it exists
+    await supabase.auth.getSession()
 
     // Get user without throwing errors
     const { data: { user } } = await supabase.auth.getUser()

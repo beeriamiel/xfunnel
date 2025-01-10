@@ -27,10 +27,7 @@ function CompanySelectorFallback() {
 
 export async function CompanySelectorWrapper({ selectedCompany }: CompanySelectorWrapperProps) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerComponentClient<Database>({
-      cookies: () => cookieStore
-    })
+    const supabase = createServerComponentClient<Database>({ cookies })
     
     // RLS will automatically handle access control here
     const { data: companies, error } = await supabase

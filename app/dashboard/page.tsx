@@ -23,10 +23,7 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>) {
       return { selectedCompany: null }
     }
 
-    const cookieStore = cookies()
-    const supabase = createServerComponentClient<Database>({
-      cookies: () => cookieStore
-    })
+    const supabase = createServerComponentClient<Database>({ cookies })
     
     // Get company data with proper error handling
     const { data: company, error } = await supabase
