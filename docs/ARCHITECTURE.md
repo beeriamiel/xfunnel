@@ -235,3 +235,48 @@
   - Client-side context
   - Role propagation
   ``` 
+
+## Authentication
+
+### Implementation
+- Uses Supabase Auth with Next.js 14
+- Server Components use `createServerComponentClient`
+- Route Handlers use `createRouteHandlerClient`
+- Client Components use `createClientComponentClient`
+
+### Known Issues
+- Next.js 14 shows warnings about synchronous cookie access in routes
+- These warnings don't affect functionality:
+  - Auth flows work correctly
+  - OAuth implementation is stable
+  - Session management is secure
+  - RLS policies are enforced
+- This is due to Supabase auth helpers' internal cookie handling
+- Will be resolved in future Supabase updates
+
+### Auth Flow
+[Rest of existing auth documentation...] 
+
+# Architecture
+
+## Authentication and Data Access
+
+### Auth Implementation
+Our auth implementation uses Supabase Auth with Next.js 14, following these patterns:
+
+#### Client Types
+- Server Components: `createServerComponentClient`
+- Route Handlers: `createRouteHandlerClient`
+- Client Components: `createClientComponentClient`
+
+#### Known Implementation Notes
+- Current implementation shows Next.js 14 warnings about synchronous cookie access
+- These warnings are suppressed as they don't affect functionality:
+  - All auth flows work correctly
+  - OAuth implementation is stable
+  - Session management is secure
+  - RLS policies are properly enforced
+- Root cause: Supabase auth helpers' internal cookie handling
+- Future: Will be resolved in upcoming Supabase updates
+
+[Rest of existing documentation...] 

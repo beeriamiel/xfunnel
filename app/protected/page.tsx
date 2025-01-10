@@ -3,17 +3,12 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { hasEnvVars } from "@/utils/supabase/check-env-vars"
 import { GenerateICPsButton } from "@/components/generate-icps-button"
-import { GenerateQuestionsButton } from "@/components/generate-questions-button"
 import { Card } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { AppSidebar } from "@/components/app-sidebar"
 import type { Database } from '@/types/supabase'
 
 export default async function ProtectedPage() {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient<Database>({
-    cookies: () => cookieStore
-  })
+  const supabase = createServerComponentClient<Database>({ cookies })
 
   const { data: { user } } = await supabase.auth.getUser()
 

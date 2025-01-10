@@ -6,10 +6,7 @@ import Link from 'next/link'
 import type { Database } from '@/types/supabase'
 
 export default async function LandingPage() {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient<Database>({
-    cookies: () => cookieStore
-  })
+  const supabase = createServerComponentClient<Database>({ cookies })
 
   const {
     data: { user },

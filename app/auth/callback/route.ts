@@ -14,12 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))
     }
 
-    // Await cookies() as it's a dynamic API
-    const cookieStore = await cookies()
-    
-    const supabase = createRouteHandlerClient<Database>({ 
-      cookies: () => cookieStore 
-    })
+    const supabase = createRouteHandlerClient<Database>({ cookies })
 
     // Exchange code for session and get session data directly
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)

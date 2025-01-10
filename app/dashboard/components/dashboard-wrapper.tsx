@@ -4,6 +4,9 @@ import { CompanySelectorWrapper } from './company-selector-wrapper'
 import { DashboardContent } from './dashboard-content'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { ErrorFallback } from '@/components/error-fallback'
+import { cookies } from 'next/headers'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Database } from '@/types/supabase'
 
 interface Company {
   id: number
@@ -26,6 +29,8 @@ function LoadingSkeleton() {
 export function DashboardWrapper({ 
   selectedCompany 
 }: DashboardWrapperProps) {
+  const supabase = createServerComponentClient<Database>({ cookies })
+
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <div className="flex flex-col min-h-screen">
