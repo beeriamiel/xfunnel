@@ -1,0 +1,44 @@
+{
+  "mapping": [
+    {
+      "B2B": "Vertical",
+      "B2C": "Age group"
+    },
+    {
+      "B2B": "Company Size",
+      "B2C": "Income Level"
+    },
+    {
+      "B2B": "Region",
+      "B2C": "Location"
+    },
+    {
+      "B2B": "Persona Title",
+      "B2C": "Gender"
+    },
+    {
+      "B2B": "Persona Department",
+      "B2C": "Additional Traits"
+    },
+    {
+      "B2B": "Persona Seniority",
+      "B2C": "Additional Traits"
+    },
+    {
+      "B2B": "Company Industry",
+      "B2C": "Company Industry"
+    },
+    {
+      "B2B": "Product Category",
+      "B2C": "Product Category"
+    },
+    {
+      "B2B": "Competitors List",
+      "B2C": "Competitors List"
+    },
+    {
+      "B2B": "Company Name",
+      "B2C": "Company Name"
+    }
+  ]
+}

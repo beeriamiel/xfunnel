@@ -26,11 +26,12 @@ import {
 import { cn } from "@/lib/utils"
 import { design } from '../../../lib/design-system'
 import { generateICPSuggestions } from '../../../utils/mock-suggestions'
+import { B2CICPForm } from './b2c-icp-form'
 import type { ICP } from '../../../types/analysis'
+import type { B2CToB2BMapping } from '../../../types/b2c-mappings'
 
 interface ICPStepProps {
-  industry: string;
-  products: Array<{ id: string; name: string }>;
+  businessType: 'b2b' | 'b2c';
   icps: ICP[];
   onAddICP: (icp: Omit<ICP, 'id'>) => void;
   onEditICP: (icp: ICP) => void;
@@ -55,8 +56,7 @@ const COMPANY_SIZES = [
 ]
 
 export function ICPStep({ 
-  industry,
-  products,
+  businessType,
   icps, 
   onAddICP, 
   onEditICP, 
@@ -73,16 +73,15 @@ export function ICPStep({
   })
   const [isGenerating, setIsGenerating] = useState(false)
 
-  // Auto-generate ICPs when component mounts
+  const isB2C = businessType === 'b2c'
+
+  // Auto-generate ICPs when component mounts (only for B2B)
   useEffect(() => {
     const generateInitialICPs = async () => {
-      if (icps.length === 0) {
+      if (icps.length === 0 && !isB2C) {
         setIsGenerating(true)
         try {
-          const suggestions = await generateICPSuggestions(
-            industry,
-            products.map(p => p.name)
-          )
+          const suggestions = await generateICPSuggestions()
           suggestions.forEach(icp => {
             onAddICP({
               region: icp.region,
@@ -132,13 +131,32 @@ export function ICPStep({
     setDialogOpen(false)
   }
 
+  const getB2CInitialData = (icp: ICP): Partial<B2CToB2BMapping> => {
+    return {
+      ageGroup: icp.vertical,
+      incomeLevel: icp.company_size,
+      location: icp.region,
+      gender: icp.personas[0]?.title || '',
+      additionalTraits: [
+        icp.personas[0]?.department || '',
+        icp.personas[0]?.seniority_level || ''
+      ].filter(Boolean)
+    }
+  }
+
   return (
     <Card className={cn(design.layout.card, design.spacing.card)}>
       <div className={design.layout.container}>
         <div className={design.layout.header}>
           <div className={design.layout.headerContent}>
-            <h3 className={design.typography.title}>Ideal Customer Profile (ICP)</h3>
-            <p className={design.typography.subtitle}>Define your target customer segments</p>
+            <h3 className={design.typography.title}>
+              {isB2C ? 'Consumer Profile' : 'Ideal Customer Profile (ICP)'}
+            </h3>
+            <p className={design.typography.subtitle}>
+              {isB2C 
+                ? 'Define your target consumer segments'
+                : 'Define your target customer segments'}
+            </p>
           </div>
         </div>
 
@@ -157,7 +175,8 @@ export function ICPStep({
                   <div className="flex flex-col">
                     <span className="font-medium">{icp.vertical}</span>
                     <span className={design.typography.subtitle}>
-                      {icp.region} · {icp.company_size} employees
+                      {icp.region} · {isB2C ? 'Income: ' : ''}{icp.company_size}
+                      {!isB2C && ' employees'}
                     </span>
                   </div>
                 </div>
@@ -181,7 +200,7 @@ export function ICPStep({
                 </div>
               </motion.div>
             ))}
-            {icps.length === 0 && !isGenerating && (
+            {icps.length === 0 && !isGenerating && !isB2C && (
               <div className="h-[100px] flex flex-col items-center justify-center gap-2">
                 <Sparkles className={cn(design.components.listItem.icon, "h-8 w-8")} />
                 <p className={design.typography.subtitle}>Generating your ideal customer profiles...</p>
@@ -204,70 +223,96 @@ export function ICPStep({
                 className={design.components.button.outline}
                 onClick={handleCreateICP}
               >
-                Add ICP <Plus className={cn("ml-2", design.components.button.iconSize)} />
+                Add {isB2C ? 'Consumer Profile' : 'ICP'} 
+                <Plus className={cn("ml-2", design.components.button.iconSize)} />
               </Button>
             </DialogTrigger>
             <DialogContent className={design.components.dialog.content}>
               <DialogHeader>
-                <DialogTitle>{editingICP ? 'Edit ICP' : 'Create ICP'}</DialogTitle>
+                <DialogTitle>
+                  {editingICP 
+                    ? `Edit ${isB2C ? 'Consumer Profile' : 'ICP'}`
+                    : `Create ${isB2C ? 'Consumer Profile' : 'ICP'}`}
+                </DialogTitle>
                 <DialogDescription>
-                  {editingICP ? 'Customize your ideal customer profile.' : 'Create a new ideal customer profile.'}
+                  {editingICP 
+                    ? `Customize your ${isB2C ? 'consumer' : 'ideal customer'} profile.`
+                    : `Create a new ${isB2C ? 'consumer' : 'ideal customer'} profile.`}
                 </DialogDescription>
               </DialogHeader>
-              <div className={design.components.dialog.body}>
-                <div className={design.spacing.element}>
-                  <Label className={design.typography.label}>Region</Label>
-                  <Select 
-                    value={newICP.region} 
-                    onValueChange={(value) => setNewICP({ ...newICP, region: value })}
-                  >
-                    <SelectTrigger className={design.components.input.base}>
-                      <SelectValue placeholder="Select region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REGIONS.map((region) => (
-                        <SelectItem key={region} value={region}>
-                          {region}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              
+              {isB2C ? (
+                <B2CICPForm
+                  onSubmit={(b2cMappedData) => {
+                    if (editingICP) {
+                      onEditICP({ ...editingICP, ...b2cMappedData })
+                    } else {
+                      onAddICP(b2cMappedData)
+                    }
+                    setDialogOpen(false)
+                  }}
+                  isEditing={!!editingICP}
+                  initialData={editingICP ? getB2CInitialData(editingICP) : undefined}
+                />
+              ) : (
+                <div className={design.components.dialog.body}>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vertical">Industry/Vertical</Label>
+                      <Input
+                        id="vertical"
+                        placeholder="e.g. Enterprise SaaS, Healthcare"
+                        value={newICP.vertical}
+                        onChange={(e) => setNewICP({ ...newICP, vertical: e.target.value })}
+                        className={cn(design.components.input.base, design.typography.input)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="region">Region</Label>
+                      <Select
+                        value={newICP.region}
+                        onValueChange={(value) => setNewICP({ ...newICP, region: value })}
+                      >
+                        <SelectTrigger id="region">
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REGIONS.map((region) => (
+                            <SelectItem key={region} value={region}>
+                              {region}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company-size">Company Size</Label>
+                      <Select
+                        value={newICP.company_size}
+                        onValueChange={(value) => setNewICP({ ...newICP, company_size: value })}
+                      >
+                        <SelectTrigger id="company-size">
+                          <SelectValue placeholder="Select company size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMPANY_SIZES.map((size) => (
+                            <SelectItem key={size} value={size}>
+                              {size} employees
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
-                <div className={design.spacing.element}>
-                  <Label className={design.typography.label}>Vertical/Industry</Label>
-                  <Input
-                    placeholder="e.g., SaaS, Healthcare, E-commerce"
-                    value={newICP.vertical}
-                    onChange={(e) => setNewICP({ ...newICP, vertical: e.target.value })}
-                    className={design.components.input.base}
-                  />
-                </div>
-                <div className={design.spacing.element}>
-                  <Label className={design.typography.label}>Company Size</Label>
-                  <Select 
-                    value={newICP.company_size} 
-                    onValueChange={(value) => setNewICP({ ...newICP, company_size: value })}
-                  >
-                    <SelectTrigger className={design.components.input.base}>
-                      <SelectValue placeholder="Select company size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPANY_SIZES.map((size) => (
-                        <SelectItem key={size} value={size}>
-                          {size} employees
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              )}
               <DialogFooter>
                 <Button 
                   onClick={handleUpdateICP}
                   disabled={!newICP.vertical || !newICP.region || !newICP.company_size}
                   className={design.components.button.primary}
                 >
-                  {editingICP ? 'Update' : 'Create'} ICP
+                  {editingICP ? 'Update' : 'Create'}
                 </Button>
               </DialogFooter>
             </DialogContent>

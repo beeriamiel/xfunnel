@@ -17,8 +17,7 @@ import { QueryRow } from './query-row'
 import { ExpandedQueryRow } from './expanded-query-row'
 import type { ICP, QueryAction } from '@/app/dashboard/components/generate-analysis/types/analysis'
 import { fetchPersonaStats, type StatsMap } from '@/lib/services/persona-stats'
-import { AddICPDialog } from './add-icp-dialog'
-import { AddPersonaDialog } from './add-persona-dialog'
+import { AddAnalysisWizard } from './add-analysis-wizard'
 import { toast } from "sonner"
 
 interface ResponseTableProps {
@@ -37,8 +36,7 @@ export function ResponseTable({
   const [expandedPersonaId, setExpandedPersonaId] = React.useState<number | null>(null)
   const [isLoadingStats, setIsLoadingStats] = React.useState(true)
   const [stats, setStats] = React.useState<StatsMap>({})
-  const [showAddICPDialog, setShowAddICPDialog] = React.useState(false)
-  const [showAddPersonaDialog, setShowAddPersonaDialog] = React.useState(false)
+  const [showWizard, setShowWizard] = React.useState(false)
 
   React.useEffect(() => {
     async function loadStats() {
@@ -80,40 +78,23 @@ export function ResponseTable({
     }
   }
 
-  const handleAddICP = async (values: any) => {
-    // TODO: Connect to backend
+  const handleAnalysisComplete = () => {
+    // TODO: Handle the complete analysis data
     toast.info("This feature will be connected to the backend soon")
-    console.log('Adding ICP:', values)
-  }
-
-  const handleAddPersona = async (values: any) => {
-    // TODO: Connect to backend
-    toast.info("This feature will be connected to the backend soon")
-    console.log('Adding Persona:', values)
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">ICPs and Personas</h3>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddICPDialog(true)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add ICP
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddPersonaDialog(true)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Persona
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowWizard(true)}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Add Analysis
+        </Button>
       </div>
       
       <Table>
@@ -176,17 +157,10 @@ export function ResponseTable({
         </TableBody>
       </Table>
 
-      <AddICPDialog
-        open={showAddICPDialog}
-        onOpenChange={setShowAddICPDialog}
-        onSubmit={handleAddICP}
-      />
-
-      <AddPersonaDialog
-        open={showAddPersonaDialog}
-        onOpenChange={setShowAddPersonaDialog}
-        onSubmit={handleAddPersona}
-        icps={icps}
+      <AddAnalysisWizard
+        open={showWizard}
+        onOpenChange={setShowWizard}
+        onComplete={handleAnalysisComplete}
       />
     </div>
   )

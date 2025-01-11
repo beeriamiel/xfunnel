@@ -4,21 +4,19 @@ import { useState, ChangeEvent } from 'react'
 import { Card } from "@/components/ui/card"
 import { StepIndicator } from './step-indicator'
 import { InitialStep } from './steps/initial-step'
-import { ProductStep } from './steps/product-step'
 import { CompetitorStep } from './steps/competitor-step'
 import { ICPStep } from './steps/icp-step'
 import { PersonaStep } from './steps/persona-step'
 import type { CompanySetupProps } from '../../types/setup'
 import type { ICP, Persona } from '../../types/analysis'
-import type { Product } from '../../types/setup'
 
-type Step = 'initial' | 'product' | 'competitors' | 'icps' | 'personas'
+type Step = 'initial' | 'competitors' | 'icps' | 'personas'
+type BusinessType = 'b2b' | 'b2c'
 
 export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProps) {
   const [step, setStep] = useState<Step>('initial')
   const [companyName, setCompanyName] = useState('')
-  const [industry, setIndustry] = useState('')
-  const [products, setProducts] = useState<Product[]>([])
+  const [businessType, setBusinessType] = useState<BusinessType>('b2b')
   const [competitors, setCompetitors] = useState<Array<{ id: string; name: string; website?: string; description?: string }>>([])
   const [icps, setICPs] = useState<ICP[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -32,7 +30,7 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
   }
 
   const handleStepClick = (selectedStep: Step) => {
-    const stepOrder: Step[] = ['initial', 'product', 'competitors', 'icps', 'personas']
+    const stepOrder: Step[] = ['initial', 'competitors', 'icps', 'personas']
     const currentStepIndex = stepOrder.indexOf(step)
     const selectedStepIndex = stepOrder.indexOf(selectedStep)
 
@@ -45,24 +43,6 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
   const handleComplete = () => {
     onTransitionStart()
     onComplete(icps, personas)
-  }
-
-  const handleAddProduct = (product: Omit<Product, 'id'>) => {
-    const newProduct: Product = {
-      ...product,
-      id: Math.random().toString(),
-    }
-    setProducts([...products, newProduct])
-  }
-
-  const handleEditProduct = (product: Product) => {
-    setProducts(products.map(p => 
-      p.id === product.id ? product : p
-    ))
-  }
-
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter(p => p.id !== id))
   }
 
   const handleAddCompetitor = (competitor: Omit<{ id: string; name: string; website?: string; description?: string }, 'id'>) => {
@@ -152,25 +132,16 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
       {step === 'initial' && (
         <InitialStep
           companyName={companyName}
+          businessType={businessType}
           onCompanyNameChange={(e: ChangeEvent<HTMLInputElement>) => setCompanyName(e.target.value)}
-          onNext={() => handleStepComplete('initial', 'product')}
-        />
-      )}
-
-      {step === 'product' && (
-        <ProductStep
-          products={products}
-          onAddProduct={handleAddProduct}
-          onEditProduct={handleEditProduct}
-          onDeleteProduct={handleDeleteProduct}
-          onNext={() => handleStepComplete('product', 'competitors')}
+          onBusinessTypeChange={setBusinessType}
+          onNext={() => handleStepComplete('initial', 'competitors')}
         />
       )}
 
       {step === 'competitors' && (
         <CompetitorStep
           companyName={companyName}
-          products={products}
           competitors={competitors}
           onAddCompetitor={handleAddCompetitor}
           onDeleteCompetitor={handleDeleteCompetitor}
@@ -180,8 +151,7 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
 
       {step === 'icps' && (
         <ICPStep
-          industry={industry}
-          products={products}
+          businessType={businessType}
           icps={icps}
           onAddICP={handleAddICP}
           onEditICP={handleEditICP}

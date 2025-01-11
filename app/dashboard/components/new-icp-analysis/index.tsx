@@ -68,6 +68,12 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedVertical, setSelectedVertical] = useState<string | null>(null)
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null)
+  const [queryCounts, setQueryCounts] = useState<{ queries: number; responses: number } | null>(null)
+
+  // Handle query counts update
+  const handleQueriesCount = (queryCount: number, responseCount: number) => {
+    setQueryCounts({ queries: queryCount, responses: responseCount })
+  }
 
   // Stage accessibility logic
   const isStageAccessible = (stage: AnalysisStage) => {
@@ -156,6 +162,7 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
             selectedVertical={selectedVertical}
             selectedPersona={selectedPersona}
             onBack={handleBack}
+            onQueriesCount={handleQueriesCount}
           />
         ) : (
           <div>No persona selected</div>
@@ -194,6 +201,7 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
           selectedVertical={selectedVertical}
           selectedPersona={selectedPersona}
           onStageSelect={setCurrentStage}
+          queryCounts={queryCounts}
         />
         
         <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

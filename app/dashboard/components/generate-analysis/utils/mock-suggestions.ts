@@ -7,54 +7,48 @@ export async function mockDelay() {
 }
 
 export async function generateCompetitorSuggestions(
-  companyName: string,
-  products: string[]
+  companyName: string
 ): Promise<Competitor[]> {
   await mockDelay()
   
-  // Default competitors based on the first product
-  const productName = products[0] || 'Product'
-  
+  // Generate competitors based on company name
   return [
     {
       id: Math.random().toString(),
-      name: `${productName} Pro`
+      name: `${companyName} Alternative`
     },
     {
       id: Math.random().toString(),
-      name: `${productName} Enterprise`
+      name: `${companyName} Competitor`
     },
     {
       id: Math.random().toString(),
-      name: `${productName} Solutions`
+      name: `${companyName} Rival`
     }
   ]
 }
 
-export async function generateICPSuggestions(
-  industry: string,
-  products: string[]
-): Promise<ICP[]> {
+export async function generateICPSuggestions(): Promise<ICP[]> {
   await mockDelay()
 
   // Default suggestions based on common patterns
-  const suggestions = [
+  const suggestions: ICP[] = [
     {
-      id: '1',
+      id: 1,
       region: 'North America',
       vertical: 'Enterprise SaaS',
       company_size: '1000+',
       personas: []
     },
     {
-      id: '2',
+      id: 2,
       region: 'Europe',
       vertical: 'Mid-Market Tech',
       company_size: '100-1000',
       personas: []
     },
     {
-      id: '3',
+      id: 3,
       region: 'Global',
       vertical: 'Small Business',
       company_size: '1-100',
@@ -105,7 +99,7 @@ export async function generatePersonaSuggestions(
   ]
   
   return roles.map(([title, department], index) => ({
-    id: `${index + 1}`,
+    id: index + 1,
     title,
     seniority_level: 'Senior',
     department
@@ -118,41 +112,42 @@ export async function generateMockQueries(
 ): Promise<Query[]> {
   await mockDelay()
 
-  const queries = [
+  const queries: Query[] = [
     {
-      id: crypto.randomUUID(),
-      text: `What are the main challenges that ${persona.title}s face when implementing solutions in ${icp.vertical}?`,
-      icp,
-      persona,
-      status: 'pending' as const
+      id: 1,
+      query_text: `What are the main challenges that ${persona.title}s face when implementing solutions in ${icp.vertical}?`,
+      buyer_journey_phase: ['problem_exploration'],
+      created_at: new Date().toISOString(),
+      prompt_id: null,
+      persona_id: persona.id,
+      company_id: null,
+      user_id: null,
+      query_batch_id: null,
+      created_by_batch: null
     },
     {
-      id: crypto.randomUUID(),
-      text: `How does the buying process typically work for ${icp.company_size} companies in ${icp.region}?`,
-      icp,
-      persona,
-      status: 'pending' as const
+      id: 2,
+      query_text: `How does the buying process typically work for ${icp.company_size} companies in ${icp.region}?`,
+      buyer_journey_phase: ['solution_education'],
+      created_at: new Date().toISOString(),
+      prompt_id: null,
+      persona_id: persona.id,
+      company_id: null,
+      user_id: null,
+      query_batch_id: null,
+      created_by_batch: null
     },
     {
-      id: crypto.randomUUID(),
-      text: `What are the key factors that ${persona.title}s in ${persona.department} consider when evaluating solutions?`,
-      icp,
-      persona,
-      status: 'pending' as const
-    },
-    {
-      id: crypto.randomUUID(),
-      text: `How do ${persona.seniority_level} ${persona.title}s typically handle vendor selection?`,
-      icp,
-      persona,
-      status: 'pending' as const
-    },
-    {
-      id: crypto.randomUUID(),
-      text: `What are common objections from ${persona.title}s in ${icp.vertical} during the sales process?`,
-      icp,
-      persona,
-      status: 'pending' as const
+      id: 3,
+      query_text: `What are the key factors that ${persona.title}s in ${persona.department} consider when evaluating solutions?`,
+      buyer_journey_phase: ['solution_evaluation'],
+      created_at: new Date().toISOString(),
+      prompt_id: null,
+      persona_id: persona.id,
+      company_id: null,
+      user_id: null,
+      query_batch_id: null,
+      created_by_batch: null
     }
   ]
 

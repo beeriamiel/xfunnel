@@ -57,6 +57,8 @@ import {
 import { SourcesAnalysisMentions } from './source-analysis/sources-analysis-mentions'
 import { SourcesAnalysisRankings } from './source-analysis/sources-analysis-rankings'
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { TopCitedSources } from './source-analysis/top-cited-sources'
+import { Separator } from "@/components/ui/separator"
 
 // Constants for journey stages
 const MENTION_STAGES = ['problem_exploration', 'solution_education']
@@ -1464,31 +1466,27 @@ function ChartLoadingState() {
 
 export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
   const [currentCompanyName, setCurrentCompanyName] = useState<string | null>(null)
-  const [selectedMentionCompetitor, setSelectedMentionCompetitor] = useState<string | null>(null)
-  const [selectedRankingCompetitor, setSelectedRankingCompetitor] = useState<string | null>(null)
-  const [competitorData, setCompetitorData] = useState<CompetitorData[]>([])
+  const [data, setData] = useState<CompetitorData[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isChartReady, setIsChartReady] = useState(false)
+  const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Memoize the competitor data to prevent unnecessary recalculations
-  const memoizedCompetitorData = useMemo(() => competitorData, [competitorData])
+  const memoizedData = useMemo(() => data, [data])
 
   useEffect(() => {
+    let isMounted = true
+
     async function fetchData() {
-      if (!companyId) {
-        setIsLoading(false)
-        return
-      }
+      if (!companyId) return
 
       try {
         setIsLoading(true)
-        setIsChartReady(false)
         setError(null)
-        
+
         const supabase = createClient()
-        
-        // First fetch the current company name
+
+        // Fetch company name
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('name')
@@ -1496,7 +1494,10 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
           .single()
 
         if (companyError) throw companyError
-        setCurrentCompanyName(companyData?.name || null)
+        
+        if (isMounted) {
+          setCurrentCompanyName(companyData?.name || null)
+        }
 
         // Fetch mentions data
         const { data: mentionsData, error: mentionsError } = await supabase
@@ -1588,95 +1589,101 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
           return comp.rankings.frequency >= MIN_RANKING_APPEARANCES || comp.rankings.frequency === 0
         })
 
-        setCompetitorData(filteredCompetitors)
-        setIsLoading(false)
-        
-        // Add a small delay before showing charts for smooth transition
-        setTimeout(() => {
-          setIsChartReady(true)
-        }, 500)
+        if (isMounted) {
+          setData(filteredCompetitors)
+          setIsLoading(false)
+        }
       } catch (err) {
         console.error('Error fetching competitor data:', err)
-        setError('Failed to load competitor data')
-        setIsLoading(false)
+        if (isMounted) {
+          setError('Failed to load competitor data')
+          setIsLoading(false)
+        }
       }
     }
 
     fetchData()
+
+    return () => {
+      isMounted = false
+    }
   }, [companyId])
 
   if (!companyId) {
     return (
-      <Card className="relative overflow-hidden border-border">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20" />
-        <div className="relative p-8">
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="rounded-full bg-muted/10 p-4 shadow-sm">
-              <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-medium">No Company Selected</h3>
-              <p className="text-sm text-muted-foreground">
-                Select a company to view citation analysis
-              </p>
-            </div>
-          </div>
+      <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+        <BarChart3 className="h-8 w-8 text-muted-foreground/60" />
+        <div className="space-y-1">
+          <h3 className="font-medium text-muted-foreground">No Company Selected</h3>
+          <p className="text-sm text-muted-foreground/60">
+            Select a company to view citation analysis
+          </p>
         </div>
-      </Card>
+      </div>
     )
   }
 
-  if (isLoading || !isChartReady) {
+  if (isLoading) {
     return <ChartLoadingState />
   }
 
   if (error) {
     return (
-      <Card className="relative overflow-hidden border-border">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20" />
-        <div className="relative p-8">
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="rounded-full bg-red-500/10 p-4 shadow-sm">
-              <AlertCircle className="h-8 w-8 text-red-500/70" />
-            </div>
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-medium text-red-500">Error Loading Data</h3>
-              <p className="text-sm text-muted-foreground">{error}</p>
-            </div>
-          </div>
+      <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+        <AlertCircle className="h-8 w-8 text-destructive" />
+        <div className="space-y-1">
+          <h3 className="font-medium text-destructive">Error Loading Data</h3>
+          <p className="text-sm text-muted-foreground">{error}</p>
         </div>
-      </Card>
+      </div>
     )
   }
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-6"
-      >
-        <CompetitorSection
-          title="Top Competitors by Mentions"
-          type="mentions"
-          data={memoizedCompetitorData}
-          currentCompanyName={currentCompanyName || undefined}
-          companyId={companyId}
-          onCompetitorSelect={setSelectedMentionCompetitor}
-          selectedCompetitor={selectedMentionCompetitor || undefined}
-        />
-        
-        <CompetitorSection
-          title="Top Competitors by Rankings"
-          type="rankings"
-          data={memoizedCompetitorData}
-          currentCompanyName={currentCompanyName || undefined}
-          companyId={companyId}
-          onCompetitorSelect={setSelectedRankingCompetitor}
-          selectedCompetitor={selectedRankingCompetitor || undefined}
-        />
-      </motion.div>
-    </AnimatePresence>
+    <div className="space-y-8">
+      {/* Top Cited Sources Section */}
+      <TopCitedSources companyId={companyId} />
+      
+      {/* Add divider with label */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <Separator className="w-full" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-background px-4 text-sm text-muted-foreground">
+            Competitor Analysis
+          </span>
+        </div>
+      </div>
+      
+      {/* Competitor Analysis Section */}
+      <div className="grid grid-cols-2 gap-8">
+        {/* Left Column - Mentions Analysis */}
+        <div>
+          <CompetitorSection
+            title="Competitor Mentions Analysis"
+            type="mentions"
+            data={memoizedData}
+            currentCompanyName={currentCompanyName || undefined}
+            companyId={companyId}
+            onCompetitorSelect={setSelectedCompetitor}
+            selectedCompetitor={selectedCompetitor ? selectedCompetitor : undefined}
+          />
+        </div>
+
+        {/* Right Column - Rankings Analysis */}
+        <div className="pl-8 border-l">
+          <CompetitorSection
+            title="Competitor Rankings Analysis"
+            type="rankings"
+            data={memoizedData}
+            currentCompanyName={currentCompanyName || undefined}
+            companyId={companyId}
+            onCompetitorSelect={setSelectedCompetitor}
+            selectedCompetitor={selectedCompetitor ? selectedCompetitor : undefined}
+          />
+        </div>
+      </div>
+    </div>
   )
 } 

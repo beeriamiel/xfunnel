@@ -3,14 +3,16 @@
 import { motion } from 'framer-motion'
 import { Card } from "@/components/ui/card"
 import { Building2, Package, CircleDot, Globe2, Users, Pencil } from "lucide-react"
+import { cn } from "@/lib/utils"
 import type { CompletedStep } from '../../types/shared'
 
 interface CompletedStepChipProps {
   step: CompletedStep;
-  onEdit: () => void;
+  isActive: boolean;
+  onClick: () => void;
 }
 
-export function CompletedStepChip({ step, onEdit }: CompletedStepChipProps) {
+export function CompletedStepChip({ step, isActive, onClick }: CompletedStepChipProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8 }}
@@ -19,8 +21,11 @@ export function CompletedStepChip({ step, onEdit }: CompletedStepChipProps) {
       className="group relative"
     >
       <Card 
-        className="px-4 py-2 flex items-center gap-2 bg-accent/5 hover:bg-[#f6efff] cursor-pointer transition-colors"
-        onClick={onEdit}
+        className={cn(
+          "px-4 py-2 flex items-center gap-2 cursor-pointer transition-colors",
+          isActive ? "bg-[#f6efff]" : "bg-accent/5 hover:bg-[#f6efff]"
+        )}
+        onClick={onClick}
       >
         {step.type === 'company' && <Building2 className="h-4 w-4 text-[#f9a8c9]" />}
         {step.type === 'product' && <Package className="h-4 w-4 text-[#f9a8c9]" />}

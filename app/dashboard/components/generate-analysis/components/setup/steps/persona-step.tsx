@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils"
 import { design } from '../../../lib/design-system'
 import { generatePersonaSuggestions } from '../../../utils/mock-suggestions'
+import { B2CPersonaForm } from './b2c-persona-form'
 import type { ICP, Persona } from '../../../types/analysis'
 
 interface PersonaStepProps {
@@ -55,9 +56,13 @@ export function PersonaStep({
   })
   const [isGenerating, setIsGenerating] = useState(false)
 
+  // Determine if selected ICP is B2C based on vertical (mapped from age group)
+  const selectedICPData = icps.find(icp => icp.id.toString() === selectedICP)
+  const isB2C = selectedICPData?.vertical?.match(/^\d{2}-\d{2}$/) // Age group format: "25-34"
+
   useEffect(() => {
     const generateSuggestions = async () => {
-      if (selectedICP && !personas.length) {
+      if (selectedICP && !personas.length && !isB2C) {
         setIsGenerating(true)
         try {
           const icp = icps.find(i => i.id.toString() === selectedICP)
@@ -79,7 +84,7 @@ export function PersonaStep({
     }
 
     generateSuggestions()
-  }, [selectedICP, personas.length, icps, onAddPersona])
+  }, [selectedICP, personas.length, icps, onAddPersona, isB2C])
 
   const handleAddPersona = () => {
     if (!newPersona.title || !newPersona.seniority_level || !newPersona.department || !selectedICP) return
@@ -107,25 +112,36 @@ export function PersonaStep({
       <div className={design.layout.container}>
         <div className={design.layout.header}>
           <div className={design.layout.headerContent}>
-            <h3 className={design.typography.title}>Buyer Personas</h3>
-            <p className={design.typography.subtitle}>Define your target buyer personas for each ICP</p>
+            <h3 className={design.typography.title}>
+              {isB2C ? 'Consumer Details' : 'Buyer Personas'}
+            </h3>
+            <p className={design.typography.subtitle}>
+              {isB2C 
+                ? 'Define additional consumer characteristics'
+                : 'Define your target buyer personas for each ICP'}
+            </p>
           </div>
         </div>
 
         <div className={design.spacing.section}>
           <div className={design.spacing.element}>
-            <Label className={design.typography.label}>Select ICP</Label>
+            <Label className={design.typography.label}>
+              Select {isB2C ? 'Consumer Profile' : 'ICP'}
+            </Label>
             <Select 
               value={selectedICP} 
               onValueChange={setSelectedICP}
             >
               <SelectTrigger className={design.components.input.base}>
-                <SelectValue placeholder="Choose an ICP to add personas" />
+                <SelectValue placeholder={`Choose ${isB2C ? 'a consumer profile' : 'an ICP'} to add details`} />
               </SelectTrigger>
               <SelectContent>
                 {icps.map((icp) => (
                   <SelectItem key={icp.id} value={icp.id.toString()}>
-                    {icp.vertical} ({icp.region})
+                    {isB2C 
+                      ? `Age ${icp.vertical} · ${icp.region}`
+                      : `${icp.vertical} (${icp.region})`
+                    }
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -145,9 +161,13 @@ export function PersonaStep({
                   <div className="flex items-center gap-2">
                     <UserCircle2 className={design.components.listItem.icon} />
                     <div className="flex flex-col">
-                      <span className="font-medium">{persona.title}</span>
+                      <span className="font-medium">
+                        {isB2C ? persona.title : persona.title}
+                      </span>
                       <span className={design.typography.subtitle}>
-                        {persona.department} · {persona.seniority_level}
+                        {isB2C 
+                          ? `${persona.department} · ${persona.seniority_level}`
+                          : `${persona.department} · ${persona.seniority_level}`}
                       </span>
                     </div>
                   </div>
@@ -173,12 +193,16 @@ export function PersonaStep({
               ))}
               {!selectedICP && (
                 <div className="h-[100px] flex items-center justify-center">
-                  <p className={design.typography.subtitle}>Select an ICP to add personas</p>
+                  <p className={design.typography.subtitle}>
+                    Select {isB2C ? 'a consumer profile' : 'an ICP'} to add details
+                  </p>
                 </div>
               )}
               {selectedICP && personas.length === 0 && !isGenerating && (
                 <div className="h-[100px] flex items-center justify-center">
-                  <p className={design.typography.subtitle}>Add your first persona</p>
+                  <p className={design.typography.subtitle}>
+                    Add your first {isB2C ? 'consumer details' : 'persona'}
+                  </p>
                 </div>
               )}
               {isGenerating && (
@@ -199,71 +223,97 @@ export function PersonaStep({
                 className={design.components.button.outline}
                 disabled={!selectedICP}
               >
-                Add Persona <Plus className={cn("ml-2", design.components.button.iconSize)} />
+                Add {isB2C ? 'Consumer Details' : 'Persona'} 
+                <Plus className={cn("ml-2", design.components.button.iconSize)} />
               </Button>
             </DialogTrigger>
             <DialogContent className={design.components.dialog.content}>
               <DialogHeader>
-                <DialogTitle>{editingPersona ? 'Edit' : 'Add'} Persona</DialogTitle>
+                <DialogTitle>
+                  {editingPersona 
+                    ? `Edit ${isB2C ? 'Consumer Details' : 'Persona'}`
+                    : `Add ${isB2C ? 'Consumer Details' : 'Persona'}`}
+                </DialogTitle>
                 <DialogDescription>
-                  Define your buyer persona. All fields are required.
+                  {isB2C
+                    ? 'Define additional consumer characteristics.'
+                    : 'Define your buyer persona. All fields are required.'}
                 </DialogDescription>
               </DialogHeader>
-              <div className={design.components.dialog.body}>
-                <div className={design.spacing.element}>
-                  <Label className={design.typography.label}>Title</Label>
-                  <Input
-                    placeholder="e.g., Product Manager, CTO"
-                    value={newPersona.title}
-                    onChange={(e) => setNewPersona({ ...newPersona, title: e.target.value })}
-                    className={design.components.input.base}
-                  />
+
+              {isB2C ? (
+                <B2CPersonaForm
+                  onSubmit={(b2bMappedData) => {
+                    if (editingPersona) {
+                      onEditPersona({ ...editingPersona, ...b2bMappedData })
+                    } else {
+                      onAddPersona(b2bMappedData, selectedICP)
+                    }
+                    setDialogOpen(false)
+                  }}
+                  isEditing={!!editingPersona}
+                  initialData={editingPersona ? {
+                    gender: editingPersona.title,
+                    traits: [editingPersona.department, editingPersona.seniority_level]
+                  } : undefined}
+                />
+              ) : (
+                <div className={design.components.dialog.body}>
+                  <div className={design.spacing.element}>
+                    <Label className={design.typography.label}>Title</Label>
+                    <Input
+                      placeholder="e.g., Product Manager, CTO"
+                      value={newPersona.title}
+                      onChange={(e) => setNewPersona({ ...newPersona, title: e.target.value })}
+                      className={design.components.input.base}
+                    />
+                  </div>
+                  <div className={design.spacing.element}>
+                    <Label className={design.typography.label}>Department</Label>
+                    <Input
+                      placeholder="e.g., Engineering, Marketing"
+                      value={newPersona.department}
+                      onChange={(e) => setNewPersona({ ...newPersona, department: e.target.value })}
+                      className={design.components.input.base}
+                    />
+                  </div>
+                  <div className={design.spacing.element}>
+                    <Label className={design.typography.label}>Seniority Level</Label>
+                    <Select 
+                      value={newPersona.seniority_level} 
+                      onValueChange={(value) => setNewPersona({ ...newPersona, seniority_level: value })}
+                    >
+                      <SelectTrigger className={design.components.input.base}>
+                        <SelectValue placeholder="Select seniority level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Junior">Junior</SelectItem>
+                        <SelectItem value="Mid-Level">Mid-Level</SelectItem>
+                        <SelectItem value="Senior">Senior</SelectItem>
+                        <SelectItem value="Lead">Lead</SelectItem>
+                        <SelectItem value="Manager">Manager</SelectItem>
+                        <SelectItem value="Director">Director</SelectItem>
+                        <SelectItem value="VP">VP</SelectItem>
+                        <SelectItem value="C-Level">C-Level</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={handleUpdatePersona}
+                      disabled={!newPersona.title || !newPersona.seniority_level || !newPersona.department}
+                      className={design.components.button.primary}
+                    >
+                      {editingPersona ? 'Update' : 'Create'} Persona
+                    </Button>
+                  </DialogFooter>
                 </div>
-                <div className={design.spacing.element}>
-                  <Label className={design.typography.label}>Department</Label>
-                  <Input
-                    placeholder="e.g., Engineering, Marketing"
-                    value={newPersona.department}
-                    onChange={(e) => setNewPersona({ ...newPersona, department: e.target.value })}
-                    className={design.components.input.base}
-                  />
-                </div>
-                <div className={design.spacing.element}>
-                  <Label className={design.typography.label}>Seniority Level</Label>
-                  <Select 
-                    value={newPersona.seniority_level} 
-                    onValueChange={(value) => setNewPersona({ ...newPersona, seniority_level: value })}
-                  >
-                    <SelectTrigger className={design.components.input.base}>
-                      <SelectValue placeholder="Select seniority level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Junior">Junior</SelectItem>
-                      <SelectItem value="Mid-Level">Mid-Level</SelectItem>
-                      <SelectItem value="Senior">Senior</SelectItem>
-                      <SelectItem value="Lead">Lead</SelectItem>
-                      <SelectItem value="Manager">Manager</SelectItem>
-                      <SelectItem value="Director">Director</SelectItem>
-                      <SelectItem value="VP">VP</SelectItem>
-                      <SelectItem value="C-Level">C-Level</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button 
-                  onClick={editingPersona ? handleUpdatePersona : handleAddPersona}
-                  disabled={!newPersona.title || !newPersona.seniority_level || !newPersona.department}
-                  className={design.components.button.primary}
-                >
-                  {editingPersona ? 'Update' : 'Add'} Persona
-                </Button>
-              </DialogFooter>
+              )}
             </DialogContent>
           </Dialog>
           <Button
             onClick={onComplete}
-            disabled={personas.length === 0 || isGenerating}
+            disabled={personas.length === 0}
             className={design.components.button.primary}
           >
             Complete <ChevronRight className={cn("ml-2", design.components.button.iconSize)} />

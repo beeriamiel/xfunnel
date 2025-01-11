@@ -14,6 +14,7 @@ interface StageProgressCardsProps {
   selectedVertical: string | null
   selectedPersona: string | null
   onStageSelect: (stage: AnalysisStage) => void
+  queryCounts: { queries: number; responses: number } | null
 }
 
 interface StageCardProps {
@@ -74,6 +75,7 @@ export function StageProgressCards({
   selectedVertical,
   selectedPersona,
   onStageSelect,
+  queryCounts
 }: StageProgressCardsProps) {
   // Helper to determine if a stage is selectable
   const isStageSelectable = (stage: AnalysisStage) => {
@@ -166,7 +168,7 @@ export function StageProgressCards({
 
           <StageCard
             title="Queries"
-            value={currentStage === 'queries' ? "124 options" : null}
+            value={currentStage === 'queries' && queryCounts ? `${queryCounts.queries} queries` : null}
             isActive={currentStage === 'queries'}
             isComplete={false}
             isSelectable={isStageSelectable('queries')}

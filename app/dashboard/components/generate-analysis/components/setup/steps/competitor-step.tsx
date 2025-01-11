@@ -21,7 +21,6 @@ import type { Competitor } from '../../../types/analysis'
 
 interface CompetitorStepProps {
   companyName: string;
-  products: Array<{ id: string; name: string }>;
   competitors: Competitor[];
   onAddCompetitor: (competitor: Omit<Competitor, 'id'>) => void;
   onDeleteCompetitor: (id: string) => void;
@@ -30,7 +29,6 @@ interface CompetitorStepProps {
 
 export function CompetitorStep({ 
   companyName,
-  products,
   competitors, 
   onAddCompetitor, 
   onDeleteCompetitor,
@@ -43,13 +41,10 @@ export function CompetitorStep({
   // Auto-generate competitors when component mounts
   useEffect(() => {
     const generateInitialCompetitors = async () => {
-      if (competitors.length === 0 && products.length > 0) {
+      if (competitors.length === 0) {
         setIsGenerating(true)
         try {
-          const suggestions = await generateCompetitorSuggestions(
-            companyName,
-            products.map(p => p.name)
-          )
+          const suggestions = await generateCompetitorSuggestions(companyName)
           suggestions.forEach(competitor => {
             onAddCompetitor({
               name: competitor.name
@@ -116,7 +111,7 @@ export function CompetitorStep({
             {competitors.length === 0 && !isGenerating && (
               <div className="h-[100px] flex flex-col items-center justify-center gap-2">
                 <Sparkles className={cn(design.components.listItem.icon, "h-8 w-8")} />
-                <p className={design.typography.subtitle}>Generating your competitors...</p>
+                <p className={design.typography.subtitle}>Add your competitors</p>
               </div>
             )}
             {isGenerating && (

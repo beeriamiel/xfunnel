@@ -1,4 +1,5 @@
-export interface LowHangingFruit {
+// In House Types
+export interface ContentOptimization {
   id: string
   title: string
   description: string
@@ -15,7 +16,7 @@ export interface LowHangingFruit {
   }[]
 }
 
-export interface TechnicalChange {
+export interface TechnicalContent {
   id: string
   title: string
   description: string
@@ -25,12 +26,11 @@ export interface TechnicalChange {
   affectedAreas: string[]
 }
 
-export interface ContentSuggestion {
+export interface NewContent {
   id: string
   title: string
   description: string
   priority: 'low' | 'medium' | 'high'
-  category: 'query-answer-matrix' | 'buying-journey' | 'competitor-analysis'
   actionItems: string[]
   metrics?: {
     name: string
@@ -39,231 +39,250 @@ export interface ContentSuggestion {
   }[]
 }
 
+export interface LLMOptimization {
+  id: string
+  title: string
+  description: string
+  impact: 'high' | 'medium' | 'low'
+  actionItems: string[]
+  metrics?: {
+    name: string
+    value: string
+    potential: string
+  }[]
+}
+
+// Outside Types
+export interface AffiliateContent {
+  id: string
+  title: string
+  description: string
+  type: 'optimization' | 'platform'
+  priority: 'low' | 'medium' | 'high'
+  sourceUrl?: string
+  actionItems: string[]
+  metrics?: {
+    name: string
+    value: string
+    potential: string
+  }[]
+}
+
+export interface UGCContent {
+  id: string
+  title: string
+  description: string
+  type: 'resolution' | 'topic'
+  priority: 'low' | 'medium' | 'high'
+  actionItems: string[]
+  metrics?: {
+    name: string
+    value: string
+    potential: string
+  }[]
+}
+
+export interface KeyTakeawaysData {
+  inHouse: {
+    contentOptimization: ContentOptimization[]
+    technicalContent: TechnicalContent[]
+    newContent: NewContent[]
+    llmOptimization: LLMOptimization[]
+  }
+  outside: {
+    affiliateContent: AffiliateContent[]
+    ugcContent: UGCContent[]
+  }
+}
+
 // Placeholder data - will be replaced with real data later
-export const MOCK_DATA = {
-  lowHangingFruits: [
-    {
-      id: '1',
-      title: 'Add AI Favorite Metrics - HiBob Blog',
-      description: 'Major improvement opportunities identified through citations, quotations, and statistics',
-      sourceUrl: 'https://www.hibob.com/blog/hr-software-small-businesses/',
-      impact: 'medium',
-      estimatedEffort: '4-6 hours',
-      potentialImpact: '132% visibility improvement',
-      timestamp: new Date().toISOString(),
-      actionItems: [
-        'Increase citations from 9 to 20-25 high-authority sources',
-        'Add 8-10 expert quotations throughout the content',
-        'Expand statistics from 8 to 15-20 relevant data points',
-        'Improve statistical context integration',
-        'Enhance citation variety and quality'
-      ],
-      metrics: [
-        {
-          name: 'Citations',
-          value: '30%',
-          potential: '80%+'
-        },
-        {
-          name: 'Quotations',
-          value: '20%',
-          potential: '75%+'
-        },
-        {
-          name: 'Statistics',
-          value: '70%',
-          potential: '85%+'
-        },
-        {
-          name: 'Position Score',
-          value: 'Base',
-          potential: '+41%'
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'Optimize Affiliate Content - Outsail Review',
-      description: 'Critical content improvements needed for affiliate review page with extremely low content quality scores',
-      sourceUrl: 'https://www.outsail.co/post/hibob-reviews-pricing-pros-cons-user-reviews',
-      impact: 'medium',
-      estimatedEffort: '3-4 hours',
-      potentialImpact: '85% content quality improvement',
-      timestamp: new Date().toISOString(),
-      actionItems: [
-        'Add comprehensive product statistics and comparisons',
-        'Include expert quotes and testimonials',
-        'Integrate industry research citations',
-        'Enhance technical accuracy and terminology',
-        'Build authority through expert validation',
-        'Optimize for AI readability while maintaining affiliate effectiveness'
-      ],
-      metrics: [
-        {
-          name: 'Content Quality',
-          value: '10%',
-          potential: '75%+'
-        },
-        {
-          name: 'Authority',
-          value: '0%',
-          potential: '70%+'
-        },
-        {
-          name: 'Technical Terms',
-          value: '20%',
-          potential: '80%+'
-        },
-        {
-          name: 'Citations',
-          value: '0%',
-          potential: '60%+'
-        }
-      ]
-    }
-  ] as LowHangingFruit[],
-  
-  technicalChanges: [
-    {
-      id: '1',
-      title: 'Enhanced LLMs.txt Implementation',
-      description: 'Implemented and enhanced LLMs.txt with unique AI preference data integration',
-      impact: 'high',
-      date: new Date().toISOString(),
-      details: `Our implementation goes beyond the standard LLMs.txt format by incorporating real AI interaction data. While the standard helps AI systems understand documentation, our enhancement uses actual interaction patterns to optimize content structure and presentation.
+export const MOCK_DATA: KeyTakeawaysData = {
+  inHouse: {
+    contentOptimization: [
+      {
+        id: '1',
+        title: 'International Payment Gateways Content Enhancement',
+        description: 'Critical content improvements needed for payment gateway comparison page',
+        impact: 'high',
+        estimatedEffort: '3-4 hours',
+        potentialImpact: '85% content quality improvement',
+        timestamp: new Date().toISOString(),
+        sourceUrl: 'https://gocardless.com/en-us/guides/posts/top-international-payment-gateways/',
+        actionItems: [
+          'Add comprehensive payment processing statistics',
+          'Include payment expert testimonials',
+          'Integrate payment industry research',
+          'Enhance technical accuracy of payment terms',
+          'Build authority through payment expert validation'
+        ],
+        metrics: [
+          {
+            name: 'Content Quality',
+            value: '10%',
+            potential: '75%+'
+          },
+          {
+            name: 'Authority',
+            value: '0%',
+            potential: '70%+'
+          },
+          {
+            name: 'Technical Terms',
+            value: '20%',
+            potential: '80%+'
+          }
+        ]
+      }
+    ],
+    technicalContent: [
+      {
+        id: '1',
+        title: 'Payment-Specific LLMs.txt Implementation',
+        description: 'Enhanced LLMs.txt with payment processing terminology and integration patterns',
+        impact: 'high',
+        date: new Date().toISOString(),
+        details: `Our implementation optimizes payment processing documentation for AI understanding. The enhancement uses actual interaction patterns to improve content structure for payment-related queries.
 
 Key improvements:
-• AI-Optimized Navigation: Structure based on successful interaction patterns
-• Enhanced Context Windows: Optimized content chunks based on AI processing patterns
-• Smart Content Prioritization: Using real interaction data to highlight key information
-• Automated Updates: Content structure evolves based on ongoing AI interactions
+• Payment-Specific Navigation: Structure based on common payment integration patterns
+• Enhanced Context Windows: Optimized content chunks for payment processing flows
+• Smart Content Prioritization: Using real interaction data for payment documentation
+• Automated Updates: Content structure evolves based on payment query patterns
 
 Current metrics show:
-• 45% improvement in AI content understanding
-• 30% faster response generation
-• 60% more accurate context retention
-• 25% reduction in clarification requests`,
-      affectedAreas: [
-        'Documentation Structure',
-        'AI Interaction Layer',
-        'Content Organization',
-        'Response Generation',
-        'Context Management'
-      ]
-    }
-  ] as TechnicalChange[],
-  
-  contentSuggestions: [
-    {
-      id: '1',
-      title: 'Query Gap Analysis & Content Strategy',
-      description: 'Strategic implementation plan for 147 identified query gaps across buyer journey stages, based on analysis of thousands of region and persona-specific queries',
-      priority: 'high',
-      category: 'query-answer-matrix',
-      actionItems: [
-        'Month 1: Implement Problem Exploration (35) & Solution Education (40) content',
-        'Month 2: Develop Solution Comparison (30) & Evaluation (25) content',
-        'Month 3: Create User Research (17) content & refine implementation',
-        'Create AI-optimized answer templates for each journey stage',
-        'Implement semantic markup for enhanced AI understanding',
-        'Set up tracking for query coverage and response accuracy'
-      ],
-      metrics: [
-        {
-          name: 'Query Coverage',
-          value: '147 gaps',
-          potential: '85% improvement'
-        },
-        {
-          name: 'Journey Stages',
-          value: '5 stages',
-          potential: '100% coverage'
-        },
-        {
-          name: 'Implementation',
-          value: '0%',
-          potential: '3 months'
-        },
-        {
-          name: 'Response Accuracy',
-          value: 'Limited',
-          potential: '90%+ accuracy'
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: 'HR Manager Journey Gaps & AI Review Sources',
-      description: 'Critical gaps identified in HR Manager buying journey, with focus on AI review sources and competitive education',
-      priority: 'high',
-      category: 'buying-journey',
-      actionItems: [
-        'Problem Exploration: Create indirect competitor comparison framework',
-        'Solution Education: Develop HR process transformation content',
-        'User Feedback: Optimize content for Perplexity, Claude, and GPT review sources',
-        'Implement review authenticity validation system',
-        'Build comprehensive HR Manager educational journey',
-        'Create competitive intelligence framework'
-      ],
-      metrics: [
-        {
-          name: 'Problem Stage',
-          value: '40% coverage',
-          potential: '90% journey completion'
-        },
-        {
-          name: 'Solution Stage',
-          value: 'Critical gaps',
-          potential: '85% content coverage'
-        },
-        {
-          name: 'AI Reviews',
-          value: '3 platforms',
-          potential: '100% source optimization'
-        },
-        {
-          name: 'Journey Completion',
-          value: '35% complete',
-          potential: '95% completion rate'
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'AI-Driven Content Strategy Blueprint',
-      description: 'Strategic content creation plan based on analysis of millions of AI content preference data points, delivering two best-in-class articles monthly',
-      priority: 'high',
-      category: 'competitor-analysis',
-      actionItems: [
-        'Analyze millions of AI interaction patterns and preferences',
-        'Identify top-performing content structures and formats',
-        'Create content templates based on successful AI citations',
-        'Implement bi-monthly premium content creation schedule',
-        'Monitor and analyze AI response patterns',
-        'Continuously refine content strategy based on AI preferences'
-      ],
-      metrics: [
-        {
-          name: 'AI Data Points',
-          value: '2M+ analyzed',
-          potential: '100% coverage'
-        },
-        {
-          name: 'Content Output',
-          value: '0 articles',
-          potential: '24 annually'
-        },
-        {
-          name: 'AI Citation Rate',
-          value: 'Baseline',
-          potential: '300% increase'
-        },
-        {
-          name: 'Content Quality',
-          value: 'Current',
-          potential: '95% AI preference match'
-        }
-      ]
-    }
-  ] as ContentSuggestion[]
+• 45% improvement in payment content understanding
+• 30% faster response generation for integration queries
+• 60% more accurate payment context retention
+• 25% reduction in technical clarification requests
+
+Reference: https://docs.google.com/document/d/1vRsrWUEIvqB8DBzq7pPHC0swBZ7Pa6pFp_3FYW07V48/edit?usp=drive_link`,
+        affectedAreas: [
+          'Payment Documentation',
+          'Integration Guides',
+          'Content Organization',
+          'Response Generation',
+          'Context Management'
+        ]
+      }
+    ],
+    newContent: [
+      {
+        id: '1',
+        title: 'Head of Payments Journey & Resources',
+        description: 'Critical content development for payment decision-maker journey',
+        priority: 'high',
+        actionItems: [
+          'Create payment gateway comparison framework',
+          'Develop payment processing transformation content',
+          'Build payment solution validation system',
+          'Create comprehensive decision-maker journey',
+          'Develop payment competitive intelligence framework'
+        ],
+        metrics: [
+          {
+            name: 'Journey Coverage',
+            value: '15%',
+            potential: '90%'
+          },
+          {
+            name: 'Decision Support',
+            value: '25%',
+            potential: '85%'
+          }
+        ]
+      }
+    ],
+    llmOptimization: [
+      {
+        id: '1',
+        title: 'Payment Gateway Query Matrix',
+        description: 'Strategic implementation plan for payment processing queries across buyer journey stages. Based on: https://docs.google.com/document/d/16xT59UmYfEL8b_oP1pq5nTZlaGkFLsYq0YgcK30BLKQ/edit?usp=drive_link',
+        impact: 'high',
+        actionItems: [
+          'Month 1: Implement Payment Problem Exploration & Solution Education',
+          'Month 2: Develop Gateway Comparison & Evaluation content',
+          'Month 3: Create Integration Research content & refine implementation',
+          'Create AI-optimized payment processing templates',
+          'Implement semantic markup for payment terminology',
+          'Set up tracking for payment query coverage'
+        ],
+        metrics: [
+          {
+            name: 'Query Coverage',
+            value: '147 gaps',
+            potential: '85% improvement'
+          },
+          {
+            name: 'Journey Stages',
+            value: '5 stages',
+            potential: '100% coverage'
+          }
+        ]
+      }
+    ]
+  },
+  outside: {
+    affiliateContent: [
+      {
+        id: '1',
+        title: 'Payments Software Evolution Content',
+        description: 'Major improvement opportunities identified through Stripe\'s platform evolution and market trends',
+        sourceUrl: 'https://www.linkedin.com/posts/sytaylor_payments-are-becoming-software-stripe-goes-activity-7250475337493491712-g9FV/',
+        type: 'optimization',
+        priority: 'high',
+        actionItems: [
+          'Analyze software-driven payment trends',
+          'Compare platform capabilities with competitors',
+          'Highlight Checkout.com\'s software advantages',
+          'Document payment infrastructure evolution',
+          'Create payment modernization roadmap content'
+        ],
+        metrics: [
+          {
+            name: 'Technical Depth',
+            value: '30%',
+            potential: '80%+'
+          },
+          {
+            name: 'Market Analysis',
+            value: '20%',
+            potential: '75%+'
+          },
+          {
+            name: 'Competitive Intel',
+            value: '70%',
+            potential: '85%+'
+          }
+        ]
+      }
+    ],
+    ugcContent: [
+      {
+        id: '1',
+        title: 'Payment Community Engagement Strategy',
+        description: 'Develop comprehensive strategy for engaging with payment community discussions and trends',
+        type: 'topic',
+        priority: 'high',
+        actionItems: [
+          'Monitor key LinkedIn discussions and trends',
+          'Create engagement templates for payment topics',
+          'Develop response framework for technical questions',
+          'Build thought leadership content calendar',
+          'Establish community expert relationships'
+        ],
+        metrics: [
+          {
+            name: 'Engagement Rate',
+            value: '25%',
+            potential: '75%'
+          },
+          {
+            name: 'Response Time',
+            value: '24h',
+            potential: '4h'
+          }
+        ]
+      }
+    ]
+  }
 } 
