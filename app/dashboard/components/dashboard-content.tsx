@@ -16,15 +16,12 @@ import { FAQs } from './faqs'
 import { useDashboardStore } from '../store'
 import { NewICPAnalysis } from "./new-icp-analysis"
 import { PersonalSettings } from "./personal-settings"
+import { Button } from "@/components/ui/button"
 
 interface Company {
   id: number
   name: string
   industry: string | null
-}
-
-interface Props {
-  selectedCompany: Company | null;
 }
 
 function MetricsSkeleton() {
@@ -54,7 +51,13 @@ function ErrorState({ error }: { error: string }) {
   )
 }
 
-function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
+function DashboardView({ 
+  selectedCompany,
+  accountId
+}: { 
+  selectedCompany: Company;
+  accountId: string;
+}) {
   const { activeView } = useDashboardStore()
   
   return (
@@ -62,21 +65,33 @@ function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
       <div className="grid gap-4">
         <Suspense fallback={<MetricsSkeleton />}>
           {activeView === 'response' ? (
-            <GenerateAnalysis />
+            <GenerateAnalysis accountId={accountId} />
           ) : activeView === 'faqs' ? (
-            <FAQs />
+            <FAQs accountId={accountId} />
           ) : activeView === 'icp' ? (
-            <NewICPAnalysis companyId={selectedCompany.id} />
+            <NewICPAnalysis companyId={selectedCompany.id} accountId={accountId} />
           ) : activeView === 'citation' ? (
-            <CitationAnalysis companyId={selectedCompany.id} />
+            <CitationAnalysis 
+              companyId={selectedCompany.id}
+              accountId={accountId}
+            />
           ) : activeView === 'takeaways' ? (
-            <KeyTakeaways companyId={selectedCompany.id} />
+            <KeyTakeaways 
+              companyId={selectedCompany.id}
+              accountId={accountId}
+            />
           ) : activeView === 'personal' ? (
-            <PersonalSettings />
+            <PersonalSettings accountId={accountId} />
           ) : (
             <>
-              <EngineMetricsChart companyId={selectedCompany.id} />
-              <CompetitorAnalysis companyId={selectedCompany.id} />
+              <EngineMetricsChart 
+                companyId={selectedCompany.id}
+                accountId={accountId}
+              />
+              <CompetitorAnalysis 
+                companyId={selectedCompany.id}
+                accountId={accountId}
+              />
             </>
           )}
         </Suspense>
@@ -85,9 +100,25 @@ function DashboardView({ selectedCompany }: { selectedCompany: Company }) {
   )
 }
 
-export function DashboardContent({ selectedCompany }: Props) {
-  const { activeView } = useDashboardStore()
+export function DashboardError() {
+  return (
+    <div className="flex items-center justify-center p-6">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold">Something went wrong</h2>
+        <Button onClick={() => window.location.reload()}>
+          Try again
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export function DashboardContent({ accountId }: { accountId: string }) {
+  const { activeView, selectedCompanyId, companies } = useDashboardStore()
   
+  // Get selected company from store
+  const selectedCompany = companies.find(c => c.id === selectedCompanyId)
+
   return (
     <SidebarProvider>
       <div className="flex flex-1">
@@ -116,7 +147,10 @@ export function DashboardContent({ selectedCompany }: Props) {
           />
           <Suspense fallback={<div className="p-8"><MetricsSkeleton /></div>}>
             {selectedCompany ? (
-              <DashboardView selectedCompany={selectedCompany} />
+              <DashboardView 
+                selectedCompany={selectedCompany} 
+                accountId={accountId}
+              />
             ) : (
               <NoCompanySelected />
             )}

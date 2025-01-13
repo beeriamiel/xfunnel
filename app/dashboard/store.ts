@@ -50,6 +50,10 @@ interface DashboardStore {
   isDevMode: boolean
   setIsDevMode: (isDevMode: boolean) => void
   resetCompanyProfile: () => void
+  companies: Company[]
+  setCompanies: (companies: Company[]) => void
+  addCompany: (company: Company) => void
+  hasCompanies: boolean
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -63,5 +67,11 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   setTimePeriod: (period) => set({ timePeriod: period }),
   isDevMode: false,
   setIsDevMode: (isDevMode) => set({ isDevMode }),
-  resetCompanyProfile: () => set({ companyProfile: null })
+  resetCompanyProfile: () => set({ companyProfile: null }),
+  companies: [],
+  setCompanies: (companies) => set({ companies }),
+  addCompany: (company) => set((state) => ({
+    companies: [...state.companies, company]
+  })),
+  hasCompanies: false
 })) 

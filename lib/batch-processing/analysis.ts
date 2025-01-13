@@ -643,7 +643,11 @@ async function fetchCompetitors(companyId: number): Promise<string[]> {
       .select('competitor_name')
       .eq('company_id', companyId);
 
-    return competitors?.map(c => c.competitor_name) || [];
+    // Check if competitors is an array and has the expected structure
+    if (Array.isArray(competitors) && competitors.every(c => 'competitor_name' in c)) {
+      return competitors.map(c => c.competitor_name);
+    }
+    return [];
   } catch (error) {
     console.error('Error fetching competitors:', error);
     return [];

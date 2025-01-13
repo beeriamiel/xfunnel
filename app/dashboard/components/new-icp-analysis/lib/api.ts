@@ -69,6 +69,7 @@ export interface QueryAnalysis {
 
 export async function getAnalysisByCompany(
   companyId: number,
+  accountId: string,
   timePeriod: TimePeriod
 ): Promise<CompanyAnalysis> {
   const supabase = createClient()
@@ -79,6 +80,7 @@ export async function getAnalysisByCompany(
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
+    .eq('account_id', accountId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: true })
@@ -129,6 +131,7 @@ export async function getAnalysisByCompany(
 
 export async function getAnalysisByRegion(
   companyId: number,
+  accountId: string,
   timePeriod: TimePeriod
 ): Promise<RegionAnalysis[]> {
   const supabase = createClient()
@@ -139,6 +142,7 @@ export async function getAnalysisByRegion(
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
+    .eq('account_id', accountId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: true })
@@ -187,6 +191,7 @@ export async function getAnalysisByRegion(
 
 export async function getAnalysisByVertical(
   companyId: number,
+  accountId: string,
   region: string,
   timePeriod: TimePeriod
 ): Promise<VerticalAnalysis[]> {
@@ -198,6 +203,7 @@ export async function getAnalysisByVertical(
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
+    .eq('account_id', accountId)
     .eq('geographic_region', region)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
@@ -329,6 +335,7 @@ function aggregateMetrics(items: AnalysisMetrics[]): AnalysisMetrics {
 
 export async function getAnalysisByQueries(
   companyId: number,
+  accountId: string,
   region: string,
   vertical: string,
   persona: string,
@@ -345,6 +352,7 @@ export async function getAnalysisByQueries(
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
+    .eq('account_id', accountId)
     .eq('geographic_region', region)
     .eq('icp_vertical', vertical)
     .eq('buyer_persona', persona)
@@ -455,6 +463,7 @@ export async function getAnalysisByQueries(
 
 export async function getAnalysisByPersona(
   companyId: number,
+  accountId: string,
   region: string,
   vertical: string,
   timePeriod: TimePeriod
@@ -467,6 +476,7 @@ export async function getAnalysisByPersona(
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
+    .eq('account_id', accountId)
     .eq('geographic_region', region)
     .eq('icp_vertical', vertical)
     .gte('created_at', start.toISOString())

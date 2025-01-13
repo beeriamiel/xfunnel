@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent } from 'react'
+import { ChangeEvent, useState } from 'react'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -10,16 +10,23 @@ import { cn } from "@/lib/utils"
 import { design } from '../../../lib/design-system'
 
 interface InitialStepProps {
-  companyName: string;
-  onCompanyNameChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  onNext: () => void;
+  accountId: string;
+  onNext: (companyName: string) => void;
 }
 
-export function InitialStep({ 
-  companyName, 
-  onCompanyNameChange, 
-  onNext 
-}: InitialStepProps) {
+export function InitialStep({ accountId, onNext }: InitialStepProps) {
+  const [companyName, setCompanyName] = useState('')
+
+  const handleCompanyNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setCompanyName(e.target.value)
+  }
+
+  const handleNext = () => {
+    if (companyName) {
+      onNext(companyName)
+    }
+  }
+
   return (
     <Card className={cn(design.layout.card, design.spacing.card)}>
       <div className={design.layout.container}>
@@ -34,7 +41,7 @@ export function InitialStep({
               <Input
                 placeholder="Enter company name"
                 value={companyName}
-                onChange={onCompanyNameChange}
+                onChange={handleCompanyNameChange}
                 className={cn(
                   "pr-24",
                   design.components.input.base,
@@ -42,7 +49,7 @@ export function InitialStep({
                 )}
               />
               <Button
-                onClick={onNext}
+                onClick={handleNext}
                 disabled={!companyName}
                 className={cn(
                   "absolute right-1 top-1 bottom-1",

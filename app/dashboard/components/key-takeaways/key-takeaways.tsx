@@ -7,9 +7,10 @@ import { MOCK_DATA } from "./types"
 
 interface KeyTakeawaysProps {
   companyId: number
+  accountId: string
 }
 
-export function KeyTakeaways({ companyId }: KeyTakeawaysProps) {
+export function KeyTakeaways({ companyId, accountId }: KeyTakeawaysProps) {
   return (
     <div className="space-y-8 p-8">
       <LowHangingFruits opportunities={MOCK_DATA.lowHangingFruits} />

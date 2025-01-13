@@ -14,7 +14,19 @@ import type { Product } from '../../types/setup'
 
 type Step = 'initial' | 'product' | 'competitors' | 'icps' | 'personas'
 
-export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProps) {
+interface CompanySetupProps {
+  accountId: string;
+  onCompanyCreate: (companyName: string) => Promise<void>;
+  onComplete: (icps: ICP[], personas: Persona[]) => void;
+  onTransitionStart: () => void;
+}
+
+export function CompanySetup({ 
+  accountId,
+  onCompanyCreate,
+  onComplete,
+  onTransitionStart 
+}: CompanySetupProps) {
   const [step, setStep] = useState<Step>('initial')
   const [companyName, setCompanyName] = useState('')
   const [industry, setIndustry] = useState('')
@@ -151,9 +163,8 @@ export function CompanySetup({ onComplete, onTransitionStart }: CompanySetupProp
       
       {step === 'initial' && (
         <InitialStep
-          companyName={companyName}
-          onCompanyNameChange={(e: ChangeEvent<HTMLInputElement>) => setCompanyName(e.target.value)}
-          onNext={() => handleStepComplete('initial', 'product')}
+          accountId={accountId}
+          onNext={onCompanyCreate}
         />
       )}
 

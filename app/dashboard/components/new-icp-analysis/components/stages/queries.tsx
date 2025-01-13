@@ -21,15 +21,17 @@ interface QueryPhase {
 }
 
 interface QueriesProps {
-  companyId: number | null
-  selectedRegion: string
-  selectedVertical: string
-  selectedPersona: string
-  onBack: () => void
+  companyId: number | null;
+  accountId: string;
+  selectedRegion: string;
+  selectedVertical: string;
+  selectedPersona: string;
+  onBack: () => void;
 }
 
 export function Queries({ 
   companyId, 
+  accountId,
   selectedRegion, 
   selectedVertical,
   selectedPersona,
@@ -37,7 +39,13 @@ export function Queries({
 }: QueriesProps) {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
   const [isVisible, setIsVisible] = useState(false)
-  const { data, isLoading, error } = useQueries(companyId, selectedRegion, selectedVertical, selectedPersona)
+  const { data, isLoading, error } = useQueries(
+    companyId,
+    accountId,
+    selectedRegion,
+    selectedVertical,
+    selectedPersona
+  )
 
   React.useEffect(() => {
     const timer = setTimeout(() => {

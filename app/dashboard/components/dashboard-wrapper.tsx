@@ -1,21 +1,19 @@
-import { Suspense } from 'react'
+'use client'
+
+import { Suspense, useEffect } from 'react'
 import { Skeleton } from "@/components/ui/skeleton"
-import { CompanySelectorWrapper } from './company-selector-wrapper'
+import { CompanySelector } from './company-selector'
 import { DashboardContent } from './dashboard-content'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { ErrorFallback } from '@/components/error-fallback'
-import { cookies } from 'next/headers'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/types/supabase'
-
-interface Company {
-  id: number
-  name: string
-  industry: string | null
-}
+import { useDashboardStore } from '../store'
+import type { Company } from '../components/generate-analysis/types/company'
+import type { Database } from '@/types/supabase'
 
 interface DashboardWrapperProps {
   selectedCompany: Company | null
+  accountId: string
+  initialCompanies: Company[]
 }
 
 function LoadingSkeleton() {
@@ -27,9 +25,21 @@ function LoadingSkeleton() {
 }
 
 export function DashboardWrapper({ 
-  selectedCompany 
+  selectedCompany,
+  accountId,
+  initialCompanies
 }: DashboardWrapperProps) {
-  const supabase = createServerComponentClient<Database>({ cookies })
+  const { setSelectedCompanyId, setCompanies } = useDashboardStore()
+
+  useEffect(() => {
+    setCompanies(initialCompanies)
+  }, [initialCompanies, setCompanies])
+
+  useEffect(() => {
+    if (selectedCompany) {
+      setSelectedCompanyId(selectedCompany.id)
+    }
+  }, [selectedCompany, setSelectedCompanyId])
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
@@ -37,7 +47,10 @@ export function DashboardWrapper({
         <div className="border-b">
           <Suspense fallback={<LoadingSkeleton />}>
             <div className="flex h-16 items-center px-4">
-              <CompanySelectorWrapper selectedCompany={selectedCompany} />
+              <CompanySelector 
+                selectedCompany={selectedCompany}
+                companies={initialCompanies}
+              />
             </div>
           </Suspense>
         </div>
@@ -51,7 +64,7 @@ export function DashboardWrapper({
             }
           >
             <DashboardContent 
-              selectedCompany={selectedCompany}
+              accountId={accountId}
             />
           </Suspense>
         </div>

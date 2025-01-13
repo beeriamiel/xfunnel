@@ -42,17 +42,6 @@ export function LoginForm() {
 
   const supabase = createClientComponentClient<Database>()
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        router.push('/dashboard')
-      }
-    }
-    checkSession()
-  }, [router])
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
 

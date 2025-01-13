@@ -39,8 +39,9 @@ import {
 import { formatRegionName } from "../../lib/format"
 
 interface RegionsProps {
-  companyId: number | null
-  onSelectRegion: (region: string) => void
+  companyId: number | null;
+  accountId: string;
+  onSelectRegion: (region: string) => void;
 }
 
 const METRICS = [
@@ -83,7 +84,7 @@ const REGION_COLORS: Record<string, string> = {
   'Unknown': 'rgb(156, 163, 175)'  // gray-400
 }
 
-export function Regions({ companyId, onSelectRegion }: RegionsProps) {
+export function Regions({ companyId, accountId, onSelectRegion }: RegionsProps) {
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
@@ -91,7 +92,7 @@ export function Regions({ companyId, onSelectRegion }: RegionsProps) {
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
     companyId ? `region-analysis-${companyId}-${timePeriod}` : null,
-    () => companyId ? getAnalysisByRegion(companyId, timePeriod) : null
+    () => companyId ? getAnalysisByRegion(companyId, accountId, timePeriod) : null
   )
 
   // Prepare data for the timeline chart - moved before conditional returns

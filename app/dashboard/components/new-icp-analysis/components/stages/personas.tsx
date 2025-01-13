@@ -38,6 +38,7 @@ import {
 
 interface PersonasProps {
   companyId: number | null
+  accountId: string
   selectedRegion: string
   selectedVertical: string
   onSelectPersona: (persona: string) => void
@@ -87,6 +88,7 @@ const PERSONA_COLORS: Record<string, string> = {
 
 export function Personas({ 
   companyId, 
+  accountId, 
   selectedRegion, 
   selectedVertical, 
   onSelectPersona, 
@@ -102,7 +104,7 @@ export function Personas({
       ? `persona-analysis-${companyId}-${selectedRegion}-${selectedVertical}-${timePeriod}` 
       : null,
     () => companyId && selectedRegion && selectedVertical 
-      ? getAnalysisByPersona(companyId, selectedRegion, selectedVertical, timePeriod) 
+      ? getAnalysisByPersona(companyId, accountId, selectedRegion, selectedVertical, timePeriod) 
       : null
   )
 

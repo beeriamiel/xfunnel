@@ -1,11 +1,19 @@
 import { Suspense } from 'react'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { DashboardWrapper } from './components/dashboard-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientWrapper } from './components/client-wrapper'
 import { unstable_noStore as noStore } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/app/supabase/server'
 import type { Database } from '@/types/supabase'
+
+interface AccountContext {
+  userId: string
+  accountId: string
+  accountRole: string
+  hasCompanies: boolean
+  companies: any[]
+}
 
 type SearchParams = { [key: string]: string | string[] | undefined }
 
@@ -14,7 +22,49 @@ type Props = {
   searchParams: Promise<SearchParams>
 }
 
-async function getCompanyData(searchParamsPromise: Promise<SearchParams>) {
+async function getAccountContext(): Promise<AccountContext> {
+  console.log('Getting account context')
+  const supabase = await createClient()
+  console.log('Server client created')
+  
+  // Get current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) throw new Error('Authentication required')
+
+  // Get account relationship
+  const { data: accountUser, error: accountError } = await supabase
+    .from('account_users')
+    .select('account_id, role')
+    .eq('user_id', user.id)
+    .single()
+
+  if (accountError || !accountUser) {
+    throw new Error('Account access required')
+  }
+
+  // Get all companies for the account
+  const { data: companies } = await supabase
+    .from('companies')
+    .select('*')
+    .eq('account_id', accountUser.account_id)
+
+  // Keep existing company check for hasCompanies
+  const { data: hasCompaniesCheck } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('account_id', accountUser.account_id)
+    .limit(1)
+
+  return {
+    userId: user.id,
+    accountId: accountUser.account_id,
+    accountRole: accountUser.role ?? 'user',
+    hasCompanies: Boolean(hasCompaniesCheck?.length),
+    companies: companies || []  // Add companies to context
+  }
+}
+
+async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accountId: string) {
   try {
     const searchParams = await searchParamsPromise
     const companyName = typeof searchParams.company === 'string' ? searchParams.company : undefined
@@ -23,7 +73,7 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>) {
       return { selectedCompany: null }
     }
 
-    const supabase = createServerComponentClient<Database>({ cookies })
+    const supabase = createClient()
     
     // Get company data with proper error handling
     const { data: company, error } = await supabase
@@ -47,22 +97,45 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>) {
 export default async function Page({ params, searchParams }: Props) {
   noStore()
   
-  const searchParamsPromise = Promise.resolve(searchParams)
-  const { selectedCompany, error } = await getCompanyData(searchParamsPromise)
+  try {
+    console.log('Dashboard page hit, checking account context')
+    const accountContext = await getAccountContext()
+    
+    // Redirect new users to company creation
+    if (!accountContext.hasCompanies) {
+      redirect('/dashboard/generate-analysis')
+    }
 
-  // Add error handling at the page level
-  if (error) {
-    // You might want to handle this differently, perhaps showing an error UI
-    console.error('Error in dashboard page:', error)
+    const { selectedCompany, error } = await getCompanyData(
+      Promise.resolve(searchParams), 
+      accountContext.accountId
+    )
+
+    if (error) {
+      console.error('Error in dashboard page:', error)
+    }
+
+    return (
+      <ClientWrapper>
+        <Suspense fallback={<Skeleton className="h-screen" />}>
+          <DashboardWrapper 
+            selectedCompany={selectedCompany ? {
+              ...selectedCompany,
+              created_at: new Date().toISOString(),
+              main_products: [],
+              product_category: null,
+              number_of_employees: null,
+              annual_revenue: null,
+              markets_operating_in: []
+            } : null}
+            accountId={accountContext.accountId}
+            initialCompanies={accountContext.companies}  // Pass companies data
+          />
+        </Suspense>
+      </ClientWrapper>
+    )
+  } catch (error) {
+    console.error('Dashboard access error:', error)
+    redirect('/login?error=access_denied')
   }
-
-  return (
-    <ClientWrapper>
-      <Suspense fallback={<Skeleton className="h-screen" />}>
-        <DashboardWrapper 
-          selectedCompany={selectedCompany}
-        />
-      </Suspense>
-    </ClientWrapper>
-  )
 }

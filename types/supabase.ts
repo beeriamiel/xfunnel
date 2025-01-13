@@ -6,68 +6,30 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type CitationSourceType = 'OWNED' | 'COMPETITOR' | 'UGC' | 'EARNED';
-
 export type Database = {
   public: {
     Tables: {
-      accounts: {
-        Row: {
-          id: string
-          name: string
-          account_type: 'internal' | 'agency' | 'company'
-          plan_type: 'free' | 'pro' | 'enterprise'
-          monthly_credits_available: number
-          monthly_credits_used: number
-          credits_renewal_date: string | null
-          last_update_date: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          name: string
-          account_type: 'internal' | 'agency' | 'company'
-          plan_type: 'free' | 'pro' | 'enterprise'
-          monthly_credits_available?: number
-          monthly_credits_used?: number
-          credits_renewal_date?: string | null
-          last_update_date?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          name?: string
-          account_type?: 'internal' | 'agency' | 'company'
-          plan_type?: 'free' | 'pro' | 'enterprise'
-          monthly_credits_available?: number
-          monthly_credits_used?: number
-          credits_renewal_date?: string | null
-          last_update_date?: string | null
-          created_at?: string | null
-        }
-        Relationships: []
-      }
       account_users: {
         Row: {
-          id: string
           account_id: string
-          user_id: string
-          role: 'admin' | 'user'
           created_at: string | null
+          id: string
+          role: string
+          user_id: string
         }
         Insert: {
-          id?: string
           account_id: string
-          user_id: string
-          role: 'admin' | 'user'
           created_at?: string | null
+          id?: string
+          role: string
+          user_id: string
         }
         Update: {
-          id?: string
           account_id?: string
-          user_id?: string
-          role?: 'admin' | 'user'
           created_at?: string | null
+          id?: string
+          role?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -77,17 +39,47 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "account_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
         ]
+      }
+      accounts: {
+        Row: {
+          account_type: string
+          created_at: string | null
+          credits_renewal_date: string | null
+          id: string
+          last_update_date: string | null
+          monthly_credits_available: number
+          monthly_credits_used: number
+          name: string
+          plan_type: string
+        }
+        Insert: {
+          account_type: string
+          created_at?: string | null
+          credits_renewal_date?: string | null
+          id?: string
+          last_update_date?: string | null
+          monthly_credits_available?: number
+          monthly_credits_used?: number
+          name: string
+          plan_type: string
+        }
+        Update: {
+          account_type?: string
+          created_at?: string | null
+          credits_renewal_date?: string | null
+          id?: string
+          last_update_date?: string | null
+          monthly_credits_available?: number
+          monthly_credits_used?: number
+          name?: string
+          plan_type?: string
+        }
+        Relationships: []
       }
       batch_metadata: {
         Row: {
+          account_id: string | null
           batch_id: string
           batch_type: string
           company_id: number | null
@@ -96,9 +88,9 @@ export type Database = {
           error_message: string | null
           metadata: Json | null
           status: string
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           batch_id: string
           batch_type: string
           company_id?: number | null
@@ -107,9 +99,9 @@ export type Database = {
           error_message?: string | null
           metadata?: Json | null
           status: string
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           batch_id?: string
           batch_type?: string
           company_id?: number | null
@@ -118,9 +110,15 @@ export type Database = {
           error_message?: string | null
           metadata?: Json | null
           status?: string
-          account_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "batch_metadata_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "batch_metadata_company_id_fkey"
             columns: ["company_id"]
@@ -128,17 +126,11 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "batch_metadata_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          }
         ]
       }
       citations: {
         Row: {
+          account_id: string | null
           buyer_journey_phase: string | null
           buyer_persona: string | null
           citation_order: number
@@ -155,10 +147,12 @@ export type Database = {
           external_links_to_root_domain: number | null
           icp_vertical: string | null
           id: number
+          is_original: boolean | null
           mentioned_companies: string[] | null
           mentioned_companies_count: string[] | null
           moz_last_crawled: string | null
           moz_last_updated: string | null
+          origin_citation_id: number | null
           page_authority: number | null
           query_text: string | null
           rank_list: string | null
@@ -168,14 +162,12 @@ export type Database = {
           response_analysis_id: number
           response_text: string | null
           root_domains_to_root_domain: number | null
-          source_type: CitationSourceType
+          source_type: Database["public"]["Enums"]["citation_source_type"]
           spam_score: number | null
           updated_at: string | null
-          is_original: boolean | null
-          origin_citation_id: number | null
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           buyer_journey_phase?: string | null
           buyer_persona?: string | null
           citation_order: number
@@ -192,10 +184,12 @@ export type Database = {
           external_links_to_root_domain?: number | null
           icp_vertical?: string | null
           id?: never
+          is_original?: boolean | null
           mentioned_companies?: string[] | null
           mentioned_companies_count?: string[] | null
           moz_last_crawled?: string | null
           moz_last_updated?: string | null
+          origin_citation_id?: number | null
           page_authority?: number | null
           query_text?: string | null
           rank_list?: string | null
@@ -205,14 +199,12 @@ export type Database = {
           response_analysis_id: number
           response_text?: string | null
           root_domains_to_root_domain?: number | null
-          source_type?: CitationSourceType
+          source_type?: Database["public"]["Enums"]["citation_source_type"]
           spam_score?: number | null
           updated_at?: string | null
-          is_original?: boolean | null
-          origin_citation_id?: number | null
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           buyer_journey_phase?: string | null
           buyer_persona?: string | null
           citation_order?: number
@@ -229,10 +221,12 @@ export type Database = {
           external_links_to_root_domain?: number | null
           icp_vertical?: string | null
           id?: never
+          is_original?: boolean | null
           mentioned_companies?: string[] | null
           mentioned_companies_count?: string[] | null
           moz_last_crawled?: string | null
           moz_last_updated?: string | null
+          origin_citation_id?: number | null
           page_authority?: number | null
           query_text?: string | null
           rank_list?: string | null
@@ -242,12 +236,9 @@ export type Database = {
           response_analysis_id?: number
           response_text?: string | null
           root_domains_to_root_domain?: number | null
-          source_type?: CitationSourceType
+          source_type?: Database["public"]["Enums"]["citation_source_type"]
           spam_score?: number | null
           updated_at?: string | null
-          is_original?: boolean | null
-          origin_citation_id?: number | null
-          account_id?: string | null
         }
         Relationships: [
           {
@@ -256,11 +247,26 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
-          }
+          },
+          {
+            foreignKeyName: "citations_origin_citation_id_fkey"
+            columns: ["origin_citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_origin_citation"
+            columns: ["origin_citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       companies: {
         Row: {
+          account_id: string | null
           annual_revenue: string | null
           created_at: string | null
           id: number
@@ -270,9 +276,9 @@ export type Database = {
           name: string
           number_of_employees: number | null
           product_category: string | null
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           annual_revenue?: string | null
           created_at?: string | null
           id?: never
@@ -282,9 +288,9 @@ export type Database = {
           name: string
           number_of_employees?: number | null
           product_category?: string | null
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           annual_revenue?: string | null
           created_at?: string | null
           id?: never
@@ -294,7 +300,6 @@ export type Database = {
           name?: string
           number_of_employees?: number | null
           product_category?: string | null
-          account_id?: string | null
         }
         Relationships: [
           {
@@ -303,7 +308,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       competitors: {
@@ -375,6 +380,7 @@ export type Database = {
       }
       ideal_customer_profiles: {
         Row: {
+          account_id: string | null
           company_id: number | null
           company_size: string
           created_at: string | null
@@ -383,9 +389,9 @@ export type Database = {
           id: number
           region: string
           vertical: string
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           company_id?: number | null
           company_size: string
           created_at?: string | null
@@ -394,9 +400,9 @@ export type Database = {
           id?: number
           region: string
           vertical: string
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           company_id?: number | null
           company_size?: string
           created_at?: string | null
@@ -405,7 +411,6 @@ export type Database = {
           id?: number
           region?: string
           vertical?: string
-          account_id?: string | null
         }
         Relationships: [
           {
@@ -421,36 +426,36 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       personas: {
         Row: {
+          account_id: string | null
           created_at: string | null
           department: string
           icp_id: number | null
           id: number
           seniority_level: string
           title: string
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           created_at?: string | null
           department: string
           icp_id?: number | null
           id?: number
           seniority_level: string
           title: string
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           created_at?: string | null
           department?: string
           icp_id?: number | null
           id?: number
           seniority_level?: string
           title?: string
-          account_id?: string | null
         }
         Relationships: [
           {
@@ -466,7 +471,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       prompt_logs: {
@@ -577,6 +582,7 @@ export type Database = {
       }
       queries: {
         Row: {
+          account_id: string | null
           buyer_journey_phase: string[] | null
           company_id: number | null
           created_at: string | null
@@ -587,9 +593,9 @@ export type Database = {
           query_batch_id: string | null
           query_text: string
           user_id: string | null
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           buyer_journey_phase?: string[] | null
           company_id?: number | null
           created_at?: string | null
@@ -600,9 +606,9 @@ export type Database = {
           query_batch_id?: string | null
           query_text: string
           user_id?: string | null
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           buyer_journey_phase?: string[] | null
           company_id?: number | null
           created_at?: string | null
@@ -613,9 +619,15 @@ export type Database = {
           query_batch_id?: string | null
           query_text?: string
           user_id?: string | null
-          account_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "queries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "queries_company_id_fkey"
             columns: ["company_id"]
@@ -644,17 +656,11 @@ export type Database = {
             referencedRelation: "prompts"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "queries_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          }
         ]
       }
       response_analysis: {
         Row: {
+          account_id: string | null
           analysis_batch_id: string | null
           answer_engine: string
           buyer_persona: string | null
@@ -683,9 +689,9 @@ export type Database = {
           response_text: string | null
           sentiment_score: number | null
           solution_analysis: Json | null
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           analysis_batch_id?: string | null
           answer_engine: string
           buyer_persona?: string | null
@@ -714,9 +720,9 @@ export type Database = {
           response_text?: string | null
           sentiment_score?: number | null
           solution_analysis?: Json | null
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           analysis_batch_id?: string | null
           answer_engine?: string
           buyer_persona?: string | null
@@ -745,7 +751,6 @@ export type Database = {
           response_text?: string | null
           sentiment_score?: number | null
           solution_analysis?: Json | null
-          account_id?: string | null
         }
         Relationships: [
           {
@@ -754,6 +759,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batch_metadata"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "response_analysis_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "response_analysis_company_id_fkey"
@@ -783,17 +795,11 @@ export type Database = {
             referencedRelation: "responses"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "response_analysis_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          }
         ]
       }
       responses: {
         Row: {
+          account_id: string | null
           answer_engine: string | null
           citations: string[] | null
           created_at: string | null
@@ -804,9 +810,9 @@ export type Database = {
           response_text: string
           url: string | null
           websearchqueries: string[] | null
-          account_id: string | null
         }
         Insert: {
+          account_id?: string | null
           answer_engine?: string | null
           citations?: string[] | null
           created_at?: string | null
@@ -817,9 +823,9 @@ export type Database = {
           response_text: string
           url?: string | null
           websearchqueries?: string[] | null
-          account_id?: string | null
         }
         Update: {
+          account_id?: string | null
           answer_engine?: string | null
           citations?: string[] | null
           created_at?: string | null
@@ -830,9 +836,15 @@ export type Database = {
           response_text?: string
           url?: string | null
           websearchqueries?: string[] | null
-          account_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "responses_query_id_fkey"
             columns: ["query_id"]
@@ -840,13 +852,6 @@ export type Database = {
             referencedRelation: "queries"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "responses_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          }
         ]
       }
     }
@@ -996,12 +1001,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
-type CitationRow = Database['public']['Tables']['citations']['Row'];
-
-export interface ExistingCitationData extends CitationRow {
-  page_authority: number | null;
-  spam_score: number | null;
-  root_domains_to_root_domain: number | null;
-  external_links_to_root_domain: number | null;
-}

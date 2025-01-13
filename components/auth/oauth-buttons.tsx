@@ -17,6 +17,11 @@ export function OAuthButtons({ isLoading, setIsLoading }: OAuthButtonsProps) {
   const supabase = createClientComponentClient<Database>()
   
   const handleOAuthSignIn = async (provider: Provider) => {
+    console.log('Starting OAuth flow:', {
+      provider,
+      redirectUrl: `${window.location.origin}/auth/callback`,
+      timestamp: new Date().toISOString()
+    });
     setIsLoading(true)
     setActiveProvider(provider)
     

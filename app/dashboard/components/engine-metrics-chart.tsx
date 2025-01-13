@@ -69,7 +69,8 @@ interface EngineMetricsData {
 }
 
 interface EngineMetricsChartProps {
-  companyId?: number | null;
+  companyId: number;
+  accountId: string;
 }
 
 // Updated ExtendedResponseAnalysis interface
@@ -1061,7 +1062,10 @@ const METRICS_INFO = {
   }
 };
 
-export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
+export function EngineMetricsChart({ 
+  companyId, 
+  accountId
+}: EngineMetricsChartProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeMetric, setActiveMetric] = useState<MetricKey>('company_mentioned');

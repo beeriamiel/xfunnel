@@ -75,7 +75,7 @@ function getQueryState(queries: Query[]): QueryState {
   }
 }
 
-export async function getCompanyProfile(companyId: number): Promise<CompanyProfile | null> {
+export async function getCompanyProfile(companyId: number, accountId: string): Promise<CompanyProfile | null> {
   try {
     const cookieStore = cookies()
     const supabase = createServerComponentClient({ cookies: () => cookieStore })
@@ -114,6 +114,7 @@ export async function getCompanyProfile(companyId: number): Promise<CompanyProfi
         )
       `)
       .eq('company_id', companyId)
+      .eq('account_id', accountId)
       .order('created_at', { ascending: false })
 
     if (icpsError) {

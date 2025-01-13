@@ -73,7 +73,8 @@ interface CompetitorData {
 }
 
 interface CompetitorAnalysisProps {
-  companyId?: number | null
+  companyId: number;
+  accountId: string;
 }
 
 interface MetricInfo {
@@ -400,7 +401,10 @@ const ENGINE_COLORS = {
   rest: COMPETITOR_COLORS.rest
 }
 
-export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
+export function CompetitorAnalysis({ 
+  companyId, 
+  accountId
+}: CompetitorAnalysisProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeEngine, setActiveEngine] = useState<string>('perplexity')

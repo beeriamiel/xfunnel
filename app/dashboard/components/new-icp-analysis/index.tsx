@@ -56,9 +56,10 @@ export const STAGES = [
 
 interface NewICPAnalysisProps {
   companyId?: number | null;
+  accountId: string;
 }
 
-export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
+export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
   // Connect to dashboard store for company selection
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
@@ -117,11 +118,12 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
   const renderStageContent = () => {
     switch (currentStage) {
       case 'total-company':
-        return <TotalCompany companyId={effectiveCompanyId} />
+        return <TotalCompany companyId={effectiveCompanyId} accountId={accountId} />
       case 'regions':
         return (
           <Regions 
             companyId={effectiveCompanyId} 
+            accountId={accountId}
             onSelectRegion={handleRegionSelect}
           />
         )
@@ -129,6 +131,7 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
         return selectedRegion ? (
           <Verticals
             companyId={effectiveCompanyId}
+            accountId={accountId}
             selectedRegion={selectedRegion}
             onSelectVertical={handleVerticalSelect}
             onBack={handleBack}
@@ -140,6 +143,7 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
         return selectedRegion && selectedVertical ? (
           <Personas
             companyId={effectiveCompanyId}
+            accountId={accountId}
             selectedRegion={selectedRegion}
             selectedVertical={selectedVertical}
             onSelectPersona={handlePersonaSelect}
@@ -152,6 +156,7 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
         return selectedRegion && selectedVertical && selectedPersona ? (
           <Queries
             companyId={effectiveCompanyId}
+            accountId={accountId}
             selectedRegion={selectedRegion}
             selectedVertical={selectedVertical}
             selectedPersona={selectedPersona}

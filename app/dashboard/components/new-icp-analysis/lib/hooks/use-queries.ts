@@ -42,6 +42,7 @@ type QueryResponse = Pick<
 
 export function useQueries(
   companyId: number | null,
+  accountId: string,
   region: string,
   vertical: string,
   persona: string
@@ -65,6 +66,7 @@ export function useQueries(
 
         console.log('Fetching queries with:', {
           companyId,
+          accountId,
           region,
           vertical,
           persona,
@@ -94,6 +96,7 @@ export function useQueries(
             company_name
           `)
           .eq('company_id', companyId)
+          .eq('account_id', accountId)
           .eq('geographic_region', region)
           .eq('icp_vertical', vertical)
           .eq('buyer_persona', persona)
@@ -189,7 +192,7 @@ export function useQueries(
     }
 
     fetchQueries()
-  }, [companyId, region, vertical, persona, timePeriod])
+  }, [companyId, accountId, region, vertical, persona, timePeriod])
 
   return { data, isLoading, error }
 } 

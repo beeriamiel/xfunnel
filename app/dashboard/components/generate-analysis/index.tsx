@@ -13,14 +13,20 @@ import confetti from 'canvas-confetti'
 import { getCompanyProfile } from './utils/actions'
 import type { ICP, Persona } from './types/analysis'
 
-export function GenerateAnalysis() {
+interface GenerateAnalysisProps {
+  accountId: string;
+}
+
+export function GenerateAnalysis({ accountId }: GenerateAnalysisProps) {
   const { 
     selectedCompanyId,
     companyProfile,
     setCompanyProfile,
     isDevMode,
     setIsDevMode,
-    resetCompanyProfile
+    resetCompanyProfile,
+    setSelectedCompanyId,
+    addCompany
   } = useDashboardStore()
 
   const [isLoading, setIsLoading] = useState(false)
@@ -38,7 +44,7 @@ export function GenerateAnalysis() {
       
       setIsLoading(true)
       try {
-        const profile = await getCompanyProfile(selectedCompanyId)
+        const profile = await getCompanyProfile(selectedCompanyId, accountId)
         if (profile) {
           setCompanyProfile(profile)
           setShowNewContent(true)
@@ -115,6 +121,32 @@ export function GenerateAnalysis() {
     }, 700)
   }
 
+  const handleCompanyCreate = async (companyName: string) => {
+    try {
+      const response = await fetch('/api/companies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: companyName,
+          accountId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create company')
+      }
+
+      const company = await response.json()
+      setSelectedCompanyId(company.id)
+      addCompany(company)
+    } catch (error) {
+      console.error('Error creating company:', error)
+      setError(error instanceof Error ? error.message : 'Failed to create company')
+    }
+  }
+
   if (!selectedCompanyId) {
     return (
       <Card className="p-6">
@@ -175,6 +207,8 @@ export function GenerateAnalysis() {
                   </p>
                 </div>
                 <CompanySetup 
+                  accountId={accountId}
+                  onCompanyCreate={handleCompanyCreate}
                   onComplete={handleSetupComplete}
                   onTransitionStart={handleTransitionStart}
                 />
@@ -189,7 +223,7 @@ export function GenerateAnalysis() {
                 <div className={`space-y-4 transition-all duration-1000 delay-300 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                   <ResponseTable
                     icps={companyProfile.icps}
-                    companyId={selectedCompanyId}
+                    companyId={selectedCompanyId!}
                     onGenerateQuestions={async (selectedIds: string[]) => {
                       console.log('Generating questions for:', selectedIds)
                     }}
