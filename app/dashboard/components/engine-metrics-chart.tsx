@@ -231,7 +231,7 @@ const METRICS: Record<MetricKey, MetricConfig> = {
     },
     allowedPhases: [SOLUTION_COMPARISON_STAGE, FINAL_RESEARCH_STAGE],
     processValue: (record: ExtendedResponseAnalysis) => 
-      typeof record.ranking_position === 'number' ? record.ranking_position : null
+      typeof record.ranking_position === 'number' && record.ranking_position > 0 ? record.ranking_position : null
   },
   feature_score: {
     label: 'Feature Score',
