@@ -1001,3 +1001,11 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export type CitationSourceType = "OWNED" | "COMPETITOR" | "UGC" | "EARNED";
+
+export type ExistingCitationData = Database['public']['Tables']['citations']['Row'] & {
+  // ... rest of the type
+  source_type: CitationSourceType | null;
+  // ... rest of the type
+};

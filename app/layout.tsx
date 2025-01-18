@@ -7,6 +7,9 @@ import Link from "next/link"
 import { headers } from 'next/headers'
 import { SessionProvider } from "./providers/session-provider"
 import { unstable_noStore as noStore } from 'next/cache'
+import { createClient } from '@/app/supabase/server'
+import { ErrorBoundary } from "@/components/error-boundary"
+import { RootErrorBoundary } from '@/components/root-error-boundary'
 
 export const metadata: Metadata = {
   title: "xFunnel",
@@ -51,25 +54,21 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Get session from headers
-  const session = await getSessionFromHeaders()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  console.log('RootLayout auth state:', { user })
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${GeistSans.className} antialiased min-h-screen bg-background`}>
-        <SessionProvider initialSession={session}>
+      <body className={GeistSans.className}>
+        <SessionProvider initialSession={user ? {
+          user,
+          accessToken: null
+        } : null}>
           <RootProvider>
-            <header className="flex items-center justify-between w-full px-6 py-3 border-b">
-              <Link href="/" className="flex items-center">
-                <img 
-                  src="/logo(320x80).png" 
-                  alt="xFunnel" 
-                  className="h-8 w-auto"
-                />
-              </Link>
-              <AuthButton />
-            </header>
-            {children}
+            <RootErrorBoundary>
+              {children}
+            </RootErrorBoundary>
           </RootProvider>
         </SessionProvider>
       </body>

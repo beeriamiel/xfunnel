@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { AppSidebar } from "@/components/app-sidebar"
 import { DashboardHeader } from './dashboard-header'
 import { Skeleton } from "@/components/ui/skeleton"
@@ -11,12 +11,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CompetitorAnalysis } from './competitor-analysis'
 import { CitationAnalysis } from './citation-analysis'
 import { KeyTakeaways } from './key-takeaways/key-takeaways'
-import { GenerateAnalysis } from './generate-analysis'
+import { GenerateAnalysis } from '@/app/dashboard/generate-analysis'
 import { FAQs } from './faqs'
 import { useDashboardStore } from '../store'
 import { NewICPAnalysis } from "./new-icp-analysis"
 import { PersonalSettings } from "./personal-settings"
 import { Button } from "@/components/ui/button"
+import { ErrorBoundary } from '@/components/error-boundary'
+import { createClient } from '@/app/supabase/client'
 
 interface Company {
   id: number
@@ -34,7 +36,7 @@ function MetricsSkeleton() {
 
 function NoCompanySelected() {
   return (
-    <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+    <div className="flex h-full items-center justify-center p-8">
       <div className="text-center">
         <h2 className="text-2xl font-semibold tracking-tight">No Company Selected</h2>
         <p className="text-muted-foreground mt-2">Please select a company to view the dashboard</p>
@@ -65,7 +67,7 @@ function DashboardView({
       <div className="grid gap-4">
         <Suspense fallback={<MetricsSkeleton />}>
           {activeView === 'response' ? (
-            <GenerateAnalysis accountId={accountId} />
+            <GenerateAnalysis accountId={accountId} isOnboarding={false} />
           ) : activeView === 'faqs' ? (
             <FAQs accountId={accountId} />
           ) : activeView === 'icp' ? (
@@ -114,45 +116,47 @@ export function DashboardError() {
 }
 
 export function DashboardContent({ accountId }: { accountId: string }) {
+  console.log('DashboardContent mounting', {
+    timestamp: new Date().toISOString(),
+    accountId,
+    window: typeof window !== 'undefined' ? 'defined' : 'undefined',
+    document: typeof document !== 'undefined' ? 'defined' : 'undefined'
+  })
+
   const { activeView, selectedCompanyId, companies } = useDashboardStore()
   
   // Get selected company from store
   const selectedCompany = companies.find(c => c.id === selectedCompanyId)
 
+  useEffect(() => {
+    console.log('DashboardContent mounted', {
+      timestamp: new Date().toISOString(),
+      activeView,
+      selectedCompanyId,
+      companiesCount: companies.length
+    })
+  }, [])
+
   return (
     <SidebarProvider>
-      <div className="flex flex-1">
+      <div className="flex w-full">
         <AppSidebar />
-        <div className="flex-1">
-          <DashboardHeader 
-            title={
-              !selectedCompany
-                ? 'Select Company'
-                : activeView === 'engine'
-                ? 'AI Engine Performance'
-                : activeView === 'icp'
-                ? 'ICP Analysis'
-                : activeView === 'citation'
-                ? 'Citation Analysis'
-                : activeView === 'takeaways'
-                ? 'Key Takeaways'
-                : activeView === 'response'
-                ? 'Generate Analysis'
-                : activeView === 'personal'
-                ? 'Personal Settings'
-                : activeView === 'faqs'
-                ? 'FAQs'
-                : 'Dashboard'
-            }
-          />
-          <Suspense fallback={<div className="p-8"><MetricsSkeleton /></div>}>
+        <div className="flex flex-1 flex-col w-full">
+          <ErrorBoundary 
+            FallbackComponent={() => <div>Error loading header</div>}
+          >
+            <DashboardHeader />
+          </ErrorBoundary>
+          <Suspense fallback={<div className="p-8 w-full"><MetricsSkeleton /></div>}>
             {selectedCompany ? (
               <DashboardView 
                 selectedCompany={selectedCompany} 
                 accountId={accountId}
               />
             ) : (
-              <NoCompanySelected />
+              <div className="flex-1">
+                <NoCompanySelected />
+              </div>
             )}
           </Suspense>
         </div>

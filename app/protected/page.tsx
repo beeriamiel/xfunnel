@@ -6,27 +6,10 @@ import { GenerateICPsButton } from "@/components/generate-icps-button"
 import { Card } from "@/components/ui/card"
 import { AppSidebar } from "@/components/app-sidebar"
 import type { Database } from '@/types/supabase'
+import { createClient } from '../supabase/server'
 
 export default async function ProtectedPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value || ''
-        },
-        set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name: string, options: any) {
-          cookieStore.set({ name, value: '', ...options })
-        },
-      },
-    }
-  )
-
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

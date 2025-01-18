@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, ChangeEvent } from 'react'
+import { useState, ChangeEvent, FormEvent } from 'react'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils"
 import { design } from '../../../lib/design-system'
 import type { Product } from '../../../types/setup'
+import { useDashboardStore } from '@/app/dashboard/store'
 
 interface ProductStepProps {
   products: Product[];
@@ -39,6 +40,12 @@ export function ProductStep({
   onDeleteProduct,
   onNext 
 }: ProductStepProps) {
+  console.log('🔵 ProductStep Render:', {
+    productsCount: products?.length,
+    products,
+    storeState: useDashboardStore.getState()
+  })
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
@@ -47,11 +54,13 @@ export function ProductStep({
     businessModel: 'B2B'
   })
 
+  console.log('ProductStep: Current products:', products)
+
   const handleAddProduct = () => {
-    if (!newProduct.name || !newProduct.businessModel) return
-    onAddProduct(newProduct as Omit<Product, 'id'>)
-    setNewProduct({ name: '', description: '', businessModel: 'B2B' })
+    console.log('ProductStep: Adding product:', newProduct)
+    onAddProduct(newProduct)
     setDialogOpen(false)
+    setNewProduct({ name: '', businessModel: 'B2B' })
   }
 
   const handleEditProduct = (product: Product) => {
@@ -66,6 +75,20 @@ export function ProductStep({
     setEditingProduct(null)
     setNewProduct({ name: '', description: '', businessModel: 'B2B' })
     setDialogOpen(false)
+  }
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    console.log('🔵 ProductStep handleSubmit START:', form.values)
+    e.preventDefault()
+    
+    try {
+      console.log('🟡 Adding product...')
+      await onAddProduct(form.values)
+      console.log('🟢 Product added successfully')
+      form.reset()
+    } catch (error) {
+      console.error('🔴 ProductStep Submit ERROR:', error)
+    }
   }
 
   return (

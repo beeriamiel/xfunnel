@@ -8,11 +8,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
-
-type Step = 'initial' | 'product' | 'competitors' | 'icps' | 'personas'
+import { type Step } from '../../types/setup'
 
 interface StepIndicatorProps {
   currentStep: Step
+  completedSteps: Step[]
   onStepClick: (step: Step) => void
 }
 
@@ -24,7 +24,19 @@ const STAGE_EXPLANATIONS = {
   personas: "Create detailed buyer personas aligned with your ICPs."
 } as const;
 
-export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) {
+export function StepIndicator({ 
+  currentStep, 
+  completedSteps,
+  onStepClick 
+}: StepIndicatorProps) {
+  const canAccessStep = (step: Step) => {
+    const stepOrder: Step[] = ['initial', 'product', 'competitors', 'icps', 'personas']
+    const currentIndex = stepOrder.indexOf(currentStep)
+    const targetIndex = stepOrder.indexOf(step)
+    
+    return targetIndex <= currentIndex || completedSteps.includes(step)
+  }
+
   const steps = [
     { id: 'initial' as const, label: 'Company' },
     { id: 'product' as const, label: 'Product' },

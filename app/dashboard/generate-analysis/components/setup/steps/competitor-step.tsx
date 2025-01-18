@@ -79,6 +79,10 @@ export function CompetitorStep({
     }
   }
 
+  const handleNext = () => {
+    onNext() // This will trigger handleStepComplete in parent
+  }
+
   return (
     <Card className={cn(design.layout.card, design.spacing.card)}>
       <div className={design.layout.container}>
@@ -165,7 +169,7 @@ export function CompetitorStep({
             </DialogContent>
           </Dialog>
           <Button
-            onClick={onNext}
+            onClick={handleNext}
             disabled={competitors.length === 0 || isGenerating}
             className={design.components.button.primary}
           >

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card } from "@/components/ui/card"
 import { ResponseTable } from './components/analysis/response-table'
-import { useDashboardStore } from '@/app/dashboard/store'
+import { useDashboardStore, type CompanyProfile } from '@/app/dashboard/store'
 import { CompanySetup } from './components/setup/company-setup'
 import { CompanyProfileHeader } from './components/company-profile-header'
 import { SuccessAnimation } from './components/shared/success-animation'
@@ -12,14 +12,29 @@ import { AlertCircle } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { getCompanyProfile } from './utils/actions'
 import type { ICP, Persona } from './types/analysis'
+import { createClient } from '@/app/supabase/client'
+import { type Step } from './types/setup'
 
 interface GenerateAnalysisProps {
   accountId: string;
+  isOnboarding: boolean;
+  step?: Step;
 }
 
-export function GenerateAnalysis({ accountId }: GenerateAnalysisProps) {
+export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding }: GenerateAnalysisProps) {
+  console.log('🔵 GenerateAnalysis Render:', {
+    accountId,
+    initialIsOnboarding,
+    selectedCompanyId: useDashboardStore.getState().selectedCompanyId,
+    companyProfile: useDashboardStore.getState().companyProfile,
+    storeState: useDashboardStore.getState()
+  })
+
   const { 
     selectedCompanyId,
+    isOnboarding,
+    startOnboarding,
+    completeOnboarding,
     companyProfile,
     setCompanyProfile,
     isDevMode,
@@ -38,20 +53,57 @@ export function GenerateAnalysis({ accountId }: GenerateAnalysisProps) {
   // Only show dev mode toggle in development
   const isDevelopment = process.env.NODE_ENV === 'development'
 
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (initialIsOnboarding) {
+      startOnboarding()
+    }
+  }, [initialIsOnboarding])
+
   useEffect(() => {
     async function fetchCompanyProfile() {
-      if (!selectedCompanyId) return
+      console.log('🔵 fetchCompanyProfile START:', { 
+        selectedCompanyId,
+        isLoading,
+        showNewContent
+      })
+      
+      if (!selectedCompanyId) {
+        console.log('🟡 No selectedCompanyId, resetting state')
+        setShowNewContent(false)
+        setIsLoading(false)
+        return
+      }
       
       setIsLoading(true)
       try {
+        console.log('🟡 Fetching profile for company:', selectedCompanyId)
         const profile = await getCompanyProfile(selectedCompanyId, accountId)
-        if (profile) {
-          setCompanyProfile(profile)
+        
+        console.log('🟢 Profile fetched:', { profile })
+        if (profile && Object.keys(profile).length > 0) {
+          // Transform API response to match CompanyProfile interface
+          const transformedProfile: CompanyProfile = {
+            ...profile,
+            icps: profile.ideal_customer_profiles || [],
+            personas: [], // Add if available from API
+            products: [], // Add if available from API
+            competitors: [], // Add if available from API
+          }
+          setCompanyProfile(transformedProfile)
           setShowNewContent(true)
+          setError(null)
+        } else {
+          setShowNewContent(false)
+          setCompanyProfile(null)
+          setError(null)
         }
-        setError(null)
       } catch (error) {
+        console.error('🔴 Error fetching profile:', error)
         setError(error instanceof Error ? error.message : 'Failed to fetch company profile')
+        setShowNewContent(false)
+        setCompanyProfile(null)
       } finally {
         setIsLoading(false)
       }
@@ -89,78 +141,93 @@ export function GenerateAnalysis({ accountId }: GenerateAnalysisProps) {
     }, 400);
   };
 
-  const handleSetupComplete = async (completedICPs: ICP[], completedPersonas: Persona[]) => {
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  const handleSetupComplete = async () => {
+    console.log('🔵 handleSetupComplete START:', {
+      selectedCompanyId,
+      isTransitioning,
+      showNewContent
+    })
     
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    if (selectedCompanyId) {
+      try {
+        console.log('🟡 Fetching final company profile...')
+        const profile = await getCompanyProfile(selectedCompanyId, accountId)
+        if (profile) {
+          const transformedProfile: CompanyProfile = {
+            ...profile,
+            icps: profile.ideal_customer_profiles || [],
+            personas: [], 
+            products: [],
+            competitors: []
+          }
+          setCompanyProfile(transformedProfile)
+        }
+      } catch (error) {
+        console.error('🔴 Error fetching final profile:', error)
+      }
+    }
+    
+    console.log('🟡 Updating transition state...')
     setShowSuccessAnimation(false)
     
-    setCompanyProfile({
-      icps: completedICPs,
-      personas: completedPersonas,
-      products: [],
-      competitors: []
-    })
-
     await new Promise(resolve => setTimeout(resolve, 500))
     setShowNewContent(true)
     setIsTransitioning(false)
+    completeOnboarding()
+    
+    console.log('🟢 handleSetupComplete END:', {
+      showNewContent: true,
+      isTransitioning: false,
+      isOnboarding: false
+    })
   }
 
   const handleTransitionStart = () => {
     setIsTransitioning(true)
     setShowSuccessAnimation(true)
     fireConfetti()
-    
-    setTimeout(() => {
-      confetti({
-        particleCount: 30,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#f9a8c9', '#30035e', '#f6efff'],
-      });
-    }, 700)
   }
 
   const handleCompanyCreate = async (companyName: string) => {
+    console.log('🔵 handleCompanyCreate START:', { companyName })
+    setIsLoading(true)
     try {
+      console.log('🟡 Creating company via API...')
       const response = await fetch('/api/companies', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: companyName,
-          accountId
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: companyName, accountId })
       })
 
       if (!response.ok) {
+        console.error('🔴 API Error:', await response.text())
         throw new Error('Failed to create company')
       }
-
+      
       const company = await response.json()
+      console.log('🟢 Company created:', company)
+      
       setSelectedCompanyId(company.id)
       addCompany(company)
+      
+      console.log('🟢 handleCompanyCreate END:', {
+        newCompanyId: company.id,
+        storeState: useDashboardStore.getState()
+      })
+      return company
     } catch (error) {
-      console.error('Error creating company:', error)
-      setError(error instanceof Error ? error.message : 'Failed to create company')
+      console.error('🔴 handleCompanyCreate ERROR:', error)
+      throw error
     }
-  }
-
-  if (!selectedCompanyId) {
-    return (
-      <Card className="p-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">Generate Analysis</h2>
-          <p className="text-muted-foreground mt-2">Please select a company to view response analysis</p>
-        </div>
-      </Card>
-    )
   }
 
   return (
     <div className="space-y-6">
-      <CompanyProfileHeader companyId={selectedCompanyId} />
+      {!isOnboarding && selectedCompanyId && (
+        <CompanyProfileHeader companyId={selectedCompanyId} />
+      )}
       
       {isDevelopment && (
         <div className="flex items-center gap-4 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
@@ -188,36 +255,38 @@ export function GenerateAnalysis({ accountId }: GenerateAnalysisProps) {
             <div className="h-32 bg-gray-200 rounded"></div>
           </div>
         </Card>
-      ) : error ? (
+      ) : error && !(!selectedCompanyId || isDevMode || (!companyProfile && !isTransitioning)) ? (
         <Card className="p-6">
           <div className="text-red-500">{error}</div>
         </Card>
       ) : (
         <>
-          {/* Show setup in dev mode or when no profile exists */}
-          {(isDevMode || !companyProfile) && !isTransitioning && (
+          {(!selectedCompanyId || isDevMode || (!companyProfile && !isTransitioning)) && (
             <Card className="p-6 transition-all duration-500 ease-in-out">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold tracking-tight">
-                    {isDevMode ? 'Dev Mode: Company Setup' : 'Generate Analysis'}
+                    {isDevMode ? 'Dev Mode: Company Setup' : !selectedCompanyId ? 'Welcome! Let\'s set up your company' : 'Company Setup'}
                   </h2>
                   <p className="text-muted-foreground">
-                    Set up your company profile and generate AI responses
+                    Get started by setting up your company profile
                   </p>
                 </div>
                 <CompanySetup 
                   accountId={accountId}
                   onCompanyCreate={handleCompanyCreate}
-                  onComplete={handleSetupComplete}
+                  onComplete={() => {
+                    console.log('GenerateAnalysis: onComplete called')
+                    handleTransitionStart()
+                    handleSetupComplete()
+                  }}
                   onTransitionStart={handleTransitionStart}
                 />
               </div>
             </Card>
           )}
 
-          {/* Show existing profile if it exists */}
-          {companyProfile && (
+          {showNewContent && companyProfile && (
             <div className={`transition-all duration-800 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <Card className="p-6">
                 <div className={`space-y-4 transition-all duration-1000 delay-300 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -243,4 +312,4 @@ export function GenerateAnalysis({ accountId }: GenerateAnalysisProps) {
       )}
     </div>
   )
-} 
+}

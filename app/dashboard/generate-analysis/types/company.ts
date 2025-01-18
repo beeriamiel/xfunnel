@@ -5,11 +5,11 @@ export interface Company {
   name: string;
   industry: string | null;
   created_at: string | null;
-  main_products: string[];
+  main_products: string[] | null;
   product_category: string | null;
   number_of_employees: number | null;
   annual_revenue: string | null;
-  markets_operating_in: MarketRegion[];
+  markets_operating_in: string[] | null;
 }
 
 export interface CompanyState {

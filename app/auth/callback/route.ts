@@ -1,8 +1,8 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/types/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 const DEFAULT_FREE_CREDITS = 100
 
@@ -11,41 +11,71 @@ export async function GET(request: NextRequest) {
   try {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    const redirectTo = requestUrl.searchParams.get('redirect_to')
+    const redirectTo = requestUrl.searchParams.get('redirect_to') || '/dashboard'
 
     if (!code) {
       return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))
     }
 
-    const cookieStore = await cookies()
+    // Create the final redirect response first
+    const response = NextResponse.redirect(new URL(redirectTo, requestUrl.origin))
+
     const supabase = createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           get(name: string) {
-            return cookieStore.get(name)?.value || ''
+            return request.cookies.get(name)?.value
           },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+          set(name: string, value: string, options: CookieOptions) {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+              path: '/'
+            })
           },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: '', ...options })
+          remove(name: string, options: CookieOptions) {
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+              maxAge: 0,
+              path: '/'
+            })
           },
         },
       }
     )
 
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (exchangeError || !data?.session) {
-      console.error('Session exchange error:', exchangeError)
+    if (error || !data?.session) {
+      console.error('Session exchange error:', error)
       return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
     }
 
     const { session } = data
 
     console.log('Session exchanged for user:', session.user.id)
+
+    // Create admin client that bypasses RLS
+    const adminClient = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+        db: {
+          schema: 'public'
+        }
+      }
+    )
 
     // Check for existing account relationship
     const { data: accountUser, error: accountError } = await supabase
@@ -66,7 +96,7 @@ export async function GET(request: NextRequest) {
       console.log('No account found, creating new account for:', session.user.id)
       try {
         // Create account
-        const { data: newAccount, error: createAccountError } = await supabase
+        const { data: newAccount, error: createAccountError } = await adminClient
           .from('accounts')
           .insert([{ 
             name: `${session.user.email}'s Account`,
@@ -86,7 +116,7 @@ export async function GET(request: NextRequest) {
         console.log('Account created:', newAccount.id)
 
         // Link user to account as admin
-        const { error: linkError } = await supabase
+        const { error: linkError } = await adminClient
           .from('account_users')
           .insert([{
             user_id: session.user.id,
@@ -106,13 +136,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.redirect(
-      redirectTo 
-        ? new URL(redirectTo, requestUrl.origin)
-        : new URL('/dashboard', requestUrl.origin)
-    )
+    // Return the response that already has the cookies set
+    return response
   } catch (error) {
     console.error('Unexpected auth callback error:', error)
-    return NextResponse.redirect(new URL('/login?error=unexpected', request.url))
+    const requestUrl = new URL(request.url)
+    return NextResponse.redirect(new URL('/login?error=unexpected', requestUrl.origin))
   }
 }

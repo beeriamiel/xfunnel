@@ -108,7 +108,7 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
     return [];
   }
 
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   try {
     // Add detailed logging of the exact data being inserted
@@ -249,7 +249,7 @@ export async function processCitationsTransaction(
   responseAnalysis: ResponseAnalysis,
   citationsParsed: ParsedCitation | null
 ): Promise<void> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   try {
     // Extract URLs first

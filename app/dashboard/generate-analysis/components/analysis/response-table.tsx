@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { format } from 'date-fns'
 import { QueryRow } from './query-row'
 import { ExpandedQueryRow } from './expanded-query-row'
-import type { ICP, QueryAction } from '@/app/dashboard/components/generate-analysis/types/analysis'
+import type { ICP, QueryAction } from '@/app/dashboard/generate-analysis/types/analysis'
 import { fetchPersonaStats, type StatsMap } from '@/lib/services/persona-stats'
 import { AddICPDialog } from './add-icp-dialog'
 import { AddPersonaDialog } from './add-persona-dialog'
@@ -152,9 +152,12 @@ export function ResponseTable({
                       </TableCell>
                       <TableCell className="text-right">
                         <QueryRow 
-                          queryState={persona.queryState!}
-                          queries={persona.queries}
-                          onAction={(action) => handleAction(action, persona.id)}
+                          query={{
+                            id: persona.id.toString(),
+                            queries: persona.queries
+                          }}
+                          isExpanded={expandedPersonaId === persona.id}
+                          onToggle={() => handleAction('view_queries', persona.id)}
                         />
                       </TableCell>
                     </TableRow>

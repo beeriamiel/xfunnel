@@ -46,9 +46,9 @@ export interface Response {
 }
 
 export interface Query {
-  id: number
+  id: string
   query_text: string
-  buyer_journey_phase: BuyerJourneyPhase[]
+  buyer_journey_phase: string[] | null
   created_at: string | null
   prompt_id: number | null
   persona_id: number | null
@@ -58,6 +58,10 @@ export interface Query {
   created_by_batch: boolean | null
   responses?: Response[]
   lastResponseDate?: string | null
+  queries?: Array<{
+    id: string
+    text: string
+  }>
 }
 
 export interface ICP {

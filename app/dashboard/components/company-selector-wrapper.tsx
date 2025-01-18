@@ -1,5 +1,4 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { CompanySelector } from './company-selector'
 import { ClientWrapper } from './client-wrapper'
 import type { Database } from '@/types/supabase'
@@ -31,26 +30,21 @@ export async function CompanySelectorWrapper({
   accountId 
 }: CompanySelectorWrapperProps) {
   try {
-    const cookieStore = await cookies()
     const supabase = createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           get(name: string) {
-            return cookieStore.get(name)?.value || ''
+            return null // Let middleware handle auth
           },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: '', ...options })
-          },
-        },
+          set(name: string, value: string) {},
+          remove(name: string) {}
+        }
       }
     )
     
-    // RLS will automatically handle access control here
+    // Keep RLS and data fetching logic
     const { data: companies, error } = await supabase
       .from('companies')
       .select('id, name, industry')
@@ -59,7 +53,6 @@ export async function CompanySelectorWrapper({
 
     if (error) {
       console.error('Error fetching companies:', error)
-      // Return empty state but don't expose error details to client
       return <CompanySelectorFallback />
     }
 

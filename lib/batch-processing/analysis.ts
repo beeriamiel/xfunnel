@@ -635,7 +635,7 @@ function formatRankList(
 }
 
 async function fetchCompetitors(companyId: number): Promise<string[]> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   try {
     const { data: competitors } = await adminClient

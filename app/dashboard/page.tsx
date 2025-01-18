@@ -6,6 +6,8 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/app/supabase/server'
 import type { Database } from '@/types/supabase'
+import { GenerateAnalysis } from './generate-analysis'
+import { ClientRedirect } from './components/client-redirect'
 
 interface AccountContext {
   userId: string
@@ -22,14 +24,32 @@ type Props = {
   searchParams: Promise<SearchParams>
 }
 
+interface Company {
+  id: number
+  name: string
+  industry: string | null
+  created_at: string | null
+  main_products: string[] | null
+  product_category: string | null
+  number_of_employees: number | null
+  annual_revenue: string | null
+  markets_operating_in: string[] | null
+  account_id: string | null
+}
+
 async function getAccountContext(): Promise<AccountContext> {
-  console.log('Getting account context')
-  const supabase = await createClient()
-  console.log('Server client created')
+  console.log('1. Getting account context')
   
-  // Get current user
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) throw new Error('Authentication required')
+  const supabase = await createClient()
+  console.log('2. Created supabase client')
+  
+  const { data: { user }, error } = await supabase.auth.getUser()
+  console.log('3. Auth getUser result:', { user: user?.id, error })
+  
+  if (!user) {
+    console.log('4. No user found, redirecting to login')
+    redirect('/login')
+  }
 
   // Get account relationship
   const { data: accountUser, error: accountError } = await supabase
@@ -37,30 +57,46 @@ async function getAccountContext(): Promise<AccountContext> {
     .select('account_id, role')
     .eq('user_id', user.id)
     .single()
+  
+  console.log('5. Account user lookup:', { 
+    accountUser: accountUser?.account_id,
+    error: accountError?.message 
+  })
 
   if (accountError || !accountUser) {
+    console.log('6. No account access, throwing error')
     throw new Error('Account access required')
   }
 
   // Get all companies for the account
-  const { data: companies } = await supabase
+  const { data: companies, error: companiesError } = await supabase
     .from('companies')
     .select('*')
     .eq('account_id', accountUser.account_id)
+  
+  console.log('7. Companies lookup:', {
+    count: companies?.length,
+    error: companiesError?.message
+  })
 
-  // Keep existing company check for hasCompanies
-  const { data: hasCompaniesCheck } = await supabase
+  // Check for any companies
+  const { data: hasCompaniesCheck, error: checkError } = await supabase
     .from('companies')
     .select('id')
     .eq('account_id', accountUser.account_id)
     .limit(1)
+  
+  console.log('8. Has companies check:', {
+    hasCompanies: Boolean(hasCompaniesCheck?.length),
+    error: checkError?.message
+  })
 
   return {
     userId: user.id,
     accountId: accountUser.account_id,
     accountRole: accountUser.role ?? 'user',
     hasCompanies: Boolean(hasCompaniesCheck?.length),
-    companies: companies || []  // Add companies to context
+    companies: companies || []
   }
 }
 
@@ -73,12 +109,21 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accoun
       return { selectedCompany: null }
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
     
-    // Get company data with proper error handling
     const { data: company, error } = await supabase
       .from('companies')
-      .select('id, name, industry')
+      .select(`
+        id, 
+        name, 
+        industry,
+        created_at,
+        main_products,
+        product_category,
+        number_of_employees,
+        annual_revenue,
+        markets_operating_in
+      `)
       .eq('name', companyName)
       .single()
 
@@ -87,7 +132,9 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accoun
       return { selectedCompany: null, error: error.message }
     }
 
-    return { selectedCompany: company }
+    return { 
+      selectedCompany: company 
+    }
   } catch (error) {
     console.error('Unexpected error in getCompanyData:', error)
     return { selectedCompany: null, error: 'Failed to fetch company data' }
@@ -98,12 +145,15 @@ export default async function Page({ params, searchParams }: Props) {
   noStore()
   
   try {
-    console.log('Dashboard page hit, checking account context')
     const accountContext = await getAccountContext()
     
-    // Redirect new users to company creation
+    // Change from conditional render to client-side navigation
     if (!accountContext.hasCompanies) {
-      redirect('/dashboard/generate-analysis')
+      return (
+        <ClientWrapper>
+          <ClientRedirect path="/dashboard/generate-analysis" />
+        </ClientWrapper>
+      )
     }
 
     const { selectedCompany, error } = await getCompanyData(
@@ -111,27 +161,15 @@ export default async function Page({ params, searchParams }: Props) {
       accountContext.accountId
     )
 
-    if (error) {
-      console.error('Error in dashboard page:', error)
-    }
-
     return (
       <ClientWrapper>
-        <Suspense fallback={<Skeleton className="h-screen" />}>
-          <DashboardWrapper 
-            selectedCompany={selectedCompany ? {
-              ...selectedCompany,
-              created_at: new Date().toISOString(),
-              main_products: [],
-              product_category: null,
-              number_of_employees: null,
-              annual_revenue: null,
-              markets_operating_in: []
-            } : null}
-            accountId={accountContext.accountId}
-            initialCompanies={accountContext.companies}  // Pass companies data
-          />
-        </Suspense>
+        <DashboardWrapper 
+          selectedCompany={selectedCompany}
+          accountId={accountContext.accountId}
+          initialCompanies={accountContext.companies}
+          isOnboarding={false}
+          children={null}
+        />
       </ClientWrapper>
     )
   } catch (error) {

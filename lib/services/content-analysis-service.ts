@@ -1,6 +1,7 @@
 import { ClaudeService } from './ai/claude-service';
 import { DeepSeekService } from './ai/deepseek-service';
 import { createAdminClient } from '@/app/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 interface ContentAnalysisResponse {
   metrics: {
@@ -35,12 +36,18 @@ interface MetricScore {
 export class ContentAnalysisService {
   private claudeService: ClaudeService;
   private deepseekService: DeepSeekService;
-  private adminClient;
+  private adminClient!: SupabaseClient;
 
   constructor() {
     this.claudeService = new ClaudeService();
     this.deepseekService = new DeepSeekService();
-    this.adminClient = createAdminClient();
+  }
+
+  private async initAdminClient() {
+    if (!this.adminClient) {
+      this.adminClient = await createAdminClient();
+    }
+    return this.adminClient;
   }
 
   private validateAnalysisResponse(response: any): ContentAnalysisResponse {
@@ -97,7 +104,8 @@ export class ContentAnalysisService {
       });
 
       // Get prompts from database
-      const { data: prompts, error: promptError } = await this.adminClient
+      const adminClient = await this.initAdminClient();
+      const { data: prompts, error: promptError } = await adminClient
         .from('prompts')
         .select('*')
         .in('name', ['Citation_Analysis v1.00 - system', 'Citation_Analysis v1.00 - user'])
