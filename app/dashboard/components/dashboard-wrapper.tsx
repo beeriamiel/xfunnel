@@ -95,13 +95,13 @@ export function DashboardWrapper({
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <SidebarProvider>
-        <div className="flex flex-col min-h-screen">
+        <div className="flex flex-col min-h-screen w-full">
           <Suspense fallback={<LoadingSkeleton />}>
             <DashboardHeader />
           </Suspense>
-          <div className="flex flex-1">
-            <AppSidebar />
-            <main className="flex-1 w-full">
+          <div className="flex flex-1 h-[calc(100vh-4rem)]">
+            <AppSidebar className="h-full shrink-0" />
+            <main className="flex-1 w-full overflow-auto">
               {mainContent}
             </main>
           </div>

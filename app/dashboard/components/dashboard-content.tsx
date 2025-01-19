@@ -138,29 +138,24 @@ export function DashboardContent({ accountId }: { accountId: string }) {
   }, [])
 
   return (
-    <SidebarProvider>
-      <div className="flex w-full">
-        <AppSidebar />
-        <div className="flex flex-1 flex-col w-full">
-          <ErrorBoundary 
-            FallbackComponent={() => <div>Error loading header</div>}
-          >
-            <DashboardHeader />
-          </ErrorBoundary>
-          <Suspense fallback={<div className="p-8 w-full"><MetricsSkeleton /></div>}>
-            {selectedCompany ? (
-              <DashboardView 
-                selectedCompany={selectedCompany} 
-                accountId={accountId}
-              />
-            ) : (
-              <div className="flex-1">
-                <NoCompanySelected />
-              </div>
-            )}
-          </Suspense>
-        </div>
-      </div>
-    </SidebarProvider>
+    <div className="flex flex-col w-full h-full">
+      <ErrorBoundary 
+        FallbackComponent={() => <div>Error loading header</div>}
+      >
+        <DashboardHeader />
+      </ErrorBoundary>
+      <Suspense fallback={<div className="p-8 w-full"><MetricsSkeleton /></div>}>
+        {selectedCompany ? (
+          <DashboardView 
+            selectedCompany={selectedCompany} 
+            accountId={accountId}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <NoCompanySelected />
+          </div>
+        )}
+      </Suspense>
+    </div>
   )
 } 

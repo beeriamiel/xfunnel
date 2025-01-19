@@ -203,7 +203,7 @@ export function AppSidebar({ className }: SidebarProps) {
       {/* Mobile Sheet */}
       <Sheet>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="sm" className="md:hidden absolute left-4 top-3">
+          <Button variant="ghost" size="sm" className="md:hidden fixed left-4 top-3 z-50">
             <Menu className="h-4 w-4" />
           </Button>
         </SheetTrigger>
@@ -215,8 +215,9 @@ export function AppSidebar({ className }: SidebarProps) {
       {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "relative border-r",
+          "hidden md:block relative border-r h-full",
           isCollapsed ? "w-[70px]" : "w-[240px]",
+          "shrink-0",
           className
         )}
       >
@@ -228,7 +229,9 @@ export function AppSidebar({ className }: SidebarProps) {
         >
           <ChevronRight className={cn("h-3 w-3", isCollapsed && "rotate-180")} />
         </Button>
-        <SidebarContent />
+        <div className="h-full overflow-hidden">
+          <SidebarContent />
+        </div>
       </aside>
     </>
   )
