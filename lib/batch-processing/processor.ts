@@ -128,7 +128,7 @@ function transformResponse(raw: RawResponse): Response {
 }
 
 export async function processNewResponses() {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   try {
     const result = await adminClient
@@ -271,7 +271,7 @@ export async function processNewResponses() {
 }
 
 export async function processAllResponses() {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   try {
     // Clear existing analysis
@@ -459,7 +459,7 @@ export async function processAllResponses() {
 }
 
 export async function testProcessSingleResponse(responseText: string) {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   try {
     // 1. Get an existing query
@@ -658,7 +658,7 @@ export async function testProcessSingleResponse(responseText: string) {
 }
 
 export async function testExistingResponse(responseId: number) {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   try {
     // Get the existing response with its query and all related data

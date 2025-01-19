@@ -25,7 +25,7 @@ interface CompanyRow {
 }
 
 export async function getFailedGenerations(): Promise<FailedGeneration[]> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   const { data, error } = await adminClient
     .from('generation_progress')
@@ -69,7 +69,7 @@ export async function recoverFromError(
     questions: string;
   }
 ): Promise<void> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   // Get the last status from the database
   const { data: lastBatch } = await adminClient

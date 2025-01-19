@@ -33,7 +33,7 @@ const VALID_PHASES = [
 ] as const;
 
 async function processNewResponses() {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   // Get the latest response ID that has been analyzed
   const { data: lastAnalyzed } = await adminClient
@@ -96,8 +96,8 @@ export async function generateQuestions(
   model: AIModelType = 'chatgpt-4o-latest'
 ): Promise<{ queries: QueryWithId[], batchId: string }> {
   const supabase = await createClient();
-  const adminClient = createAdminClient();
-  const batchTracker = new SupabaseBatchTrackingService();
+  const adminClient = await createAdminClient();
+  const batchTracker = await SupabaseBatchTrackingService.initialize();
   let batchId: string | undefined;
   
   console.log('Starting question generation:', {
@@ -411,7 +411,7 @@ export async function processQueriesWithEngines(
 ) {
   console.log(`Processing ${queries.length} queries with selected engines:`, engines);
   
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   const batchSize = 5;
   let totalInserted = 0;
   

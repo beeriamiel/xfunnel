@@ -1,9 +1,19 @@
 import { createAdminClient } from '@/app/supabase/server';
 import { BatchMetadata, BatchStatus, BatchTrackingService, BatchType } from '../types/batch';
 import { randomUUID } from 'crypto';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase';
 
 export class SupabaseBatchTrackingService implements BatchTrackingService {
-  private supabase = createAdminClient();
+  private constructor(
+    private readonly supabase: SupabaseClient<Database>
+  ) {}
+
+  // Static factory method to create an instance
+  static async initialize(): Promise<SupabaseBatchTrackingService> {
+    const supabase = await createAdminClient();
+    return new SupabaseBatchTrackingService(supabase);
+  }
 
   async createBatch(
     type: BatchType,

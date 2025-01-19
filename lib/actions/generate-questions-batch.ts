@@ -6,6 +6,7 @@ import { Database } from "@/types/supabase";
 import { AIModelType } from "@/lib/services/ai/types";
 import { SupabaseBatchTrackingService } from "@/lib/services/batch-tracking";
 import { ResponseAnalysisQueue } from "@/lib/batch-processing/queue";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 type Tables = Database['public']['Tables'];
 type Persona = Tables['personas']['Row'];
@@ -19,12 +20,14 @@ interface PersonaWithICP extends Pick<Persona, 'id' | 'title' | 'seniority_level
 }
 
 async function updateResponseBatchIds(
-  adminClient: ReturnType<typeof createAdminClient>,
+  adminClient: SupabaseClient<Database>,
   queryIds: number[],
   responseBatchId: string
 ) {
+  const client = await adminClient;
+  
   try {
-    const { error } = await adminClient
+    const { error } = await client
       .from('responses')
       .update({
         response_batch_id: responseBatchId,
@@ -50,8 +53,8 @@ export async function generateQuestionsForAllPersonas(
   model: AIModelType = 'chatgpt-4o-latest',
   icpBatchId?: string
 ) {
-  const adminClient = createAdminClient();
-  const batchTracker = new SupabaseBatchTrackingService();
+  const adminClient = await createAdminClient();
+  const batchTracker = await SupabaseBatchTrackingService.initialize();
   const batchSize = 3;
   const delayBetweenBatches = 5000;
   let responseBatchId: string | undefined;

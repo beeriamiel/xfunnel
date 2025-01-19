@@ -60,7 +60,7 @@ export class MozEnrichmentQueue {
   }
 
   private async fetchCitationBatch(): Promise<Array<{ id: number; citation_url: string }>> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     const { data: citations, error } = await adminClient
       .from('citations')
@@ -108,7 +108,7 @@ export class MozEnrichmentQueue {
     try {
       // Ensure all URLs are properly formatted before sending to Moz API
       const mozResponse = await fetchMozMetrics(citations.map(c => this.ensureValidUrl(c.citation_url))) as MozResponse;
-      const adminClient = createAdminClient();
+      const adminClient = await createAdminClient();
 
       let batchSuccesses = 0;
       let batchFailures = 0;
@@ -250,7 +250,7 @@ export class MozEnrichmentQueue {
   async processBatch(citations: Array<{ id: number; citation_url: string }>, companyId: number): Promise<void> {
     if (citations.length === 0) return;
 
-    const batchTracker = new SupabaseBatchTrackingService();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
     const batchId = randomUUID();
 
     try {
@@ -301,7 +301,7 @@ export class MozEnrichmentQueue {
       return;
     }
 
-    const batchTracker = new SupabaseBatchTrackingService();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
     const batchId = randomUUID();
 
     try {
@@ -351,7 +351,9 @@ export class MozEnrichmentQueue {
     this.failedCitations.clear();
     this.stats.failedCitations = 0;
 
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
+
     const { data: citations, error } = await adminClient
       .from('citations')
       .select('id, citation_url')
@@ -363,7 +365,6 @@ export class MozEnrichmentQueue {
     }
 
     if (citations && citations.length > 0) {
-      const batchTracker = new SupabaseBatchTrackingService();
       const batchId = randomUUID();
       
       await batchTracker.createBatch('citations_moz', 0, {

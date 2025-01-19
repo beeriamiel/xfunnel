@@ -47,7 +47,7 @@ export class ResponseAnalysisQueue {
   }
 
   private async fetchResponseBatch(startId: number, endId: number): Promise<Response[]> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     console.log(`Fetching batch from ID ${startId} to ${endId}`);
     
@@ -169,7 +169,7 @@ export class ResponseAnalysisQueue {
     });
   }
   private async processBatch(responses: Response[], analysisBatchId: string): Promise<void> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     const analysisResults: ResponseAnalysisInsert[] = [];
     
     for (const response of responses) {
@@ -296,8 +296,8 @@ export class ResponseAnalysisQueue {
       return;
     }
 
-    const adminClient = createAdminClient();
-    const batchTracker = new SupabaseBatchTrackingService();
+    const adminClient = await createAdminClient();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
 
     try {
       this.processing = true;
@@ -353,10 +353,10 @@ export class ResponseAnalysisQueue {
     this.failedResponses.clear();
     this.stats.failedResponses = 0;
 
-    const batchTracker = new SupabaseBatchTrackingService();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
     
     // Get company ID from the first response
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     const { data: firstResponse } = await adminClient
       .from('responses')
       .select('query:queries(company_id)')

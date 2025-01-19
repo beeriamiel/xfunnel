@@ -112,8 +112,8 @@ export async function generateResponsesAction(
   model: AIModelType = 'gpt-4-turbo-preview'
 ) {
   try {
-    const adminClient = createAdminClient();
-    const batchTracker = new SupabaseBatchTrackingService();
+    const adminClient = await createAdminClient();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
 
     // Create a new response batch
     const responseBatchId = await batchTracker.createBatch('response', companyId, {

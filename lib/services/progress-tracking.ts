@@ -6,7 +6,7 @@ export async function updateGenerationProgress(
   progress: number,
   errorMessage?: string
 ) {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   const { error } = await adminClient
     .from('generation_progress')
@@ -24,7 +24,7 @@ export async function updateGenerationProgress(
 }
 
 export async function getGenerationProgress(companyId: number) {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   const { data, error } = await adminClient
     .from('generation_progress')

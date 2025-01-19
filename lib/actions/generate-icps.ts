@@ -125,8 +125,8 @@ export async function generateICPs(
   userPromptName: string,
   model: AIModelType
 ) {
-  const adminClient = createAdminClient();
-  const batchTracker = new SupabaseBatchTrackingService();
+  const adminClient = await createAdminClient();
+  const batchTracker = await SupabaseBatchTrackingService.initialize();
   let companyId: number | undefined;
   let batchId: string | undefined;
   
