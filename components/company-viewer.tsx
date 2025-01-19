@@ -175,6 +175,7 @@ export function CompanyViewer({ accountId }: CompanyViewerProps) {
               google_search: true
             }}
             selectedModel="gpt-4-turbo-preview"
+            accountId={accountId}
             selectedPrompts={{
               systemPromptName: "default",
               userPromptName: "default"

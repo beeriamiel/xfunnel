@@ -6,10 +6,19 @@ import { Plus } from "lucide-react"
 import type { Query, QueryState, QueryAction } from '../../types/analysis'
 import { useQueryStore } from '../../store/query-store'
 
+interface RowQuery {
+  id: string;
+  queries?: {
+    id: string;
+    text: string;
+  }[];
+}
+
 interface QueryRowProps {
-  query: Query
-  isExpanded: boolean
-  onToggle: () => void
+  query: RowQuery;  // Use RowQuery instead of Query
+  isExpanded: boolean;
+  onToggle: () => void;
+  onGenerateResponse?: (queryId: string) => Promise<void>;
 }
 
 function ActionButton({ 
@@ -52,7 +61,7 @@ function ActionButton({
   }
 }
 
-export function QueryRow({ query, isExpanded, onToggle }: QueryRowProps) {
+export function QueryRow({ query, isExpanded, onToggle, onGenerateResponse }: QueryRowProps) {
   // Add null check for query
   if (!query?.id) {
     return null;

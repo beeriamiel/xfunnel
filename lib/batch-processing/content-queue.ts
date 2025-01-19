@@ -117,7 +117,11 @@ export class ContentScrapingQueue {
     }
   }
 
-  async processBatch(citations: Citation[], companyId: number): Promise<void> {
+  async processBatch(
+    citations: Array<{ id: number; citation_url: string }>,
+    companyId: number,
+    accountId: string
+  ): Promise<void> {
     if (this.processing) {
       console.log('Queue is already being processed');
       return;
@@ -128,7 +132,7 @@ export class ContentScrapingQueue {
       this.stats.inProgress = true;
 
       const batchTracker = await this.initializeBatchTracker();
-      const batchId = await batchTracker.createBatch('citations_content', companyId, {
+      const batchId = await batchTracker.createBatch('citations_content', companyId, accountId, {
         totalUrls: citations.length,
         processingType: 'content_scraping'
       });

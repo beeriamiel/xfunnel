@@ -1,3 +1,7 @@
+// Will contain simplified version of generate-icps.ts
+// Only handles company info and ICP generation
+// No question generation 
+
 import { createAdminClient } from "@/app/supabase/server";
 import { updateGenerationProgress } from "@/lib/services/progress-tracking";
 import { parsePrompt } from "@/lib/prompts/prompt-parser";
@@ -5,6 +9,7 @@ import { AIModelType } from "@/lib/services/ai/types";
 import { AIServiceFactory } from "@/lib/services/ai/factory";
 import { SupabaseBatchTrackingService } from "@/lib/services/batch-tracking";
 
+// Keep existing interfaces
 interface Persona {
   title: string;
   seniority_level: string;
@@ -34,11 +39,13 @@ export interface ICPResponse {
   ideal_customer_profiles: ICP[];
 }
 
+// Keep validation constants
 const VALID_SENIORITY_LEVELS = ["c_level", "vp_level", "director_level", "manager_level"] as const;
 const VALID_COMPANY_SIZES = ["smb_under_500", "mid_market_500_1000", "enterprise_1000_5000", "large_enterprise_5000_plus"] as const;
 const VALID_REGIONS = ["north_america", "europe", "asia_pacific", "middle_east", "latin_america"] as const;
 const VALID_MARKETS = ["north_america", "europe", "asia_pacific", "middle_east", "latin_america"] as const;
 
+// Keep validation function
 function validateICPResponse(response: any): ICPResponse {
   if (!response.company_information) {
     throw new Error('Missing company_information object');
@@ -119,11 +126,15 @@ function validateICPResponse(response: any): ICPResponse {
   return response as ICPResponse;
 }
 
-export async function generateICPs(
-  companyName: string, 
-  systemPromptName: string, 
-  userPromptName: string,
-  model: AIModelType,
+// Default configuration
+const DEFAULT_CONFIG = {
+  model: 'claude-3.5-sonnet' as AIModelType,
+  systemPrompt: 'ICPs v1.03 - system (NA only)',
+  userPrompt: 'ICPs v1.03 - user (NA only)'
+}
+
+export async function generateInitialICPs(
+  companyName: string,
   accountId: string
 ) {
   const adminClient = await createAdminClient();
@@ -132,87 +143,55 @@ export async function generateICPs(
   let batchId: string | undefined;
   
   try {
-    console.log('Starting ICP generation:', {
-      model,
+    console.log('Starting Initial ICP generation:', {
+      model: DEFAULT_CONFIG.model,
       companyName,
-      systemPrompt: systemPromptName,
-      userPrompt: userPromptName
+      systemPrompt: DEFAULT_CONFIG.systemPrompt,
+      userPrompt: DEFAULT_CONFIG.userPrompt
     });
 
-    // Validate model selection
-    if (!['gpt-4-turbo-preview', 'claude-3.5-sonnet'].includes(model)) {
-      throw new Error(`Invalid model selected: ${model}`);
-    }
-
-    // First, check if company exists
+    // Get company ID
     const { data: existingCompany, error: selectError } = await adminClient
       .from('companies')
       .select('id')
       .eq('name', companyName)
       .single();
 
-    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 is "not found"
+    if (selectError && selectError.code !== 'PGRST116') {
       throw new Error(`Failed to check company existence: ${selectError.message}`);
     }
 
-    // Create or get company ID
-    if (!existingCompany) {
-      // Create new company
-      const { data: newCompany, error: insertError } = await adminClient
-        .from('companies')
-        .insert({ name: companyName })
-        .select('id')
-        .single();
-
-      if (insertError || !newCompany) {
-        throw new Error(`Failed to create company: ${insertError?.message || 'Unknown error'}`);
-      }
-
-      companyId = newCompany.id;
-    } else {
-      companyId = existingCompany.id;
-
-      // If company exists, delete old ICPs and personas
-      // They will be regenerated with fresh data
-      const { error: deleteError } = await adminClient
-        .from('ideal_customer_profiles')
-        .delete()
-        .eq('company_id', companyId);
-
-      if (deleteError) {
-        console.error('Error deleting existing ICPs:', deleteError);
-        // Continue despite error - we'll try to generate new ones
-      }
+    companyId = existingCompany?.id;
+    if (!companyId) {
+      throw new Error('Company ID not found');
     }
 
-    // Create a new batch for ICP generation
+    // Create batch and start progress tracking
     batchId = await batchTracker.createBatch('icp', companyId, accountId, {
-      model,
-      systemPromptName,
-      userPromptName
+      model: DEFAULT_CONFIG.model,
+      systemPromptName: DEFAULT_CONFIG.systemPrompt,
+      userPromptName: DEFAULT_CONFIG.userPrompt
     });
+    
     await batchTracker.updateBatchStatus(batchId, 'in_progress');
-
-    // Start progress tracking
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 0);
 
-    // Fetch prompts from Supabase
+    // Fetch prompts
     const { data: prompts, error: promptError } = await adminClient
       .from('prompts')
       .select('*')
-      .in('name', [systemPromptName, userPromptName])
+      .in('name', [DEFAULT_CONFIG.systemPrompt, DEFAULT_CONFIG.userPrompt])
       .eq('is_active', true);
 
     if (promptError || !prompts || prompts.length !== 2) {
       throw new Error(`Failed to fetch ICP generation prompts: ${
         promptError?.message || 
-        `Expected 2 prompts, got ${prompts?.length || 0}. ` +
-        `Make sure prompts "${systemPromptName}" and "${userPromptName}" exist and are active.`
+        `Expected 2 prompts, got ${prompts?.length || 0}`
       }`);
     }
 
-    const systemPrompt = prompts.find(p => p.name === systemPromptName)?.prompt_text;
-    const userPrompt = prompts.find(p => p.name === userPromptName)?.prompt_text;
+    const systemPrompt = prompts.find(p => p.name === DEFAULT_CONFIG.systemPrompt)?.prompt_text;
+    const userPrompt = prompts.find(p => p.name === DEFAULT_CONFIG.userPrompt)?.prompt_text;
 
     if (!systemPrompt || !userPrompt) {
       throw new Error('Missing required prompts for ICP generation');
@@ -220,36 +199,17 @@ export async function generateICPs(
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 10);
 
-    // Get company data for context
-    const { data: companyData } = await adminClient
-      .from('companies')
-      .select('*')
-      .eq('name', companyName)
-      .single();
-
-    if (!companyData) {
-      throw new Error('Company data not found');
-    }
-
-    // Get competitors
-    const { data: competitors } = await adminClient
-      .from('competitors')
-      .select('competitor_name')
-      .eq('company_id', companyData.id);
-
-    // Create context for prompt parser
+    // Create context and generate ICPs
     const context = {
       company: {
         name: companyName
       }
     };
 
-    // Parse prompts before sending to AI service
     const parsedSystemPrompt = parsePrompt(systemPrompt, context);
     const parsedUserPrompt = parsePrompt(userPrompt, context);
 
-    // Use AI service factory to get the appropriate service
-    const aiService = AIServiceFactory.getInstance().getService(model);
+    const aiService = AIServiceFactory.getInstance().getService(DEFAULT_CONFIG.model);
     const response = await aiService.generateICPs(
       parsedSystemPrompt,
       parsedUserPrompt,
@@ -258,12 +218,10 @@ export async function generateICPs(
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 30);
 
-    // Parse and validate the response
+    // Validate and process response
     const parsedResponse = validateICPResponse(response);
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 40);
-
-    // Update company with metadata from the response
+    // Update company information
     const { error: updateError } = await adminClient
       .from('companies')
       .update({
@@ -272,22 +230,18 @@ export async function generateICPs(
         product_category: parsedResponse.company_information.product_category,
         number_of_employees: parsedResponse.company_information.number_of_employees,
         annual_revenue: parsedResponse.company_information.annual_revenue,
-        markets_operating_in: parsedResponse.company_information.markets_operating_in.map(m => m.toLowerCase())
+        markets_operating_in: parsedResponse.company_information.markets_operating_in.map(m => m.toLowerCase()),
+        account_id: accountId
       })
       .eq('id', companyId);
 
     if (updateError) {
       console.error('Company metadata update error:', updateError);
-      // Continue despite metadata update error
     }
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 50);
 
-    // Handle competitors - delete existing and insert new
-    if (typeof companyId === 'undefined') {
-      throw new Error('Company ID is undefined');
-    }
-
+    // Handle competitors
     await adminClient
       .from('competitors')
       .delete()
@@ -298,25 +252,19 @@ export async function generateICPs(
       .insert(
         parsedResponse.main_competitors.map(competitor => ({
           company_id: companyId as number,
-          competitor_name: competitor
+          competitor_name: competitor,
+          account_id: accountId
         }))
       );
 
     if (competitorsError) {
       console.error('Competitors insertion error:', competitorsError);
-      // Continue despite competitor insertion error
     }
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 60);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 75);
 
-    // Store ICPs and Personas with batch ID
+    // Store ICPs and Personas
     for (const icp of parsedResponse.ideal_customer_profiles) {
-      // Validate region before insertion
-      if (!VALID_REGIONS.includes(icp.region as any)) {
-        console.error(`Invalid region "${icp.region}" for ICP. Valid regions are:`, VALID_REGIONS);
-        throw new Error(`Invalid region: ${icp.region}`);
-      }
-
       const { data: insertedICP, error: icpError } = await adminClient
         .from('ideal_customer_profiles')
         .insert([{
@@ -325,57 +273,46 @@ export async function generateICPs(
           company_size: icp.company_size,
           region: icp.region,
           icp_batch_id: batchId,
-          created_by_batch: true
+          created_by_batch: true,
+          account_id: accountId
         }])
         .select('id')
         .single();
 
-      if (icpError) {
+      if (icpError || !insertedICP) {
         console.error('ICP insertion error:', icpError);
         continue;
       }
 
-      // Insert Personas for this ICP with retry
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { error: personasError } = await adminClient
-          .from('personas')
-          .insert(
-            icp.personas.map(persona => ({
-              icp_id: insertedICP.id,
-              title: persona.title,
-              seniority_level: persona.seniority_level,
-              department: persona.department
-            }))
-          );
+      // Insert Personas
+      const { error: personasError } = await adminClient
+        .from('personas')
+        .insert(
+          icp.personas.map(persona => ({
+            icp_id: insertedICP.id,
+            title: persona.title,
+            seniority_level: persona.seniority_level,
+            department: persona.department,
+            account_id: accountId
+          }))
+        );
 
-        if (!personasError) {
-          break;
-        }
-
-        console.error(`Personas insertion attempt ${attempt + 1} failed:`, personasError);
-        
-        if (attempt === 2) {
-          console.error('All persona insertion attempts failed');
-          throw new Error(`Failed to insert personas after 3 attempts: ${personasError.message}`);
-        }
-
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      if (personasError) {
+        console.error('Personas insertion error:', personasError);
       }
     }
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 100);
     await batchTracker.completeBatch(batchId);
 
-    // Return the generated ICPs and Personas along with the batch ID
     return {
       ...parsedResponse,
       batchId
     };
 
   } catch (error) {
-    console.error('ICP generation failed:', error);
-    if (typeof companyId !== 'undefined') {
+    console.error('Initial ICP generation failed:', error);
+    if (companyId) {
       await updateGenerationProgress(
         companyId,
         accountId,

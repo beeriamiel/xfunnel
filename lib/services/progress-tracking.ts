@@ -1,8 +1,11 @@
 import { createAdminClient } from '@/app/supabase/server'
 
+export type GenerationStatus = 'failed' | 'generating_icps' | 'generating_questions' | 'complete';
+
 export async function updateGenerationProgress(
   companyId: number,
-  status: 'generating_icps' | 'generating_questions' | 'complete' | 'failed',
+  accountId: string,
+  status: GenerationStatus,
   progress: number,
   errorMessage?: string
 ) {
@@ -12,6 +15,7 @@ export async function updateGenerationProgress(
     .from('generation_progress')
     .upsert({
       company_id: companyId,
+      account_id: accountId,
       status,
       progress,
       error_message: errorMessage,

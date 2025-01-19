@@ -14,6 +14,7 @@ import type { ICP, Persona } from '../../types/analysis'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { type Step } from '../../types/setup'
 import { useDashboardStore } from '@/app/dashboard/store'
+import { generateInitialICPsAction } from "@/app/company-actions"
 
 export function CompanySetup({ 
   accountId,
@@ -115,6 +116,11 @@ export function CompanySetup({
       const company = await onCompanyCreate(companyName)
       console.log('🟢 Company created:', company)
       
+      // Add ICP Generation
+      console.log('🟡 Generating initial ICPs...')
+      await generateInitialICPsAction(companyName, accountId)
+      console.log('🟢 Initial ICPs generated')
+      
       // Update all state synchronously
       setCompanyName(companyName)
       setCompanyId(company.id)
@@ -206,9 +212,13 @@ export function CompanySetup({
       
       const { error: updateError } = await supabase
         .from('companies')
-        .update({ main_products: updatedMainProducts })
+        .update({ 
+          main_products: updatedMainProducts.map(p => 
+            typeof p === 'string' ? p : JSON.stringify(p)
+          ) 
+        })
         .eq('id', companyId)
-        .eq('account_id', accountId) // Add this to ensure ownership
+        .eq('account_id', accountId)
 
       if (updateError) {
         console.error('🔴 Failed to save product:', updateError)

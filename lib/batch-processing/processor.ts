@@ -48,6 +48,7 @@ type RawResponse = {
     prompt_id: number | null;
     user_id: number | null;
     created_at: string | null;
+    account_id: string;
     company: {
       id: number;
       name: string;
@@ -75,6 +76,41 @@ type RawResponse = {
       };
     };
   }[];
+};
+
+type QueryData = {
+  id: number;
+  company_id: number;
+  query_text: string;
+  account_id: string;
+  prompt_id?: number | null;
+  buyer_journey_phase?: string[] | null;
+  persona?: {
+    id: number;
+    title: string;
+    department: string;
+    icp: {
+      id: number;
+      vertical: string;
+      region: string;
+      company_size: string;
+    };
+  };
+  company?: {
+    id: number;
+    name: string;
+    industry: string | null;
+    created_at: string | null;
+    ideal_customer_profiles: Array<{
+      id: number;
+      vertical: string;
+      region: string;
+      company_size: string;
+    }>;
+    competitors: Array<{
+      competitor_name: string;
+    }>;
+  };
 };
 
 // Transform raw response to our Response type
@@ -107,12 +143,14 @@ function transformResponse(raw: RawResponse): Response {
     created_at: raw.created_at,
     citations: raw.citations,
     web_search_queries: raw.websearchqueries,
+    account_id: queryData.account_id,
     query: {
       ...queryData,
       company_id: companyData.id,
       company: companyData,
-      persona: queryData.persona,  // Preserve the entire persona object with ICP
-      competitors: companyData.competitors || []
+      persona: queryData.persona,
+      competitors: companyData.competitors || [],
+      account_id: queryData.account_id
     }
   };
 
@@ -139,6 +177,7 @@ export async function processNewResponses() {
           id,
           buyer_journey_phase,
           query_text,
+          account_id,
           persona:personas!inner (
             id,
             title,
@@ -249,7 +288,11 @@ export async function processNewResponses() {
             responseAnalysisId: insertedData?.id
           });
           
-          await processCitationsTransaction(insertedData, originalCitationsParsed);
+          await processCitationsTransaction(
+            insertedData, 
+            originalCitationsParsed,
+            queryData.account_id
+          );
           
           console.log(`Completed citation processing for response ${rawResponse.id}`);
         } catch (citationError) {
@@ -274,7 +317,6 @@ export async function processAllResponses() {
   const adminClient = await createAdminClient();
   
   try {
-    // Clear existing analysis
     await adminClient
       .from('response_analysis')
       .delete()
@@ -289,6 +331,7 @@ export async function processAllResponses() {
           id,
           buyer_journey_phase,
           query_text,
+          account_id,
           persona:personas!inner (
             id,
             title,
@@ -437,7 +480,11 @@ export async function processAllResponses() {
             responseAnalysisId: insertedData?.id
           });
           
-          await processCitationsTransaction(insertedData, originalCitationsParsed);
+          await processCitationsTransaction(
+            insertedData, 
+            originalCitationsParsed,
+            queryData.account_id
+          );
           
           console.log(`Completed citation processing for response ${rawResponse.id}`);
         } catch (citationError) {
@@ -466,7 +513,12 @@ export async function testProcessSingleResponse(responseText: string) {
     const result = await adminClient
       .from('queries')
       .select(`
-        *,
+        id,
+        company_id,
+        query_text,
+        account_id,
+        prompt_id,
+        buyer_journey_phase,
         companies!inner (*),
         personas!queries_persona_id_fkey (
           *,
@@ -503,6 +555,7 @@ export async function testProcessSingleResponse(responseText: string) {
           id,
           buyer_journey_phase,
           query_text,
+          account_id,
           persona:personas!inner (
             id,
             title,
@@ -641,7 +694,11 @@ export async function testProcessSingleResponse(responseText: string) {
         responseAnalysisId: insertedData?.id
       });
       
-      await processCitationsTransaction(insertedData, originalCitationsParsed);
+      await processCitationsTransaction(
+        insertedData, 
+        originalCitationsParsed,
+        queryData.account_id
+      );
       
       console.log(`Completed citation processing for response ${rawResponse.id}`);
     } catch (citationError) {
@@ -670,6 +727,7 @@ export async function testExistingResponse(responseId: number) {
           id,
           query_text,
           buyer_journey_phase,
+          account_id,
           persona:personas!inner (
             id,
             title,
@@ -806,7 +864,11 @@ export async function testExistingResponse(responseId: number) {
         responseAnalysisId: insertedData?.id
       });
       
-      await processCitationsTransaction(insertedData, originalCitationsParsed);
+      await processCitationsTransaction(
+        insertedData, 
+        originalCitationsParsed,
+        queryData.account_id
+      );
       
       console.log(`Completed citation processing for response ${responseData.id}`);
     } catch (citationError) {

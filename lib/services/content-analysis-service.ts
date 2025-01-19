@@ -93,7 +93,8 @@ export class ContentAnalysisService {
   async analyzeContent(
     queryText: string,
     responseText: string,
-    contentMarkdown: string
+    contentMarkdown: string,
+    accountId: string
   ): Promise<ContentAnalysisResponse> {
     try {
       console.log('Starting content analysis:', {

@@ -247,7 +247,11 @@ export class MozEnrichmentQueue {
   /**
    * Process a specific list of citations
    */
-  async processBatch(citations: Array<{ id: number; citation_url: string }>, companyId: number): Promise<void> {
+  async processBatch(
+    citations: Array<{ id: number; citation_url: string }>,
+    companyId: number,
+    accountId: string
+  ): Promise<void> {
     if (citations.length === 0) return;
 
     const batchTracker = await SupabaseBatchTrackingService.initialize();
@@ -261,13 +265,14 @@ export class MozEnrichmentQueue {
       console.log('Creating batch with:', {
         type: 'citations_moz',
         companyId,
+        accountId,
         metadata: {
           citationCount: citations.length
         }
       });
 
       // Create a batch record with proper batch type and metadata
-      await batchTracker.createBatch('citations_moz', companyId, {
+      await batchTracker.createBatch('citations_moz', companyId, accountId, {
         citationCount: citations.length
       });
 
@@ -280,6 +285,7 @@ export class MozEnrichmentQueue {
       console.error('Error processing citations batch:', {
         batchId,
         companyId,
+        accountId,
         error: error instanceof Error ? {
           name: error.name,
           message: error.message,
@@ -295,7 +301,7 @@ export class MozEnrichmentQueue {
   /**
    * Process all unprocessed citations for a company
    */
-  async processQueue(companyId: number): Promise<void> {
+  async processQueue(companyId: number, accountId: string): Promise<void> {
     if (this.processing) {
       console.log('Queue is already being processed');
       return;
@@ -308,7 +314,7 @@ export class MozEnrichmentQueue {
       this.processing = true;
       this.stats.inProgress = true;
 
-      await batchTracker.createBatch('citations_moz', companyId, {
+      await batchTracker.createBatch('citations_moz', companyId, accountId, {
         processingType: 'full_queue'
       });
 
@@ -326,7 +332,7 @@ export class MozEnrichmentQueue {
 
       // Handle any failed citations
       if (this.failedCitations.size > 0) {
-        await this.retryFailed();
+        await this.retryFailed(accountId);
       }
 
       await batchTracker.completeBatch(batchId);
@@ -340,7 +346,7 @@ export class MozEnrichmentQueue {
     }
   }
 
-  async retryFailed(): Promise<void> {
+  async retryFailed(accountId: string): Promise<void> {
     if (this.failedCitations.size === 0) {
       console.log('No failed citations to retry');
       return;
@@ -367,7 +373,7 @@ export class MozEnrichmentQueue {
     if (citations && citations.length > 0) {
       const batchId = randomUUID();
       
-      await batchTracker.createBatch('citations_moz', 0, {
+      await batchTracker.createBatch('citations_moz', 0, accountId, {
         isRetry: true,
         originalIds: failedIds
       });

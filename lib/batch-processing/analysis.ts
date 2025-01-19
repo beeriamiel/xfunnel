@@ -257,6 +257,7 @@ export type Response = {
     id: number;
     company_id: number;
     query_text: string;
+    account_id: string;
     prompt_id?: number | null;
     buyer_journey_phase?: string[] | null;
     persona?: {

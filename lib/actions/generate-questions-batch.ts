@@ -19,6 +19,9 @@ interface PersonaWithICP extends Pick<Persona, 'id' | 'title' | 'seniority_level
   };
 }
 
+// Add type definition
+type GenerationStatus = 'failed' | 'generating_icps' | 'generating_questions' | 'complete';
+
 async function updateResponseBatchIds(
   adminClient: SupabaseClient<Database>,
   queryIds: number[],
@@ -51,6 +54,7 @@ export async function generateQuestionsForAllPersonas(
   systemPromptName: string,
   userPromptName: string,
   model: AIModelType = 'chatgpt-4o-latest',
+  accountId: string,
   icpBatchId?: string
 ) {
   const adminClient = await createAdminClient();
@@ -68,19 +72,32 @@ export async function generateQuestionsForAllPersonas(
       .from('companies')
       .select('id')
       .eq('name', companyName)
+      .eq('account_id', accountId)
       .single();
 
     if (!company) throw new Error('Company not found');
 
-    // Create a new batch for responses
-    responseBatchId = await batchTracker.createBatch('response', company.id, {
-      model,
-      systemPromptName,
-      userPromptName,
-      engines: Object.keys(engines).filter((k): k is keyof typeof engines => engines[k as keyof typeof engines]),
-      icpBatchId
-    });
-    await batchTracker.updateBatchStatus(responseBatchId, 'in_progress');
+    // Create a new batch for responses with accountId
+    responseBatchId = await batchTracker.createBatch(
+      'response', 
+      company.id.toString(),  // Convert to string for batch tracking
+      {
+        model,
+        systemPromptName,
+        userPromptName,
+        accountId,
+        engines: Object.keys(engines).filter((k): k is keyof typeof engines => engines[k as keyof typeof engines]),
+        icpBatchId
+      }
+    );
+
+    // Update progress tracking with accountId
+    await updateGenerationProgress(
+      company.id,
+      accountId,
+      'generating_questions',
+      0
+    );
 
     // Get all personas for this company
     console.log('Fetching personas for company:', companyName);
@@ -101,7 +118,8 @@ export async function generateQuestionsForAllPersonas(
           )
         )
       `)
-      .eq('icp.company.name', companyName);
+      .eq('icp.company.name', companyName)
+      .eq('account_id', accountId);
 
     const { data: personas, error: personasError } = await query;
 
@@ -111,30 +129,30 @@ export async function generateQuestionsForAllPersonas(
       queryDetails: {
         table: 'personas',
         select: `id, title, seniority_level, department, icp:ideal_customer_profiles!inner(vertical, company_size, region, company:companies!inner(name))`,
-        filter: `icp.company.name = ${companyName}`
+        filter: `icp.company.name = ${companyName} and account_id = ${accountId}`
       }
     });
 
     if (personasError) {
       console.error('Error fetching personas:', personasError);
-      await updateGenerationProgress(company.id, 'failed', 0, 'Failed to fetch personas');
+      await updateGenerationProgress(company.id, accountId, 'failed', 0, 'Failed to fetch personas');
       throw new Error(`Failed to fetch personas: ${personasError.message}`);
     }
 
     if (!personas || personas.length === 0) {
       console.error('No personas found for company:', companyName);
-      await updateGenerationProgress(company.id, 'failed', 0, 'No personas found');
+      await updateGenerationProgress(company.id, accountId, 'failed', 0, 'No personas found');
       throw new Error('No personas found for company');
     }
 
-    await updateGenerationProgress(company.id, 'generating_questions', 0);
+    await updateGenerationProgress(company.id, accountId, 'generating_questions', 0);
 
     // Process personas in batches
     for (let i = 0; i < personas.length; i += batchSize) {
       const batch = personas.slice(i, i + batchSize);
       const batchProgress = Math.round((i / personas.length) * 100);
       
-      await updateGenerationProgress(company.id, 'generating_questions', batchProgress);
+      await updateGenerationProgress(company.id, accountId, 'generating_questions', batchProgress);
       console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(personas.length / batchSize)}`);
       
       try {
@@ -143,12 +161,13 @@ export async function generateQuestionsForAllPersonas(
           batch.map(async (persona) => {
             try {
               const result = await generateQuestions(
-                companyName, 
-                engines, 
-                persona.id,
+                companyName,
+                engines,
+                parseInt(persona.id),
                 systemPromptName,
                 userPromptName,
-                model
+                model,
+                accountId
               );
 
               // 1. Collect queries for later processing
@@ -197,8 +216,9 @@ export async function generateQuestionsForAllPersonas(
         }
         await updateGenerationProgress(
           company.id, 
-          'failed', 
-          batchProgress, 
+          accountId, 
+          'failed',
+          batchProgress,
           `Failed during batch ${Math.floor(i / batchSize) + 1}`
         );
         throw error;
@@ -210,7 +230,8 @@ export async function generateQuestionsForAllPersonas(
       await processQueriesWithEngines(
         allGeneratedQueries, 
         engines,
-        responseBatchId!
+        responseBatchId!,
+        accountId
       );
       
       // 5. Start the response processing queue
@@ -224,7 +245,12 @@ export async function generateQuestionsForAllPersonas(
       if (responseRange?.length) {
         const startId = responseRange[0].id;
         const endId = responseRange[responseRange.length - 1].id;
-        await queue.processQueue(startId, endId, company.id);
+        await queue.processQueue(
+          startId, 
+          endId, 
+          company.id,  // Keep as number
+          accountId
+        );
       }
     }
 
@@ -236,7 +262,7 @@ export async function generateQuestionsForAllPersonas(
       total_personas: personas.length
     });
 
-    await updateGenerationProgress(company.id, 'complete', 100);
+    await updateGenerationProgress(company.id, accountId, 'complete', 100);
 
     return {
       responseBatchId,

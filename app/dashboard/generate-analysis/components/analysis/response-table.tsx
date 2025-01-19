@@ -21,6 +21,14 @@ import { AddICPDialog } from './add-icp-dialog'
 import { AddPersonaDialog } from './add-persona-dialog'
 import { toast } from "sonner"
 
+interface QueryRowData {  // Rename to avoid conflict with imported Query type
+  id: string;
+  queries?: {
+    id: string;
+    text: string;
+  }[];
+}
+
 interface ResponseTableProps {
   icps: ICP[]
   companyId: number
@@ -154,7 +162,10 @@ export function ResponseTable({
                         <QueryRow 
                           query={{
                             id: persona.id.toString(),
-                            queries: persona.queries
+                            queries: persona.queries?.map(q => ({
+                              id: q.id.toString(),
+                              text: q.query_text
+                            }))
                           }}
                           isExpanded={expandedPersonaId === persona.id}
                           onToggle={() => handleAction('view_queries', persona.id)}

@@ -55,11 +55,12 @@ export class ResponseAnalysisQueue {
       .from('responses')
       .select(`
         *,
-        query:queries (
+        query:queries!inner (
           id,
-          buyer_journey_phase,
           query_text,
-          company:companies (
+          buyer_journey_phase,
+          account_id,
+          company:companies!inner (
             id,
             name,
             industry,
@@ -68,7 +69,7 @@ export class ResponseAnalysisQueue {
               competitor_name
             )
           ),
-          persona:personas (
+          persona:personas!inner (
             id,
             title,
             seniority_level,
@@ -119,8 +120,9 @@ export class ResponseAnalysisQueue {
           web_search_queries: response.websearchqueries || [],
           query: {
             id: 0,
-            company_id: 0,
             query_text: '',
+            company_id: 0,
+            account_id: '',
             prompt_id: null,
             buyer_journey_phase: null,
             persona: undefined,
@@ -140,8 +142,9 @@ export class ResponseAnalysisQueue {
         web_search_queries: response.websearchqueries || [],
         query: {
           id: response.query.id,
-          company_id: response.query.company?.id || 0,
           query_text: response.query.query_text,
+          company_id: response.query.company?.id || 0,
+          account_id: response.query.account_id || '',
           prompt_id: null,
           buyer_journey_phase: response.query.buyer_journey_phase || null,
           persona: response.query.persona && response.query.persona.icp ? {
@@ -190,6 +193,7 @@ export class ResponseAnalysisQueue {
 
         analysisResults.push({
           response_id: response.id,
+          account_id: response.query.account_id,
           citations_parsed: analysis.citations_parsed ?
           JSON.parse(JSON.stringify(analysis.citations_parsed)) : null,
           recommended: analysis.recommended,
@@ -273,11 +277,16 @@ export class ResponseAnalysisQueue {
             citationsParsed: analysisData.citations_parsed
           });
 
+          if (!insertedAnalysis.account_id) {
+            throw new Error(`No account_id found for analysis ${analysisData.response_id}`);
+          }
+
           await processCitationsTransaction(
             insertedAnalysis,
             typeof analysisData.citations_parsed === 'string' 
               ? JSON.parse(analysisData.citations_parsed)
-              : analysisData.citations_parsed
+              : analysisData.citations_parsed,
+            insertedAnalysis.account_id
           );
 
           console.log(`Successfully processed citations for response ${analysisData.response_id}`);
@@ -290,7 +299,12 @@ export class ResponseAnalysisQueue {
     }
   }
 
-  async processQueue(startId: number, endId: number, companyId: number): Promise<void> {
+  async processQueue(
+    startId: number, 
+    endId: number, 
+    companyId: number,
+    accountId: string
+  ): Promise<void> {
     if (this.processing) {
       console.log('Queue is already being processed');
       return;
@@ -303,7 +317,7 @@ export class ResponseAnalysisQueue {
       this.processing = true;
       this.stats.inProgress = true;
       
-      const analysisBatchId = await batchTracker.createBatch('response_analysis', companyId, {
+      const analysisBatchId = await batchTracker.createBatch('response_analysis', companyId, accountId, {
         startId,
         endId,
         processingType: 'analysis'
@@ -342,7 +356,7 @@ export class ResponseAnalysisQueue {
     }
   }
 
-  async retryFailed(): Promise<void> {
+  async retryFailed(accountId: string): Promise<void> {
     if (this.failedResponses.size === 0) {
       console.log('No failed responses to retry');
       return;
@@ -353,9 +367,6 @@ export class ResponseAnalysisQueue {
     this.failedResponses.clear();
     this.stats.failedResponses = 0;
 
-    const batchTracker = await SupabaseBatchTrackingService.initialize();
-    
-    // Get company ID from the first response
     const adminClient = await createAdminClient();
     const { data: firstResponse } = await adminClient
       .from('responses')
@@ -368,10 +379,16 @@ export class ResponseAnalysisQueue {
     }
 
     // Create a new analysis batch for retries
-    const retryBatchId = await batchTracker.createBatch('response_analysis', firstResponse.query.company_id, {
-      isRetry: true,
-      originalIds: failedIds
-    });
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
+    const retryBatchId = await batchTracker.createBatch(
+      'response_analysis', 
+      firstResponse.query.company_id,
+      accountId,
+      {
+        isRetry: true,
+        originalIds: failedIds
+      }
+    );
 
     for (let i = 0; i < failedIds.length; i += this.batchSize) {
       const batchIds = failedIds.slice(i, i + this.batchSize);

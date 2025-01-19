@@ -45,6 +45,7 @@ interface CitationMetadata {
   spam_score?: number | null;
   root_domains_to_root_domain?: number | null;
   external_links_to_root_domain?: number | null;
+  account_id: string;
 }
 
 export interface ParsedCitation {
@@ -58,7 +59,8 @@ export interface ParsedCitation {
  */
 export async function processCitations(
   responseAnalysis: ResponseAnalysis,
-  citationsParsed: ParsedCitation | null
+  citationsParsed: ParsedCitation | null,
+  accountId: string
 ): Promise<CitationMetadata[]> {
   if (!citationsParsed || !citationsParsed.urls || citationsParsed.urls.length === 0) {
     console.log('No citations to process for response analysis:', responseAnalysis.id);
@@ -69,6 +71,10 @@ export async function processCitations(
     responseAnalysisId: responseAnalysis.id,
     citationCount: citationsParsed.urls.length
   });
+
+  if (!responseAnalysis.account_id || !accountId) {
+    throw new Error('account_id is required for response analysis');
+  }
 
   return citationsParsed.urls.map((url, index) => {
     const metadata: CitationMetadata = {
@@ -87,6 +93,7 @@ export async function processCitations(
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
       query_text: responseAnalysis.query_text ?? '',
+      account_id: accountId,
     };
 
     console.log('Created citation metadata:', {
@@ -154,7 +161,8 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         page_authority: citation.page_authority,
         spam_score: citation.spam_score,
         root_domains_to_root_domain: citation.root_domains_to_root_domain,
-        external_links_to_root_domain: citation.external_links_to_root_domain
+        external_links_to_root_domain: citation.external_links_to_root_domain,
+        account_id: citation.account_id
       })))
       .select('id');
 
@@ -247,9 +255,15 @@ export function extractCitationMetadata(
  */
 export async function processCitationsTransaction(
   responseAnalysis: ResponseAnalysis,
-  citationsParsed: ParsedCitation | null
+  citationsParsed: ParsedCitation | null,
+  accountId: string
 ): Promise<void> {
   const adminClient = await createAdminClient();
+
+  // Add type guard for both account_id values
+  if (!responseAnalysis.account_id || !accountId) {
+    throw new Error('account_id is required');
+  }
 
   try {
     // Extract URLs first
@@ -283,7 +297,8 @@ export async function processCitationsTransaction(
       response_text: responseAnalysis.response_text ?? '',
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
-      query_text: responseAnalysis.query_text ?? ''
+      query_text: responseAnalysis.query_text ?? '',
+      account_id: accountId
     }));
 
     // Type-safe handling of reusable citations
@@ -328,7 +343,21 @@ export async function processCitationsTransaction(
         response_text: responseAnalysis.response_text ?? '',
         region: responseAnalysis.geographic_region ?? '',
         ranking_position: responseAnalysis.ranking_position,
-        query_text: responseAnalysis.query_text ?? ''
+        query_text: responseAnalysis.query_text ?? '',
+        account_id: accountId,
+        is_original: false,
+        origin_citation_id: existing.id,
+        content_markdown: existing.content_markdown,
+        moz_last_updated: existing.moz_last_updated,
+        content_scraped_at: existing.content_scraped_at,
+        content_analysis: existing.content_analysis,
+        content_analysis_updated_at: existing.content_analysis_updated_at,
+        domain_authority: existing.domain_authority,
+        source_type: existing.source_type,
+        page_authority: existing.page_authority,
+        spam_score: existing.spam_score,
+        root_domains_to_root_domain: existing.root_domains_to_root_domain,
+        external_links_to_root_domain: existing.external_links_to_root_domain
       };
 
       // Return combined citation with existing data
@@ -418,8 +447,8 @@ export async function processCitationsTransaction(
           });
 
           await Promise.all([
-            mozQueue.processBatch(citationsToProcess, responseAnalysis.company_id),
-            contentQueue.processBatch(citationsToProcess, responseAnalysis.company_id)
+            mozQueue.processBatch(citationsToProcess, responseAnalysis.company_id, accountId),
+            contentQueue.processBatch(citationsToProcess, responseAnalysis.company_id, accountId)
           ]);
         } catch (enrichmentError) {
           console.error('Enrichment error:', {
@@ -446,7 +475,8 @@ export async function processCitationsTransaction(
             const analysis = await contentAnalysisService.analyzeContent(
               citation.query_text || '',
               citation.response_text || '',
-              citation.content_markdown || ''
+              citation.content_markdown || '',
+              accountId
             );
 
             const { error: updateError } = await adminClient

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Query, QueryAction } from '../types/analysis'
+import type { QueryAction } from '../types/analysis'
 
 interface QueryState {
   queries: Record<string, {
@@ -26,7 +26,7 @@ export const useQueryStore = create<QueryState>((set) => ({
       }
     })),
   initializeQuery: (queryId, initialState = {
-    availableActions: ['generate_queries', 'view_queries'],
+    availableActions: ['generate_response', 'view_responses'],
     status: 'idle',
     isLoading: false,
     error: null

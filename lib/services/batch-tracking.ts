@@ -18,26 +18,30 @@ export class SupabaseBatchTrackingService implements BatchTrackingService {
   async createBatch(
     type: BatchType,
     companyId: number,
+    accountId: string,
     metadata?: Record<string, any>
   ): Promise<string> {
     const batchId = randomUUID();
     
-    const { error } = await this.supabase
+    const { data, error } = await this.supabase
       .from('batch_metadata')
       .insert({
         batch_id: batchId,
         batch_type: String(type),
         company_id: companyId,
         status: 'pending',
-        metadata
-      });
+        metadata,
+        account_id: accountId
+      })
+      .select('batch_id')
+      .single();
 
     if (error) {
       console.error('Error creating batch:', error);
       throw error;
     }
 
-    return batchId;
+    return data.batch_id;
   }
 
   async updateBatchStatus(

@@ -6,48 +6,55 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import type { Query } from '../../types/analysis'
 import { motion, AnimatePresence } from "framer-motion"
-import { useQueryStore } from '../../store/queryStore'
+import { useQueryStore } from '../../store/query-store'
 import { QueryRow } from './query-row'
 import { useState, useEffect } from 'react'
 
 interface QuerySectionProps {
-  queries: Query[]
-  onAddQuery: (text: string) => void
-  newQuery: string
-  onNewQueryChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  queries: Query[];
+  onGenerateResponse?: (queryId: string) => Promise<void>;
 }
 
-export function QuerySection({ queries }: { queries: Query[] }) {
+export function QuerySection({ queries, onGenerateResponse }: QuerySectionProps) {
   const [expandedQueryId, setExpandedQueryId] = useState<string | null>(null)
+  const initializeQuery = useQueryStore(state => state.initializeQuery)
 
-  // Initialize all queries on mount
   useEffect(() => {
     queries.forEach(query => {
       if (query.id) {
-        useQueryStore.getState().initializeQuery(query.id, {
-          availableActions: ['generate_queries', 'view_queries'],
+        initializeQuery(query.id, {
+          availableActions: ['generate_response', 'view_responses'],
           status: 'idle',
           isLoading: false,
           error: null
         })
       }
     })
-  }, [queries])
+  }, [queries, initializeQuery])
 
   return (
     <div className="space-y-4">
-      {queries.map((query) => (
-        query?.id ? (
-          <QueryRow
-            key={query.id}
-            query={query}
-            isExpanded={expandedQueryId === query.id}
-            onToggle={() => setExpandedQueryId(
-              expandedQueryId === query.id ? null : query.id
-            )}
-          />
-        ) : null
-      ))}
+      <AnimatePresence>
+        {queries.map((query) => (
+          query?.id ? (
+            <motion.div
+              key={query.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <QueryRow
+                query={query}
+                isExpanded={expandedQueryId === query.id}
+                onToggle={() => setExpandedQueryId(
+                  expandedQueryId === query.id ? null : query.id
+                )}
+                onGenerateResponse={onGenerateResponse}
+              />
+            </motion.div>
+          ) : null
+        ))}
+      </AnimatePresence>
     </div>
   )
 } 

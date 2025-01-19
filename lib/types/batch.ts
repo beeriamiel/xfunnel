@@ -35,7 +35,12 @@ export interface ResponseBatchInfo {
 }
 
 export interface BatchTrackingService {
-  createBatch(type: BatchType, companyId: number, metadata?: Record<string, any>): Promise<string>;
+  createBatch(
+    type: BatchType,
+    companyId: number,
+    accountId: string,
+    metadata?: Record<string, any>
+  ): Promise<string>;
   updateBatchStatus(batchId: string, status: BatchStatus, errorMessage?: string): Promise<void>;
   updateBatchMetadata(batchId: string, metadata: Record<string, any>): Promise<void>;
   completeBatch(batchId: string): Promise<void>;
