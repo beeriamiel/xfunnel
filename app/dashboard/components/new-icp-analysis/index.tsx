@@ -67,6 +67,7 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedVertical, setSelectedVertical] = useState<string | null>(null)
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null)
+  const [queryCounts, setQueryCounts] = useState<{ queries: number; responses: number } | null>(null)
 
   // Handle region selection
   const handleRegionSelect = (region: string) => {
@@ -84,6 +85,11 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
   const handlePersonaSelect = (persona: string) => {
     setSelectedPersona(persona)
     setCurrentStage('queries')
+  }
+
+  // Handle query counts update
+  const handleQueriesCount = (queryCount: number, responseCount: number) => {
+    setQueryCounts({ queries: queryCount, responses: responseCount })
   }
 
   // Handle back navigation
@@ -137,6 +143,7 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
           selectedRegion={selectedRegion}
           selectedVertical={selectedVertical}
           selectedPersona={selectedPersona}
+          queryCounts={queryCounts}
         />
         
         <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -144,7 +151,15 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
           {currentStage === 'regions' && <Regions companyId={effectiveCompanyId} accountId={accountId} onSelectRegion={handleRegionSelect} />}
           {currentStage === 'verticals' && selectedRegion && <Verticals companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} onSelectVertical={handleVerticalSelect} onBack={handleBack} />}
           {currentStage === 'personas' && selectedRegion && selectedVertical && <Personas companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} selectedVertical={selectedVertical} onSelectPersona={handlePersonaSelect} onBack={handleBack} />}
-          {currentStage === 'queries' && selectedRegion && selectedVertical && selectedPersona && <Queries companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} selectedVertical={selectedVertical} selectedPersona={selectedPersona} onBack={handleBack} />}
+          {currentStage === 'queries' && selectedRegion && selectedVertical && selectedPersona && <Queries 
+            companyId={effectiveCompanyId} 
+            accountId={accountId} 
+            selectedRegion={selectedRegion} 
+            selectedVertical={selectedVertical} 
+            selectedPersona={selectedPersona} 
+            onBack={handleBack}
+            onQueriesCount={handleQueriesCount}
+          />}
         </div>
       </Card>
     </div>

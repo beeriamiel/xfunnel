@@ -294,7 +294,7 @@ function aggregateMetrics(items: AnalysisMetrics[]): AnalysisMetrics {
     }
 
     // Ranking Position: Weight by response count and valid position
-    if (item.rankingPosition > 0) {
+    if (item.rankingPosition !== null && item.rankingPosition !== undefined && item.rankingPosition > 0) {
       const weight = baseWeight;
       weightedSums.position += item.rankingPosition * weight;
       weights.position += weight;
@@ -571,13 +571,14 @@ function calculateRankingPosition(
   const filteredData = data.filter(item => 
     item.buying_journey_stage !== null &&
     validStages.includes(item.buying_journey_stage) &&
-    item.ranking_position !== null
+    item.ranking_position !== null &&
+    item.ranking_position > 0  // Only include rankings greater than 0
   );
   
   if (filteredData.length === 0) return 0;
   
   return filteredData.reduce((sum, item) => 
-    sum + (item.ranking_position || 0)
+    sum + item.ranking_position!
   , 0) / filteredData.length;
 }
 

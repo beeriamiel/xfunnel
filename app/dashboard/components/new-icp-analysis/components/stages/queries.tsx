@@ -27,6 +27,7 @@ interface QueriesProps {
   selectedVertical: string;
   selectedPersona: string;
   onBack: () => void;
+  onQueriesCount?: (queryCount: number, responseCount: number) => void;
 }
 
 export function Queries({ 
@@ -35,7 +36,8 @@ export function Queries({
   selectedRegion, 
   selectedVertical,
   selectedPersona,
-  onBack 
+  onBack,
+  onQueriesCount 
 }: QueriesProps) {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
   const [isVisible, setIsVisible] = useState(false)
@@ -46,6 +48,32 @@ export function Queries({
     selectedVertical,
     selectedPersona
   )
+  const previousCounts = React.useRef<{ queries: number; responses: number } | null>(null)
+
+  // Memoize the calculations
+  const totals = React.useMemo(() => {
+    if (!data?.length) return null
+
+    const totalQueries = data.reduce((sum: number, phase: QueryPhase) => sum + phase.queries.length, 0)
+    const totalResponses = data.reduce((total: number, phase: QueryPhase) => {
+      return total + phase.queries.reduce((sum: number, query: Query) => {
+        return sum + Object.keys(query.engineResults).length
+      }, 0)
+    }, 0)
+
+    return { queries: totalQueries, responses: totalResponses }
+  }, [data])
+
+  // Update parent with counts only when they change
+  React.useEffect(() => {
+    if (totals && onQueriesCount) {
+      const prev = previousCounts.current
+      if (!prev || prev.queries !== totals.queries || prev.responses !== totals.responses) {
+        previousCounts.current = totals
+        onQueriesCount(totals.queries, totals.responses)
+      }
+    }
+  }, [totals, onQueriesCount])
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -109,13 +137,6 @@ export function Queries({
     )
   }
 
-  // Calculate totals
-  const totalResponses = data.reduce((total: number, phase: QueryPhase) => {
-    return total + phase.queries.reduce((sum: number, query: Query) => {
-      return sum + Object.keys(query.engineResults).length
-    }, 0)
-  }, 0)
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -131,10 +152,10 @@ export function Queries({
           className="flex items-center gap-4"
         >
           <Badge variant="secondary" className="text-sm bg-purple-50/50 hover:bg-purple-50/80 transition-all">
-            {data?.reduce((sum: number, phase: QueryPhase) => sum + phase.queries.length, 0) || 0} queries
+            {totals?.queries} queries
           </Badge>
           <Badge variant="secondary" className="text-sm bg-purple-50/50 hover:bg-purple-50/80 transition-all">
-            {totalResponses} responses
+            {totals?.responses} responses
           </Badge>
         </motion.div>
       </div>
@@ -191,7 +212,7 @@ export function Queries({
                           count={phaseData.queries.reduce((sum: number, query: Query) => 
                             sum + Object.keys(query.engineResults).length, 0
                           )}
-                          total={totalResponses}
+                          total={totals?.responses || 0}
                         />
                         <div className="shrink-0">
                           {expandedPhase === phase ? (
