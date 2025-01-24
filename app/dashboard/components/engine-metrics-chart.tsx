@@ -1278,10 +1278,10 @@ export function EngineMetricsChart({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* Research Coverage Card */}
       <Card className="w-full bg-white shadow-sm">
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           <div className="mb-6">
             <h3 className="text-2xl font-semibold tracking-tight">Research Coverage</h3>
             <p className="text-sm text-muted-foreground mt-1">Analysis scope for your company across AI platforms</p>
@@ -1297,7 +1297,7 @@ export function EngineMetricsChart({
 
       {/* AI Engine Performance Card */}
       <Card className="w-full bg-white shadow-sm">
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {isLoading ? (
             <ChartPlaceholder />
           ) : error ? (

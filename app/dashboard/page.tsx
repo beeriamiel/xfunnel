@@ -103,9 +103,9 @@ async function getAccountContext(): Promise<AccountContext> {
 async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accountId: string) {
   try {
     const searchParams = await searchParamsPromise
-    const companyName = typeof searchParams.company === 'string' ? searchParams.company : undefined
+    const companyId = typeof searchParams.company === 'string' ? parseInt(searchParams.company) : undefined
     
-    if (!companyName) {
+    if (!companyId) {
       return { selectedCompany: null }
     }
 
@@ -124,7 +124,8 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accoun
         annual_revenue,
         markets_operating_in
       `)
-      .eq('name', companyName)
+      .eq('id', companyId)
+      .eq('account_id', accountId)
       .single()
 
     if (error) {

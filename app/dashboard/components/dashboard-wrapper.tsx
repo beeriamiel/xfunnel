@@ -116,7 +116,7 @@ export function DashboardWrapper({
       step: searchParams.get('step'),
       pathname: window?.location?.pathname
     })
-    mainContent = <div className="w-full px-8 py-6">{children}</div>
+    mainContent = <div className="w-full h-full">{children}</div>
   } else if (!selectedCompany && !searchParams.get('companyId') && !searchParams.get('company')) {
     // Only show NoCompanySelected if we don't have a company ID in URL
     console.log('🟡 Rendering NoCompanySelected:', {
@@ -135,19 +135,23 @@ export function DashboardWrapper({
       pathname: window?.location?.pathname,
       children: !!children
     })
-    mainContent = <div className="flex-1">{children}</div>
+    mainContent = (
+      <div className="w-full h-full">
+        {children || <DashboardContent accountId={accountId} />}
+      </div>
+    )
   }
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <SidebarProvider>
-        <div className="flex flex-col min-h-screen">
+        <div className="flex flex-col min-h-screen w-full">
           <Suspense fallback={<LoadingSkeleton />}>
             <DashboardHeader />
           </Suspense>
-          <div className="flex flex-1 w-full">
+          <div className="flex flex-1 h-[calc(100vh-4rem)]">
             <AppSidebar />
-            <main className="flex-1 w-full">
+            <main className="flex-1 w-full overflow-auto">
               {mainContent}
             </main>
           </div>

@@ -54,29 +54,19 @@ export const STAGES = [
   }
 ] as const;
 
-interface NewICPAnalysisProps {
-  companyId?: number | null;
+export interface NewICPAnalysisProps {
+  companyId?: number;
   accountId: string;
 }
 
 export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
-  // Connect to dashboard store for company selection
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
-
-  // Stage navigation state
+  
   const [currentStage, setCurrentStage] = useState<AnalysisStage>('total-company')
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedVertical, setSelectedVertical] = useState<string | null>(null)
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null)
-
-  // Stage accessibility logic
-  const isStageAccessible = (stage: AnalysisStage) => {
-    const currentIndex = STAGES.findIndex(s => s.id === currentStage)
-    const targetIndex = STAGES.findIndex(s => s.id === stage)
-    // Allow moving to any completed stage or the next stage
-    return targetIndex <= currentIndex + 1
-  }
 
   // Handle region selection
   const handleRegionSelect = (region: string) => {
@@ -114,70 +104,18 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
     }
   }
 
-  // Stage content renderer
-  const renderStageContent = () => {
-    switch (currentStage) {
-      case 'total-company':
-        return <TotalCompany companyId={effectiveCompanyId} accountId={accountId} />
-      case 'regions':
-        return (
-          <Regions 
-            companyId={effectiveCompanyId} 
-            accountId={accountId}
-            onSelectRegion={handleRegionSelect}
-          />
-        )
-      case 'verticals':
-        return selectedRegion ? (
-          <Verticals
-            companyId={effectiveCompanyId}
-            accountId={accountId}
-            selectedRegion={selectedRegion}
-            onSelectVertical={handleVerticalSelect}
-            onBack={handleBack}
-          />
-        ) : (
-          <div>No region selected</div>
-        )
-      case 'personas':
-        return selectedRegion && selectedVertical ? (
-          <Personas
-            companyId={effectiveCompanyId}
-            accountId={accountId}
-            selectedRegion={selectedRegion}
-            selectedVertical={selectedVertical}
-            onSelectPersona={handlePersonaSelect}
-            onBack={handleBack}
-          />
-        ) : (
-          <div>No vertical selected</div>
-        )
-      case 'queries':
-        return selectedRegion && selectedVertical && selectedPersona ? (
-          <Queries
-            companyId={effectiveCompanyId}
-            accountId={accountId}
-            selectedRegion={selectedRegion}
-            selectedVertical={selectedVertical}
-            selectedPersona={selectedPersona}
-            onBack={handleBack}
-          />
-        ) : (
-          <div>No persona selected</div>
-        )
-    }
-  }
-
-  // Handle no company selected
+  // Ensure we have a valid company ID
   if (!effectiveCompanyId) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">No Company Selected</h2>
-          <p className="text-muted-foreground mt-2">Please select a company to view the ICP analysis</p>
+      <Card className="w-full bg-white shadow-sm">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold">ICP Analysis</h3>
+          <div className="h-[200px] w-full flex items-center justify-center text-muted-foreground">
+            Please select a company to view ICP analysis
+          </div>
         </div>
-      </div>
-    )
+      </Card>
+    );
   }
 
   return (
@@ -193,16 +131,20 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
           </p>
         </div>
         
-        <StageProgressCards
+        <StageProgressCards 
           currentStage={currentStage}
+          onStageSelect={setCurrentStage}
           selectedRegion={selectedRegion}
           selectedVertical={selectedVertical}
           selectedPersona={selectedPersona}
-          onStageSelect={setCurrentStage}
         />
         
         <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {renderStageContent()}
+          {currentStage === 'total-company' && <TotalCompany companyId={effectiveCompanyId} accountId={accountId} />}
+          {currentStage === 'regions' && <Regions companyId={effectiveCompanyId} accountId={accountId} onSelectRegion={handleRegionSelect} />}
+          {currentStage === 'verticals' && selectedRegion && <Verticals companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} onSelectVertical={handleVerticalSelect} onBack={handleBack} />}
+          {currentStage === 'personas' && selectedRegion && selectedVertical && <Personas companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} selectedVertical={selectedVertical} onSelectPersona={handlePersonaSelect} onBack={handleBack} />}
+          {currentStage === 'queries' && selectedRegion && selectedVertical && selectedPersona && <Queries companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} selectedVertical={selectedVertical} selectedPersona={selectedPersona} onBack={handleBack} />}
         </div>
       </Card>
     </div>

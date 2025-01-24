@@ -1,12 +1,9 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
-import { AppSidebar } from "@/components/app-sidebar"
-import { DashboardHeader } from './dashboard-header'
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card } from '@/components/ui/card'
 import { EngineMetricsChart } from './engine-metrics-chart'
-import { SidebarProvider } from "@/components/ui/sidebar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CompetitorAnalysis } from './competitor-analysis'
 import { CitationAnalysis } from './citation-analysis'
@@ -75,8 +72,8 @@ function DashboardView({
   }, [])
 
   return (
-    <div className="w-full p-8" data-testid="dashboard-view">
-      <div className="w-full">
+    <div className="h-full py-6" data-testid="dashboard-view">
+      <div className="space-y-6">
         <Suspense fallback={<MetricsSkeleton />}>
           {activeView === 'response' ? (
             <GenerateAnalysis accountId={accountId} isOnboarding={false} />
@@ -132,71 +129,26 @@ export function DashboardContent({ accountId }: { accountId: string }) {
   const selectedCompany = companies.find(c => c.id === selectedCompanyId)
 
   useEffect(() => {
-    const containers = {
-      root: document.querySelector('[data-testid="dashboard-root"]') as HTMLDivElement | null,
-      sidebarWrapper: document.querySelector('[data-testid="sidebar-wrapper"]') as HTMLDivElement | null,
-      contentWrapper: document.querySelector('[data-testid="content-wrapper"]') as HTMLDivElement | null,
-      main: document.querySelector('main') as HTMLElement | null,
-      mainContent: document.querySelector('[data-testid="main-content"]') as HTMLDivElement | null
-    }
+    console.log('DashboardContent state:', {
+      selectedCompanyId,
+      companiesCount: companies.length,
+      hasSelectedCompany: !!selectedCompany,
+      activeView
+    })
+  }, [selectedCompanyId, companies, selectedCompany, activeView])
 
-    // Only log if we have all containers
-    if (containers.root && containers.contentWrapper && containers.main && containers.mainContent) {
-      console.log('Layout dimensions:', {
-        window: {
-          width: window.innerWidth,
-          height: window.innerHeight
-        },
-        root: {
-          width: containers.root.clientWidth,
-          offsetWidth: containers.root.offsetWidth,
-          scrollWidth: containers.root.scrollWidth
-        },
-        contentWrapper: {
-          width: containers.contentWrapper.clientWidth,
-          offsetWidth: containers.contentWrapper.offsetWidth,
-          scrollWidth: containers.contentWrapper.scrollWidth
-        },
-        main: {
-          width: containers.main.clientWidth,
-          offsetWidth: containers.main.offsetWidth,
-          scrollWidth: containers.main.scrollWidth
-        },
-        mainContent: {
-          width: containers.mainContent.clientWidth,
-          offsetWidth: containers.mainContent.offsetWidth,
-          scrollWidth: containers.mainContent.scrollWidth
-        }
-      })
-    }
-  }, [])
+  if (!selectedCompany) {
+    return <NoCompanySelected />
+  }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen" data-testid="dashboard-root">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col" data-testid="content-wrapper">
-          <ErrorBoundary 
-            FallbackComponent={() => <div>Error loading header</div>}
-          >
-            <DashboardHeader />
-          </ErrorBoundary>
-          <main className="flex-1">
-            <div className="w-full h-full" data-testid="main-content">
-              <Suspense fallback={<div className="p-8"><MetricsSkeleton /></div>}>
-                {selectedCompany ? (
-                  <DashboardView 
-                    selectedCompany={selectedCompany} 
-                    accountId={accountId}
-                  />
-                ) : (
-                  <NoCompanySelected />
-                )}
-              </Suspense>
-            </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
+    <div className="h-full overflow-hidden" data-testid="main-content">
+      <Suspense fallback={<div className="p-4"><MetricsSkeleton /></div>}>
+        <DashboardView 
+          selectedCompany={selectedCompany} 
+          accountId={accountId}
+        />
+      </Suspense>
+    </div>
   )
 } 

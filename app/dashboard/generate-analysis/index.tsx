@@ -224,13 +224,13 @@ export function GenerateAnalysis({
   }
 
   return (
-    <div className="relative w-full p-8">
+    <div className="h-full py-6">
       {isLoading ? (
-        <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       ) : error ? (
-        <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex items-center justify-center min-h-[400px]">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
@@ -238,23 +238,21 @@ export function GenerateAnalysis({
           </Alert>
         </div>
       ) : (
-        <>
+        <div className="space-y-6">
           {isDevMode && (
-            <div className="mb-4 w-full">
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Development Mode</AlertTitle>
-                <AlertDescription>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsDevMode(false)}
-                  >
-                    Disable Dev Mode
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Development Mode</AlertTitle>
+              <AlertDescription>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDevMode(false)}
+                >
+                  Disable Dev Mode
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
 
           {isOnboarding ? (
@@ -295,7 +293,7 @@ export function GenerateAnalysis({
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
