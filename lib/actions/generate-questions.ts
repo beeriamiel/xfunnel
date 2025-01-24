@@ -166,7 +166,7 @@ export async function generateQuestions(
     }
 
     // Create a new batch for question generation
-    batchId = await batchTracker.createBatch('query', companyId, {
+    batchId = await batchTracker.createBatch('query', companyId, accountId, {
       model,
       systemPromptName,
       userPromptName,
@@ -363,7 +363,8 @@ export async function generateQuestions(
           persona_id: personaId,
           user_id: user.id,
           query_batch_id: batchId,
-          created_by_batch: true
+          created_by_batch: true,
+          account_id: accountId
         })
         .select('id, query_text, buyer_journey_phase')
         .single();
@@ -501,7 +502,8 @@ export async function processQueriesWithEngines(
               responses.map((response, index) => ({
                 ...responseObjects[index](response),
                 response_batch_id: responseBatchId,
-                created_by_batch: true
+                created_by_batch: true,
+                account_id: accountId
               }))
             );
             

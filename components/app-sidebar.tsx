@@ -149,11 +149,29 @@ export function AppSidebar({ className }: SidebarProps) {
     }
 
     e.preventDefault()
+    console.log('🔵 AppSidebar Navigation:', {
+      item,
+      currentView: activeView,
+      newView: item.view
+    })
+    
     setActiveView(item.view)
     
+    // Use the correct path for Generate Analysis
+    const basePath = item.view === 'response' 
+      ? '/dashboard/generate-analysis'
+      : '/dashboard'
+      
     // Preserve existing search params and navigate
     const params = new URLSearchParams(searchParams.toString())
-    router.push(`/dashboard${params.toString() ? `?${params.toString()}` : ''}`)
+    
+    console.log('🟡 AppSidebar URL Construction:', {
+      basePath,
+      params: params.toString(),
+      finalUrl: `${basePath}${params.toString() ? `?${params.toString()}` : ''}`
+    })
+
+    router.push(`${basePath}${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
   const SidebarContent = () => (

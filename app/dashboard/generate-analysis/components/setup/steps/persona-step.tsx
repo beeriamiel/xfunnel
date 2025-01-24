@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ChevronRight, Plus, UserCircle2, Pencil, X, Loader2 } from "lucide-react"
+import { ChevronRight, Plus, UserCircle2, Pencil, X, Loader2, AlertCircle } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Dialog,
@@ -23,14 +23,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import { design } from '../../../lib/design-system'
-import { generatePersonaSuggestions } from '../../../utils/mock-suggestions'
 import type { ICP, Persona } from '../../../types/analysis'
+import { useDashboardStore } from '@/app/dashboard/store'
+import { createClient } from '@/app/supabase/client'
+
+// Type for ICPs from database that doesn't require the personas field
+interface DatabaseICP {
+  id: number
+  vertical: string
+  company_size: string
+  region: string
+  created_at?: string | null
+  icp_batch_id?: string | null
+  created_by_batch?: boolean | null
+  company_id?: number | null
+}
 
 interface PersonaStepProps {
-  icps: ICP[];
-  personas: Persona[];
   onAddPersona: (persona: Omit<Persona, 'id'>, icpId: string) => void;
   onEditPersona: (persona: Persona) => void;
   onDeletePersona: (id: number) => void;
@@ -38,54 +50,233 @@ interface PersonaStepProps {
 }
 
 export function PersonaStep({ 
-  icps,
-  personas,
   onAddPersona, 
   onEditPersona, 
   onDeletePersona,
   onComplete 
 }: PersonaStepProps) {
+  console.log('🔵 PersonaStep Render')
+
+  const supabase = createClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingPersona, setEditingPersona] = useState<Persona | null>(null)
   const [selectedICP, setSelectedICP] = useState<string>('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingGeneratedData, setIsLoadingGeneratedData] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [newPersona, setNewPersona] = useState<Partial<Persona>>({
     title: '',
     seniority_level: '',
     department: ''
   })
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
+  const [icps, setICPs] = useState<DatabaseICP[]>([])
+  const [personas, setPersonas] = useState<Persona[]>([])
 
+  const { 
+    onboarding: { stepData },
+    selectedCompanyId,
+    setStepData
+  } = useDashboardStore()
+
+  // Load ICPs and personas once when mounted
   useEffect(() => {
-    const generateSuggestions = async () => {
-      if (selectedICP && !personas.length) {
-        setIsGenerating(true)
-        try {
-          const icp = icps.find(i => i.id.toString() === selectedICP)
-          if (icp) {
-            const suggestions = await generatePersonaSuggestions(icp)
-            suggestions.forEach(persona => {
-              onAddPersona({
-                title: persona.title,
-                seniority_level: persona.seniority_level,
-                department: persona.department
-              }, selectedICP)
+    let isMounted = true;
+
+    async function loadGeneratedData() {
+      console.log('🟡 PersonaStep loadGeneratedData starting:', {
+        selectedCompanyId,
+        hasLoadedInitialData,
+        currentPersonas: personas.length,
+        stepData
+      })
+
+      if (!selectedCompanyId || hasLoadedInitialData || personas.length > 0) {
+        console.log('🔴 PersonaStep loadGeneratedData skipped:', {
+          reason: !selectedCompanyId 
+            ? 'no selectedCompanyId' 
+            : hasLoadedInitialData 
+              ? 'already loaded' 
+              : 'personas already exist',
+          selectedCompanyId,
+          hasLoadedInitialData,
+          personasLength: personas.length
+        })
+        return
+      }
+
+      try {
+        console.log('🟡 PersonaStep: Starting Supabase queries for company:', selectedCompanyId)
+        
+        // First fetch ICPs
+        const { data: dbICPs, error: icpsError } = await supabase
+          .from('ideal_customer_profiles')
+          .select('id, vertical, region, company_size')
+          .eq('company_id', selectedCompanyId)
+
+        if (icpsError) {
+          console.error('🔴 PersonaStep: ICPs query error:', icpsError)
+          throw icpsError
+        }
+
+        if (dbICPs && isMounted) {
+          console.log('🟢 PersonaStep: Fetched ICPs:', dbICPs)
+          setICPs(dbICPs)
+        }
+        
+        // Then fetch personas with ICP data
+        const { data: dbPersonas, error: personasError } = await supabase
+          .from('personas')
+          .select(`
+            id,
+            title,
+            seniority_level,
+            department,
+            icp_id,
+            ideal_customer_profiles!inner (
+              id,
+              company_id,
+              vertical,
+              region
+            )
+          `)
+          .eq('ideal_customer_profiles.company_id', selectedCompanyId)
+
+        console.log('🟡 PersonaStep: DB query complete:', {
+          error: personasError,
+          personasCount: dbPersonas?.length,
+          rawData: dbPersonas
+        })
+
+        if (personasError) {
+          console.error('🔴 PersonaStep: Personas query error:', personasError)
+          throw personasError
+        }
+
+        if (dbPersonas?.length && isMounted) {
+          // Map the personas from the database
+          const mappedPersonas = dbPersonas.map(persona => ({
+            id: persona.id,
+            title: persona.title,
+            seniority_level: persona.seniority_level,
+            department: persona.department,
+            icp_id: persona.icp_id
+          }))
+
+          console.log('🟢 PersonaStep: Mapped personas:', {
+            count: mappedPersonas.length,
+            personas: mappedPersonas
+          })
+
+          setPersonas(mappedPersonas)
+
+          // Pre-select the ICP of the first persona if it exists
+          if (mappedPersonas[0]?.icp_id) {
+            console.log('🟢 PersonaStep: Pre-selecting ICP:', mappedPersonas[0].icp_id.toString())
+            setSelectedICP(mappedPersonas[0].icp_id.toString())
+          }
+
+          // Update the store after adding personas
+          if (isMounted) {
+            console.log('🟢 PersonaStep: Updating store with hasPersonas')
+            setStepData({
+              ...stepData,
+              hasPersonas: true
             })
           }
-        } catch (error) {
-          console.error('Failed to generate persona suggestions:', error)
+        } else {
+          console.log('🟡 PersonaStep: No personas found in DB or component unmounted:', {
+            dbPersonasLength: dbPersonas?.length,
+            isMounted
+          })
         }
-        setIsGenerating(false)
+      } catch (error) {
+        console.error('🔴 PersonaStep Error loading data:', error)
+        if (isMounted) {
+          setError(error instanceof Error ? error.message : 'Failed to load data')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGeneratedData(false)
+          setHasLoadedInitialData(true)
+          console.log('🟢 PersonaStep loadGeneratedData complete:', {
+            isLoadingGeneratedData: false,
+            hasLoadedInitialData: true
+          })
+        }
       }
     }
 
-    generateSuggestions()
-  }, [selectedICP, personas.length, icps, onAddPersona])
+    loadGeneratedData()
 
-  const handleAddPersona = () => {
+    return () => {
+      console.log('🔴 PersonaStep: Cleanup - setting isMounted to false')
+      isMounted = false
+    }
+  }, [selectedCompanyId, setStepData, stepData, hasLoadedInitialData, personas.length])
+
+  // Log state changes
+  useEffect(() => {
+    console.log('🟡 PersonaStep state changed:', {
+      dialogOpen,
+      editingPersona,
+      selectedICP,
+      isSubmitting,
+      isLoadingGeneratedData,
+      hasLoadedInitialData,
+      error,
+      newPersona,
+      icpsCount: icps.length,
+      personasCount: personas.length
+    })
+  }, [dialogOpen, editingPersona, selectedICP, isSubmitting, isLoadingGeneratedData, hasLoadedInitialData, error, newPersona, icps.length, personas.length])
+
+  const handleAddPersona = async () => {
     if (!newPersona.title || !newPersona.seniority_level || !newPersona.department || !selectedICP) return
-    onAddPersona(newPersona as Omit<Persona, 'id'>, selectedICP)
-    setNewPersona({ title: '', seniority_level: '', department: '' })
-    setDialogOpen(false)
+    
+    setIsSubmitting(true)
+    setError(null)
+    
+    try {
+      // First get the account_id from the selected ICP
+      const { data: selectedICPData, error: icpError } = await supabase
+        .from('ideal_customer_profiles')
+        .select('account_id')
+        .eq('id', parseInt(selectedICP))
+        .single()
+
+      if (icpError) throw icpError
+      if (!selectedICPData?.account_id) throw new Error('Could not find account_id for selected ICP')
+
+      // Insert the new persona directly into the database
+      const { data: insertedPersona, error: insertError } = await supabase
+        .from('personas')
+        .insert({
+          title: newPersona.title,
+          seniority_level: newPersona.seniority_level,
+          department: newPersona.department,
+          icp_id: parseInt(selectedICP),
+          account_id: selectedICPData.account_id
+        })
+        .select()
+        .single()
+
+      if (insertError) throw insertError
+
+      console.log('🟢 PersonaStep: Added new persona:', insertedPersona)
+      
+      // Add to local state
+      setPersonas(prev => [...prev, insertedPersona])
+      
+      // Reset form
+      setNewPersona({ title: '', seniority_level: '', department: '' })
+      setDialogOpen(false)
+    } catch (err) {
+      console.error('🔴 PersonaStep: Error adding persona:', err)
+      setError(err instanceof Error ? err.message : 'Failed to add persona')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleEditPersona = (persona: Persona) => {
@@ -94,12 +285,88 @@ export function PersonaStep({
     setDialogOpen(true)
   }
 
-  const handleUpdatePersona = () => {
+  const handleUpdatePersona = async () => {
     if (!editingPersona || !newPersona.title || !newPersona.seniority_level || !newPersona.department) return
-    onEditPersona({ ...editingPersona, ...newPersona as Persona })
-    setEditingPersona(null)
-    setNewPersona({ title: '', seniority_level: '', department: '' })
-    setDialogOpen(false)
+    
+    setIsSubmitting(true)
+    setError(null)
+    
+    try {
+      // Update the persona in the database
+      const { data: updatedPersona, error: updateError } = await supabase
+        .from('personas')
+        .update({
+          title: newPersona.title,
+          seniority_level: newPersona.seniority_level,
+          department: newPersona.department
+        })
+        .eq('id', editingPersona.id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+
+      console.log('🟢 PersonaStep: Updated persona:', updatedPersona)
+      
+      // Update local state
+      setPersonas(prev => prev.map(p => p.id === editingPersona.id ? updatedPersona : p))
+      
+      // Reset form
+      setEditingPersona(null)
+      setNewPersona({ title: '', seniority_level: '', department: '' })
+      setDialogOpen(false)
+    } catch (err) {
+      console.error('🔴 PersonaStep: Error updating persona:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update persona')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeletePersona = async (id: number) => {
+    setIsSubmitting(true)
+    setError(null)
+    
+    try {
+      // Delete the persona from the database
+      const { error: deleteError } = await supabase
+        .from('personas')
+        .delete()
+        .eq('id', id)
+
+      if (deleteError) throw deleteError
+
+      console.log('🟢 PersonaStep: Deleted persona:', id)
+      
+      // Update local state
+      setPersonas(prev => prev.filter(p => p.id !== id))
+    } catch (err) {
+      console.error('🔴 PersonaStep: Error deleting persona:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete persona')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Validation for next step
+  const canProceed = personas.length > 0 && stepData.hasPersonas
+
+  if (isLoadingGeneratedData) {
+    return (
+      <Card className={cn(design.layout.card, design.spacing.card)}>
+        <div className="flex flex-col items-center justify-center p-8 space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-[#30035e]" />
+          <div className="space-y-2 text-center">
+            <h3 className={design.typography.title}>
+              Loading Personas
+            </h3>
+            <p className={design.typography.subtitle}>
+              Checking for generated persona data...
+            </p>
+          </div>
+        </div>
+      </Card>
+    )
   }
 
   return (
@@ -108,9 +375,16 @@ export function PersonaStep({
         <div className={design.layout.header}>
           <div className={design.layout.headerContent}>
             <h3 className={design.typography.title}>Buyer Personas</h3>
-            <p className={design.typography.subtitle}>Define your target buyer personas for each ICP</p>
+            <p className={design.typography.subtitle}>Review generated personas or add your own</p>
           </div>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <div className={design.spacing.section}>
           <div className={design.spacing.element}>
@@ -134,7 +408,9 @@ export function PersonaStep({
 
           <AnimatePresence>
             <div className="min-h-[100px] flex flex-col gap-2">
-              {personas.map((persona) => (
+              {personas
+                .filter(persona => selectedICP ? persona.icp_id === parseInt(selectedICP, 10) : false)
+                .map((persona) => (
                 <motion.div
                   initial={design.animations.listItem.initial}
                   animate={design.animations.listItem.animate}
@@ -157,6 +433,7 @@ export function PersonaStep({
                       size="icon"
                       className={design.components.button.icon}
                       onClick={() => handleEditPersona(persona)}
+                      disabled={isSubmitting}
                     >
                       <Pencil className={design.components.button.iconSize} />
                     </Button>
@@ -164,7 +441,8 @@ export function PersonaStep({
                       variant="ghost"
                       size="icon"
                       className={cn(design.components.button.icon, "text-destructive")}
-                      onClick={() => onDeletePersona(persona.id)}
+                      onClick={() => handleDeletePersona(persona.id)}
+                      disabled={isSubmitting}
                     >
                       <X className={design.components.button.iconSize} />
                     </Button>
@@ -176,15 +454,9 @@ export function PersonaStep({
                   <p className={design.typography.subtitle}>Select an ICP to add personas</p>
                 </div>
               )}
-              {selectedICP && personas.length === 0 && !isGenerating && (
+              {selectedICP && personas.filter(p => p.icp_id === parseInt(selectedICP, 10)).length === 0 && (
                 <div className="h-[100px] flex items-center justify-center">
-                  <p className={design.typography.subtitle}>Add your first persona</p>
-                </div>
-              )}
-              {isGenerating && (
-                <div className="h-[100px] flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-[#30035e]" />
-                  <p className={cn("ml-2", design.typography.subtitle)}>Generating suggestions...</p>
+                  <p className={design.typography.subtitle}>Waiting for personas to be generated...</p>
                 </div>
               )}
             </div>
@@ -197,7 +469,7 @@ export function PersonaStep({
               <Button 
                 variant="outline" 
                 className={design.components.button.outline}
-                disabled={!selectedICP}
+                disabled={!selectedICP || isSubmitting}
               >
                 Add Persona <Plus className={cn("ml-2", design.components.button.iconSize)} />
               </Button>
@@ -253,17 +525,17 @@ export function PersonaStep({
               <DialogFooter>
                 <Button 
                   onClick={editingPersona ? handleUpdatePersona : handleAddPersona}
-                  disabled={!newPersona.title || !newPersona.seniority_level || !newPersona.department}
+                  disabled={!newPersona.title || !newPersona.seniority_level || !newPersona.department || isSubmitting}
                   className={design.components.button.primary}
                 >
-                  {editingPersona ? 'Update' : 'Add'} Persona
+                  {isSubmitting ? 'Saving...' : editingPersona ? 'Update' : 'Add'} Persona
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Button
             onClick={onComplete}
-            disabled={personas.length === 0 || isGenerating}
+            disabled={!canProceed || isSubmitting}
             className={design.components.button.primary}
           >
             Complete <ChevronRight className={cn("ml-2", design.components.button.iconSize)} />

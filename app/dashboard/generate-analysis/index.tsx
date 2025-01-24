@@ -9,11 +9,14 @@ import { CompanyProfileHeader } from './components/company-profile-header'
 import { SuccessAnimation } from './components/shared/success-animation'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
-import confetti from 'canvas-confetti'
 import { getCompanyProfile } from './utils/actions'
 import type { ICP, Persona } from './types/analysis'
 import { createClient } from '@/app/supabase/client'
 import { type Step } from './types/setup'
+import { motion } from 'framer-motion'
+import { CheckCircle, Loader2 } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useRouter } from 'next/navigation'
 
 interface GenerateAnalysisProps {
   accountId: string;
@@ -21,10 +24,15 @@ interface GenerateAnalysisProps {
   step?: Step;
 }
 
-export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding }: GenerateAnalysisProps) {
+export function GenerateAnalysis({ 
+  accountId, 
+  isOnboarding: initialIsOnboarding,
+  step: initialStep 
+}: GenerateAnalysisProps) {
   console.log('🔵 GenerateAnalysis Render:', {
     accountId,
     initialIsOnboarding,
+    initialStep,
     selectedCompanyId: useDashboardStore.getState().selectedCompanyId,
     companyProfile: useDashboardStore.getState().companyProfile,
     storeState: useDashboardStore.getState()
@@ -32,12 +40,12 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
 
   const { 
     selectedCompanyId,
-    isOnboarding,
+    companyProfile,
+    isDevMode,
+    onboarding: { isOnboarding },
     startOnboarding,
     completeOnboarding,
-    companyProfile,
     setCompanyProfile,
-    isDevMode,
     setIsDevMode,
     resetCompanyProfile,
     setSelectedCompanyId,
@@ -49,17 +57,23 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
   const [showNewContent, setShowNewContent] = useState(false)
+  const [currentStep, setCurrentStep] = useState<Step | undefined>(initialStep)
 
   // Only show dev mode toggle in development
   const isDevelopment = process.env.NODE_ENV === 'development'
 
   const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     if (initialIsOnboarding) {
       startOnboarding()
     }
-  }, [initialIsOnboarding])
+  }, [initialIsOnboarding, startOnboarding])
+
+  useEffect(() => {
+    setCurrentStep(initialStep)
+  }, [initialStep])
 
   useEffect(() => {
     async function fetchCompanyProfile() {
@@ -87,9 +101,15 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
           const transformedProfile: CompanyProfile = {
             ...profile,
             icps: profile.ideal_customer_profiles || [],
-            personas: [], // Add if available from API
-            products: [], // Add if available from API
-            competitors: [], // Add if available from API
+            personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
+            products: (profile.main_products || []).map((name, index) => ({
+              id: String(index),
+              name
+            })),
+            competitors: (profile.competitors || []).map(c => ({
+              id: String(c.id),
+              name: c.competitor_name
+            }))
           }
           setCompanyProfile(transformedProfile)
           setShowNewContent(true)
@@ -112,35 +132,6 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
     fetchCompanyProfile()
   }, [selectedCompanyId, setCompanyProfile])
 
-  const fireConfetti = () => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#f9a8c9', '#30035e', '#f6efff'],
-    });
-
-    setTimeout(() => {
-      confetti({
-        particleCount: 50,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0 },
-        colors: ['#f9a8c9', '#30035e', '#f6efff'],
-      });
-    }, 200);
-
-    setTimeout(() => {
-      confetti({
-        particleCount: 50,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1 },
-        colors: ['#f9a8c9', '#30035e', '#f6efff'],
-      });
-    }, 400);
-  };
-
   const handleSetupComplete = async () => {
     console.log('🔵 handleSetupComplete START:', {
       selectedCompanyId,
@@ -148,20 +139,28 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
       showNewContent
     })
     
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    setIsTransitioning(true)
     
     if (selectedCompanyId) {
       try {
         console.log('🟡 Fetching final company profile...')
         const profile = await getCompanyProfile(selectedCompanyId, accountId)
         if (profile) {
+          console.log('🟡 Transforming profile:', profile)
           const transformedProfile: CompanyProfile = {
             ...profile,
             icps: profile.ideal_customer_profiles || [],
-            personas: [], 
-            products: [],
-            competitors: []
+            personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
+            products: (profile.main_products || []).map((name, index) => ({
+              id: String(index),
+              name
+            })),
+            competitors: (profile.competitors || []).map(c => ({
+              id: String(c.id),
+              name: c.competitor_name
+            }))
           }
+          console.log('🟢 Setting transformed profile:', transformedProfile)
           setCompanyProfile(transformedProfile)
         }
       } catch (error) {
@@ -169,25 +168,26 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
       }
     }
     
-    console.log('🟡 Updating transition state...')
-    setShowSuccessAnimation(false)
-    
-    await new Promise(resolve => setTimeout(resolve, 500))
-    setShowNewContent(true)
-    setIsTransitioning(false)
+    console.log('🟡 Starting success animation...')
+    setShowSuccessAnimation(true)
     completeOnboarding()
-    
-    console.log('🟢 handleSetupComplete END:', {
-      showNewContent: true,
-      isTransitioning: false,
-      isOnboarding: false
-    })
   }
 
   const handleTransitionStart = () => {
     setIsTransitioning(true)
     setShowSuccessAnimation(true)
-    fireConfetti()
+  }
+
+  const handleAnimationComplete = () => {
+    console.log('🟡 Success animation complete, transitioning...')
+    setShowSuccessAnimation(false)
+    setShowNewContent(true)
+    setIsTransitioning(false)
+    
+    // Redirect with companyId
+    if (selectedCompanyId) {
+      router.push(`/dashboard/generate-analysis?companyId=${selectedCompanyId}`)
+    }
   }
 
   const handleCompanyCreate = async (companyName: string) => {
@@ -224,91 +224,78 @@ export function GenerateAnalysis({ accountId, isOnboarding: initialIsOnboarding 
   }
 
   return (
-    <div className="space-y-6">
-      {!isOnboarding && selectedCompanyId && (
-        <CompanyProfileHeader companyId={selectedCompanyId} />
-      )}
-      
-      {isDevelopment && (
-        <div className="flex items-center gap-4 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-          <AlertCircle className="w-5 h-5 text-yellow-600" />
-          <span className="text-sm text-yellow-700">Development Mode</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setIsDevMode(!isDevMode)
-              if (!isDevMode) {
-                resetCompanyProfile()
-              }
-            }}
-          >
-            {isDevMode ? 'Exit Dev Mode' : 'Enter Dev Mode'}
-          </Button>
-        </div>
-      )}
-      
+    <div className="relative w-full p-8">
       {isLoading ? (
-        <Card className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-32 bg-gray-200 rounded"></div>
-          </div>
-        </Card>
-      ) : error && !(!selectedCompanyId || isDevMode || (!companyProfile && !isTransitioning)) ? (
-        <Card className="p-6">
-          <div className="text-red-500">{error}</div>
-        </Card>
+        <div className="flex items-center justify-center min-h-[400px] w-full">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center min-h-[400px] w-full">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </div>
       ) : (
         <>
-          {(!selectedCompanyId || isDevMode || (!companyProfile && !isTransitioning)) && (
-            <Card className="p-6 transition-all duration-500 ease-in-out">
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold tracking-tight">
-                    {isDevMode ? 'Dev Mode: Company Setup' : !selectedCompanyId ? 'Welcome! Let\'s set up your company' : 'Company Setup'}
-                  </h2>
-                  <p className="text-muted-foreground">
-                    Get started by setting up your company profile
-                  </p>
-                </div>
-                <CompanySetup 
-                  accountId={accountId}
-                  onCompanyCreate={handleCompanyCreate}
-                  onComplete={() => {
-                    console.log('GenerateAnalysis: onComplete called')
-                    handleTransitionStart()
-                    handleSetupComplete()
-                  }}
-                  onTransitionStart={handleTransitionStart}
-                />
-              </div>
-            </Card>
+          {isDevMode && (
+            <div className="mb-4 w-full">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Development Mode</AlertTitle>
+                <AlertDescription>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsDevMode(false)}
+                  >
+                    Disable Dev Mode
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
 
-          {showNewContent && companyProfile && (
-            <div className={`transition-all duration-800 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <Card className="p-6">
-                <div className={`space-y-4 transition-all duration-1000 delay-300 ease-in-out ${showNewContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                  <ResponseTable
-                    icps={companyProfile.icps}
-                    companyId={selectedCompanyId!}
-                    onGenerateQuestions={async (selectedIds: string[]) => {
-                      console.log('Generating questions for:', selectedIds)
-                    }}
-                    onGenerateResponses={async (selectedIds: string[]) => {
-                      console.log('Generating responses for:', selectedIds)
-                    }}
-                  />
-                </div>
-              </Card>
+          {isOnboarding ? (
+            <CompanySetup
+              accountId={accountId}
+              onCompanyCreate={handleCompanyCreate}
+              onComplete={handleSetupComplete}
+              onTransitionStart={handleTransitionStart}
+            />
+          ) : (
+            <div className="w-full">
+              {showSuccessAnimation && (
+                <SuccessAnimation onComplete={handleAnimationComplete} />
+              )}
+              <div className="space-y-6">
+                {!isOnboarding && !isTransitioning && (
+                  <>
+                    {companyProfile?.name ? (
+                      <>
+                        <CompanyProfileHeader companyId={selectedCompanyId!} />
+                        <ResponseTable 
+                          icps={companyProfile?.icps || []}
+                          companyId={selectedCompanyId!}
+                          accountId={accountId}
+                          companyName={companyProfile?.name || ''}
+                        />
+                      </>
+                    ) : (
+                      <CompanySetup 
+                        accountId={accountId}
+                        onCompanyCreate={handleCompanyCreate}
+                        onComplete={handleSetupComplete}
+                        onTransitionStart={handleTransitionStart}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </>
-      )}
-
-      {showSuccessAnimation && (
-        <SuccessAnimation title="Setup Complete!" />
       )}
     </div>
   )

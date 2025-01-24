@@ -147,7 +147,7 @@ export default async function Page({ params, searchParams }: Props) {
   try {
     const accountContext = await getAccountContext()
     
-    // Change from conditional render to client-side navigation
+    // Return redirect response for no companies
     if (!accountContext.hasCompanies) {
       return (
         <ClientWrapper>
@@ -174,6 +174,10 @@ export default async function Page({ params, searchParams }: Props) {
     )
   } catch (error) {
     console.error('Dashboard access error:', error)
-    redirect('/login?error=access_denied')
+    return (
+      <ClientWrapper>
+        <ClientRedirect path="/login?error=access_denied" />
+      </ClientWrapper>
+    )
   }
 }

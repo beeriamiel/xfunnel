@@ -52,10 +52,15 @@ export interface CompanyProfile {
 }
 
 interface OnboardingState {
-  hasProducts: boolean;
-  hasCompetitors: boolean;
-  hasICPs: boolean;
-  hasPersonas: boolean;
+  currentStep: Step
+  completedSteps: Step[]
+  stepData: {
+    hasProducts: boolean
+    hasCompetitors: boolean
+    hasICPs: boolean
+    hasPersonas: boolean
+  }
+  isOnboarding: boolean
 }
 
 interface DashboardStore {
@@ -75,22 +80,12 @@ interface DashboardStore {
   addCompany: (company: Company) => void
   hasCompanies: boolean
   setHasCompanies: (hasCompanies: boolean) => void
-  onboardingState: {
-    hasProducts: boolean
-    hasCompetitors: boolean
-    hasICPs: boolean
-    hasPersonas: boolean
-  }
-  setOnboardingState: (state: OnboardingState) => void
-  currentOnboardingStep: Step | null
-  setCurrentOnboardingStep: (step: Step | null) => void
-  currentStep: Step | null
-  setCurrentStep: (step: Step | null) => void
-  isOnboarding: boolean
+  onboarding: OnboardingState
   currentWizardStep: Step
   completedSteps: Step[]
   setWizardStep: (step: Step) => void
   completeStep: (step: Step, nextStep: Step) => void
+  setStepData: (data: Partial<OnboardingState['stepData']>) => void
   startOnboarding: () => void
   completeOnboarding: () => void
 }
@@ -120,31 +115,62 @@ export const useDashboardStore = create(
       })),
       hasCompanies: false,
       setHasCompanies: (hasCompanies) => set({ hasCompanies }),
-      onboardingState: {
-        hasProducts: false,
-        hasCompetitors: false,
-        hasICPs: false,
-        hasPersonas: false
+      onboarding: {
+        currentStep: 'initial',
+        completedSteps: [],
+        stepData: {
+          hasProducts: false,
+          hasCompetitors: false,
+          hasICPs: false,
+          hasPersonas: false
+        },
+        isOnboarding: false
       },
-      setOnboardingState: (state) => set({ onboardingState: state }),
-      currentOnboardingStep: null,
-      setCurrentOnboardingStep: (step) => set({ currentOnboardingStep: step }),
-      currentStep: null,
-      setCurrentStep: (step) => set({ currentStep: step }),
-      isOnboarding: false,
       currentWizardStep: 'initial',
       completedSteps: [],
-      setWizardStep: (step) => set({ currentWizardStep: step }),
-      completeStep: (step, nextStep) => set((state) => ({ 
-        completedSteps: [...state.completedSteps, step],
-        currentWizardStep: nextStep
+      setWizardStep: (step) => set((state) => ({
+        currentWizardStep: step,
+        onboarding: {
+          ...state.onboarding,
+          currentStep: step
+        }
       })),
-      startOnboarding: () => set({ 
-        isOnboarding: true, 
+      completeStep: (step, nextStep) => set((state) => ({
+        currentWizardStep: nextStep,
+        completedSteps: [...state.completedSteps, step],
+        onboarding: {
+          ...state.onboarding,
+          currentStep: nextStep,
+          completedSteps: [...state.onboarding.completedSteps, step]
+        }
+      })),
+      setStepData: (data) => set((state) => ({
+        onboarding: {
+          ...state.onboarding,
+          stepData: { ...state.onboarding.stepData, ...data }
+        }
+      })),
+      startOnboarding: () => set((state) => ({
         currentWizardStep: 'initial',
-        completedSteps: []
-      }),
-      completeOnboarding: () => set({ isOnboarding: false })
+        completedSteps: [],
+        onboarding: {
+          currentStep: 'initial',
+          completedSteps: [],
+          stepData: {
+            hasProducts: false,
+            hasCompetitors: false,
+            hasICPs: false,
+            hasPersonas: false
+          },
+          isOnboarding: true
+        }
+      })),
+      completeOnboarding: () => set((state) => ({
+        onboarding: {
+          ...state.onboarding,
+          isOnboarding: false
+        }
+      }))
     }),
     {
       name: 'dashboard-store',

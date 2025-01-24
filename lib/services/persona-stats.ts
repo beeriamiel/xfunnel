@@ -39,23 +39,40 @@ export async function fetchPersonaStats(companyId: number): Promise<StatsMap> {
   const supabase = createClient();
   console.log('Fetching stats for company:', companyId);
 
-  // Use LEFT joins to get all questions, even without responses
-  const { data, error } = await supabase
+  // First get ICPs for this company
+  const { data: icpData, error: icpError } = await supabase
     .from('ideal_customer_profiles')
+    .select('id')
+    .eq('company_id', companyId);
+
+  if (icpError) {
+    console.error('Error fetching ICPs:', icpError);
+    return {};
+  }
+
+  if (!icpData?.length) {
+    console.log('No ICPs found for company:', companyId);
+    return {};
+  }
+
+  const icpIds = icpData.map(icp => icp.id);
+  console.log('Found ICP IDs:', icpIds);
+
+  // Then get personas with their queries and responses
+  const { data, error } = await supabase
+    .from('personas')
     .select(`
       id,
-      personas (
+      icp_id,
+      queries!left (
         id,
-        queries (
+        responses!left (
           id,
-          responses (
-            id,
-            response_batch_id
-          )
+          response_batch_id
         )
       )
     `)
-    .eq('company_id', companyId);
+    .in('icp_id', icpIds);
 
   if (error) {
     console.error('Error fetching persona stats:', error);
@@ -67,11 +84,9 @@ export async function fetchPersonaStats(companyId: number): Promise<StatsMap> {
   console.log('Raw query result:', JSON.stringify(data, null, 2));
 
   // Get all batch IDs
-  const batchIds = (data as ICP[] || []).flatMap(icp => 
-    (icp.personas || []).flatMap(p => 
-      (p.queries || []).flatMap(q => 
-        (q.responses || []).map(r => r.response_batch_id)
-      )
+  const batchIds = (data || []).flatMap(persona => 
+    (persona.queries || []).flatMap(q => 
+      (q.responses || []).map(r => r.response_batch_id)
     )
   ).filter((id): id is string => id !== null);
 
@@ -87,27 +102,25 @@ export async function fetchPersonaStats(companyId: number): Promise<StatsMap> {
   );
 
   // Process the data
-  return (data as ICP[] || []).reduce((acc: StatsMap, icp) => {
-    (icp.personas || []).forEach(persona => {
-      const key = `${icp.id}-${persona.id}`;
-      const queries = persona.queries || [];
-      const responses = queries.flatMap(q => q.responses || []);
-      
-      // Get response dates from the map
-      const responseDates = responses
-        .map(r => r.response_batch_id)
-        .filter((id): id is string => id !== null)
-        .map(id => batchDateMap.get(id))
-        .filter((date): date is string => date !== undefined);
-      
-      acc[key] = {
-        questionCount: queries.length,
-        responseCount: responses.length,
-        lastBatchDate: responseDates.length > 0 
-          ? new Date(Math.max(...responseDates.map(d => new Date(d).getTime()))).toISOString()
-          : null
-      };
-    });
+  return (data || []).reduce((acc: StatsMap, persona) => {
+    const key = `${persona.icp_id}-${persona.id}`;
+    const queries = persona.queries || [];
+    const responses = queries.flatMap(q => q.responses || []);
+    
+    // Get response dates from the map
+    const responseDates = responses
+      .map(r => r.response_batch_id)
+      .filter((id): id is string => id !== null)
+      .map(id => batchDateMap.get(id))
+      .filter((date): date is string => date !== undefined);
+    
+    acc[key] = {
+      questionCount: queries.length,
+      responseCount: responses.length,
+      lastBatchDate: responseDates.length > 0 
+        ? new Date(Math.max(...responseDates.map(d => new Date(d).getTime()))).toISOString()
+        : null
+    };
     return acc;
   }, {});
 } 

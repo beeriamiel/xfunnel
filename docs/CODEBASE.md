@@ -42,6 +42,18 @@
   login-form.tsx       # Email auth
   oauth-buttons.tsx    # OAuth providers
   signup-form.tsx      # Registration
+
+/onboarding/
+  /components/     # Onboarding-specific components
+    company-form.tsx
+    initial-icp-generator.tsx
+    onboarding-progress.tsx
+  page.tsx        # Main onboarding page
+  layout.tsx      # Onboarding layout
+
+/lib/actions/
+  generate-initial-icps.ts  # Initial ICP generation
+  generate-questions.ts     # Question generation
 ```
 
 ## Core Modules
@@ -476,3 +488,48 @@ create policy "users_companies_policy" on companies
    - Auth failures
    - Session expiry
    - Permission denied 
+
+## Onboarding Flow
+
+### Directory Structure
+```typescript
+/app
+  /onboarding/
+    /components/     # Onboarding-specific components
+      company-form.tsx
+      initial-icp-generator.tsx
+      onboarding-progress.tsx
+    page.tsx        # Main onboarding page
+    layout.tsx      # Onboarding layout
+
+/lib/actions/
+  generate-initial-icps.ts  # Initial ICP generation
+  generate-questions.ts     # Question generation
+```
+
+### Key Components
+
+#### Initial ICP Generator
+- Location: `app/onboarding/components/initial-icp-generator.tsx`
+- Features:
+  - Simplified ICP generation for new companies
+  - North America focused initial setup
+  - Progress tracking
+  - Error handling with retry options
+
+#### Onboarding Flow
+1. Company Creation
+   - Basic company info collection
+   - Industry selection
+   - Market focus definition
+
+2. Initial ICP Generation
+   - Automated ICP creation using Claude
+   - North America market focus
+   - Simplified prompt templates
+   - Progress tracking
+
+3. Question Generation
+   - Initial question set creation
+   - Basic buyer journey coverage
+   - Engine selection 

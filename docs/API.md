@@ -236,3 +236,25 @@ The citation processing pipeline handles extraction, enrichment, and analysis of
      - Role-based limitations
      - Audit logging
      ``` 
+
+## Onboarding API
+
+### Company Creation
+- POST `/api/companies`
+  - Creates new company profile
+  - Validates company data
+  - Establishes account association
+
+### Initial ICP Generation
+- POST `/api/generate-initial-icps`
+  - Generates initial ICPs for new company
+  - Uses simplified NA-focused prompts
+  - Returns ICP data and batch ID
+  - Progress tracking support
+
+### Initial Questions Generation
+- POST `/api/generate-questions`
+  - Creates initial question set
+  - Supports multiple engines
+  - Tracks generation progress
+  - Returns batch statistics 

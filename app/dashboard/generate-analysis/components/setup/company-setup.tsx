@@ -3,18 +3,41 @@
 import { createClient } from '@/app/supabase/client'
 import { useState, ChangeEvent, FormEvent, useEffect } from 'react'
 import { Card } from "@/components/ui/card"
-import { StepIndicator } from './step-indicator'
+import { CompletedStepChip } from './completed-step-chip'
 import { InitialStep } from './steps/initial-step'
 import { ProductStep } from './steps/product-step'
 import { CompetitorStep } from './steps/competitor-step'
 import { ICPStep } from './steps/icp-step'
 import { PersonaStep } from './steps/persona-step'
-import type { CompanySetupProps, Product, InitialFormData } from '../../types/setup'
+import type { CompanySetupProps, Product, InitialFormData, ICPBase } from '../../types/setup'
 import type { ICP, Persona } from '../../types/analysis'
+import type { CompletedStep } from '../../types/shared'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { type Step } from '../../types/setup'
 import { useDashboardStore } from '@/app/dashboard/store'
 import { generateInitialICPsAction } from "@/app/company-actions"
+
+// Add type definitions at the top
+type ProductChip = {
+  id: string
+  name: string
+  businessModel: "B2B" | "B2C"
+}
+
+type CompetitorChip = {
+  id: string
+  name: string
+}
+
+type ICPChip = ICPBase
+
+type PersonaChip = {
+  id: number
+  title: string
+  icp_id: number
+  seniority_level: string
+  department: string
+}
 
 export function CompanySetup({ 
   accountId,
@@ -43,10 +66,10 @@ export function CompanySetup({
 
   const [companyName, setCompanyName] = useState('')
   const [industry, setIndustry] = useState('')
-  const [products, setProducts] = useState<Product[]>([])
-  const [competitors, setCompetitors] = useState<Array<{ id: string; name: string; website?: string; description?: string }>>([])
-  const [icps, setICPs] = useState<ICP[]>([])
-  const [personas, setPersonas] = useState<Persona[]>([])
+  const [productChips, setProductChips] = useState<ProductChip[]>([])
+  const [competitorChips, setCompetitorChips] = useState<CompetitorChip[]>([])
+  const [icpChips, setICPChips] = useState<ICPChip[]>([])
+  const [personaChips, setPersonaChips] = useState<PersonaChip[]>([])
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +78,24 @@ export function CompanySetup({
   const [companyId, setCompanyId] = useState<number | null>(() => 
     urlCompanyId ? parseInt(urlCompanyId, 10) : null
   )
+
+  // Log state changes for chips
+  useEffect(() => {
+    console.log('🟡 CompanySetup chips state changed:', {
+      productChips,
+      competitorChips,
+      icpChips,
+      personaChips
+    })
+  }, [productChips, competitorChips, icpChips, personaChips])
+
+  // Log step changes
+  useEffect(() => {
+    console.log('🟡 CompanySetup step changed:', {
+      currentWizardStep,
+      completedSteps
+    })
+  }, [currentWizardStep, completedSteps])
 
   useEffect(() => {
     const stepFromUrl = searchParams.get('step') as Step
@@ -150,6 +191,7 @@ export function CompanySetup({
   }
 
   const handleStepComplete = (completedStep: Step, nextStep: Step) => {
+    console.log('🟡 CompanySetup handleStepComplete:', { completedStep, nextStep })
     if (!companyId && nextStep !== 'initial') {
       console.error('Cannot proceed without company ID')
       return
@@ -162,72 +204,32 @@ export function CompanySetup({
     router.push(`/dashboard/generate-analysis?${params.toString()}`, {
       scroll: false
     })
+    console.log('🟢 CompanySetup step completed:', { completedStep, nextStep })
   }
 
   const handleComplete = () => {
     completeStep('personas', 'personas')
+    onTransitionStart()
     onComplete()
   }
 
-  const handleAddProduct = async (product: Omit<Product, "id">) => {
-    console.log('🔵 handleAddProduct START:', { product, companyId })
-    
+  const handleAddProduct = async (product: Product) => {
     if (!companyId) {
       console.error('🔴 No companyId found')
       return
     }
 
+    console.log('🟡 CompanySetup handleAddProduct:', product)
     try {
-      // First get the company to check if it exists
-      const { data: company, error: selectError } = await supabase
-        .from('companies')
-        .select('*')  // Change to select specific fields we need
-        .eq('id', companyId)
-        .eq('account_id', accountId) // Add this to ensure ownership
-        .single()
-      
-      console.log('🟡 Current company data:', { company, selectError })
-
-      if (selectError) {
-        console.error('🔴 Error fetching company:', selectError)
-        return
-      }
-
-      // Create new product with ID
-      const newProduct = { 
-        id: Date.now().toString(),
-        name: product.name,
-        businessModel: product.businessModel,
-        description: product.description || ''
-      }
-
-      // Update local state first for optimistic UI
-      setProducts(prev => [...prev, newProduct])
-      
-      // Prepare the update payload
-      const mainProducts = company.main_products || []
-      const updatedMainProducts = [...mainProducts, newProduct]
-      
-      console.log('🟡 Updating with:', { updatedMainProducts })
-      
-      const { error: updateError } = await supabase
-        .from('companies')
-        .update({ 
-          main_products: updatedMainProducts.map(p => 
-            typeof p === 'string' ? p : JSON.stringify(p)
-          ) 
-        })
-        .eq('id', companyId)
-        .eq('account_id', accountId)
-
-      if (updateError) {
-        console.error('🔴 Failed to save product:', updateError)
-        // Rollback local state if save failed
-        setProducts(prev => prev.filter(p => p.id !== newProduct.id))
-        return
-      }
-      
-      console.log('🟢 Product added successfully:', newProduct)
+      setProductChips(prev => {
+        const newChips = [...prev, { 
+          id: product.id,
+          name: product.name,
+          businessModel: product.businessModel
+        }]
+        console.log('🟢 CompanySetup updated productChips:', newChips)
+        return newChips
+      })
     } catch (error) {
       console.error('🔴 handleAddProduct ERROR:', error)
       throw error
@@ -236,222 +238,156 @@ export function CompanySetup({
 
   const handleEditProduct = async (product: Product) => {
     if (!companyId) return
-    const { data: company } = await supabase
-      .from('companies')
-      .select('main_products')
-      .eq('id', companyId)
-      .single()
-
-    if (company) {
-      const updatedProducts = company.main_products?.map(p => 
-        p === product.id ? product.name : p
-      ) ?? []
-      
-      const { error } = await supabase
-        .from('companies')
-        .update({ main_products: updatedProducts })
-        .eq('id', companyId)
-
-      if (!error) {
-        setProducts(products.map(p => p.id === product.id ? product : p))
-      }
-    }
+    setProductChips(chips => 
+      chips.map(p => p.id === product.id ? { 
+        id: product.id, 
+        name: product.name,
+        businessModel: product.businessModel 
+      } : p)
+    )
   }
 
   const handleDeleteProduct = async (id: string) => {
     if (!companyId) return
-    const { data: company } = await supabase
-      .from('companies')
-      .select('main_products')
-      .eq('id', companyId)
-      .single()
-
-    if (company) {
-      const updatedProducts = company.main_products?.filter(p => p !== id) ?? []
-      const { error } = await supabase
-        .from('companies')
-        .update({ main_products: updatedProducts })
-        .eq('id', companyId)
-
-      if (!error) {
-        setProducts(products.filter(p => p.id !== id))
-      }
-    }
+    setProductChips(chips => chips.filter(p => p.id !== id))
   }
 
-  const handleAddCompetitor = async (competitor: { name: string }) => {
+  const handleAddCompetitor = async (competitor: { id?: string; name: string }) => {
     if (!companyId) return;
     
-    const { data: newCompetitor, error } = await supabase
-      .from('competitors')
-      .insert({
-        company_id: companyId,
-        competitor_name: competitor.name
-      })
-      .select()
-      .single()
+    console.log('🟡 CompanySetup handleAddCompetitor:', competitor)
+    try {
+      const existingCompetitor = competitorChips.find(c => c.id === competitor.id)
+      if (existingCompetitor) {
+        console.log('🟡 Competitor already exists:', competitor)
+        return
+      }
 
-    if (!error) {
-      setCompetitors([...competitors, { 
-        id: newCompetitor.id.toString(),
-        name: competitor.name 
-      }])
+      setCompetitorChips(prev => {
+        const newChips = [...prev, { 
+          id: competitor.id!,
+          name: competitor.name 
+        }]
+        console.log('🟢 CompanySetup updated competitorChips:', newChips)
+        return newChips
+      })
+    } catch (error) {
+      console.error('🔴 handleAddCompetitor ERROR:', error)
+      throw error
     }
   }
 
   const handleEditCompetitor = async (competitor: { id: string; name: string }) => {
     if (!companyId) return
-    const { error } = await supabase
-      .from('competitors')
-      .update({ competitor_name: competitor.name })
-      .eq('company_id', companyId)
-      .eq('id', competitor.id)
-
-    if (!error) {
-      setCompetitors(competitors.map(c => 
-        c.id === competitor.id ? competitor : c
-      ))
-    }
+    setCompetitorChips(chips => 
+      chips.map(c => c.id === competitor.id ? { 
+        id: competitor.id, 
+        name: competitor.name 
+      } : c)
+    )
   }
 
   const handleDeleteCompetitor = async (id: string) => {
     if (!companyId) return
-    const { error } = await supabase
-      .from('competitors')
-      .delete()
-      .eq('id', id)
-      .eq('company_id', companyId)
-
-    if (!error) {
-      setCompetitors(competitors.filter(c => c.id !== id))
-    }
+    setCompetitorChips(chips => chips.filter(c => c.id !== id))
   }
 
-  const handleAddICP = async (icp: Omit<ICP, "id">) => {
-    const { data: newICP, error } = await supabase
-      .from('ideal_customer_profiles')
-      .insert({
-        company_id: companyId,
-        account_id: accountId,
-        vertical: icp.vertical,
-        region: icp.region,
-        company_size: icp.company_size
+  const handleAddICP = async (icp: ICPBase) => {
+    if (!companyId) return;
+    
+    console.log('🟡 CompanySetup handleAddICP:', icp)
+    try {
+      setICPChips(prev => {
+        const newChips = [...prev, { 
+          id: icp.id,
+          vertical: icp.vertical,
+          region: icp.region,
+          company_size: icp.company_size,
+          personas: []
+        }]
+        console.log('🟢 CompanySetup updated icpChips:', newChips)
+        return newChips
       })
-      .select()
-      .single()
-
-    if (!error) {
-      setICPs([...icps, { ...icp, id: newICP.id }])
+    } catch (error) {
+      console.error('🔴 handleAddICP ERROR:', error)
+      throw error
     }
   }
 
-  const handleEditICP = async (icp: ICP) => {
+  const handleEditICP = async (icp: ICPBase) => {
     if (!companyId) return
-    const { error } = await supabase
-      .from('ideal_customer_profiles')
-      .update({
+    setICPChips(chips => 
+      chips.map(i => i.id === icp.id ? {
+        id: icp.id,
         vertical: icp.vertical,
         region: icp.region,
-        company_size: icp.company_size
-      })
-      .eq('id', icp.id)
-      .eq('company_id', companyId)
-
-    if (!error) {
-      setICPs(icps.map(i => i.id === icp.id ? icp : i))
-    }
+        company_size: icp.company_size,
+        personas: i.personas
+      } : i)
+    )
   }
 
   const handleDeleteICP = async (id: number) => {
     if (!companyId) return
-    const { error } = await supabase
-      .from('ideal_customer_profiles')
-      .delete()
-      .eq('id', id)
-      .eq('company_id', companyId)
-
-    if (!error) {
-      setICPs(icps.filter(i => i.id !== id))
-      // Keep existing persona cleanup
-      setPersonas(personas.filter(p => !icps.find(i => i.id === id)?.personas.some(ip => ip.id === p.id)))
-    }
+    setICPChips(chips => chips.filter(i => i.id !== id))
   }
 
   const handleAddPersona = async (persona: Omit<Persona, 'id'>, icpId: string) => {
     if (!companyId) return
     
-    const { data: newPersona, error } = await supabase
-      .from('personas')
-      .insert({
+    try {
+      const newPersona: PersonaChip = {
+        id: Date.now(),
         title: persona.title,
         icp_id: parseInt(icpId, 10),
-        account_id: accountId,
         seniority_level: persona.seniority_level,
         department: persona.department
-      })
-      .select()
-      .single()
-
-    if (!error && newPersona) {
-      const personaWithId: Persona = { 
-        ...persona, 
-        id: newPersona.id
       }
-      setPersonas([...personas, personaWithId])
+      setPersonaChips(prev => [...prev, newPersona])
       
-      // Add persona to ICP
-      setICPs(icps.map(icp => 
-        icp.id === parseInt(icpId, 10)
-          ? { ...icp, personas: [...icp.personas, personaWithId] }
-          : icp
-      ))
+      // Update ICP's personas
+      setICPChips(chips => 
+        chips.map(icp => 
+          icp.id === parseInt(icpId, 10)
+            ? { ...icp, personas: [...icp.personas, newPersona] }
+            : icp
+        )
+      )
+    } catch (error) {
+      console.error('🔴 handleAddPersona ERROR:', error)
+      throw error
     }
   }
 
   const handleEditPersona = async (persona: Persona) => {
-    if (!companyId) return
+    if (!companyId || !persona.icp_id) return
     
-    const { error } = await supabase
-      .from('personas')
-      .update({
-        title: persona.title,
-        seniority_level: persona.seniority_level,
-        department: persona.department
-      })
-      .eq('id', persona.id)
-
-    if (!error) {
-      setPersonas(personas.map(p => 
-        p.id === persona.id ? persona : p
-      ))
-      
-      // Update persona in ICPs
-      setICPs(icps.map(icp => ({
+    const updatedPersona: PersonaChip = {
+      id: persona.id,
+      title: persona.title,
+      icp_id: persona.icp_id,
+      seniority_level: persona.seniority_level,
+      department: persona.department
+    }
+    
+    setPersonaChips(chips => 
+      chips.map(p => p.id === persona.id ? updatedPersona : p)
+    )
+    
+    // Update persona in ICPs
+    setICPChips(chips => 
+      chips.map(icp => ({
         ...icp,
         personas: icp.personas.map(p => 
-          p.id === persona.id ? persona : p
+          p.id === persona.id ? updatedPersona : p
         )
-      })))
-    }
+      }))
+    )
   }
 
   const handleDeletePersona = async (id: number) => {
     if (!companyId) return
-    
-    const { error } = await supabase
-      .from('personas')
-      .delete()
-      .eq('id', id)
-
-    if (!error) {
-      setPersonas(personas.filter(p => p.id !== id))
-      
-      // Remove persona from ICPs
-      setICPs(icps.map(icp => ({
-        ...icp,
-        personas: icp.personas.filter(p => p.id !== id)
-      })))
-    }
+    setPersonaChips(chips => chips.filter(p => p.id !== id))
   }
 
   useEffect(() => {
@@ -460,14 +396,48 @@ export function CompanySetup({
 
   return (
     <div className="flex flex-col items-center w-full space-y-6">
-      <StepIndicator 
-        currentStep={currentWizardStep}
-        completedSteps={completedSteps}
-        onStepClick={(step) => {
-          if (!companyId && step !== 'initial') return
-          setWizardStep(step)
-        }}
-      />
+      {companyId && (
+        <div className="flex flex-wrap gap-2">
+          <CompletedStepChip 
+            step={{
+              type: 'initial',
+              title: companyName,
+              summary: 'Company details'
+            }}
+            onEdit={() => setWizardStep('initial')}
+          />
+          {currentWizardStep !== 'initial' && (
+            <CompletedStepChip
+              step={{
+                type: 'product',
+                title: `${productChips.length} Products`,
+                summary: productChips.map(p => p.name).join(', ')
+              }}
+              onEdit={() => setWizardStep('product')}
+            />
+          )}
+          {currentWizardStep === 'personas' && (
+            <>
+              <CompletedStepChip
+                step={{
+                  type: 'competitors',
+                  title: `${competitorChips.length} Competitors`,
+                  summary: competitorChips.map(c => c.name).join(', ')
+                }}
+                onEdit={() => setWizardStep('competitors')}
+              />
+              <CompletedStepChip
+                step={{
+                  type: 'icps',
+                  title: `${icpChips.length} ICPs`,
+                  summary: icpChips.map(icp => icp.vertical).join(', ')
+                }}
+                onEdit={() => setWizardStep('icps')}
+              />
+            </>
+          )}
+        </div>
+      )}
       
       {!companyId ? (
         <InitialStep
@@ -478,7 +448,7 @@ export function CompanySetup({
         <>
           {currentWizardStep === 'product' && (
             <ProductStep
-              products={products}
+              products={productChips}
               onAddProduct={handleAddProduct}
               onEditProduct={handleEditProduct}
               onDeleteProduct={handleDeleteProduct}
@@ -489,30 +459,31 @@ export function CompanySetup({
           {currentWizardStep === 'competitors' && (
             <CompetitorStep
               companyName={companyName}
-              products={products}
-              competitors={competitors}
+              products={productChips}
+              competitors={competitorChips}
               onAddCompetitor={handleAddCompetitor}
+              onEditCompetitor={handleEditCompetitor}
               onDeleteCompetitor={handleDeleteCompetitor}
               onNext={() => handleStepComplete('competitors', 'icps')}
+              accountId={accountId}
             />
           )}
 
           {currentWizardStep === 'icps' && (
             <ICPStep
               industry={industry}
-              products={products}
-              icps={icps}
+              products={productChips}
+              icps={icpChips}
               onAddICP={handleAddICP}
               onEditICP={handleEditICP}
               onDeleteICP={handleDeleteICP}
               onNext={() => handleStepComplete('icps', 'personas')}
+              accountId={accountId}
             />
           )}
 
           {currentWizardStep === 'personas' && (
             <PersonaStep
-              icps={icps}
-              personas={personas}
               onAddPersona={handleAddPersona}
               onEditPersona={handleEditPersona}
               onDeletePersona={handleDeletePersona}

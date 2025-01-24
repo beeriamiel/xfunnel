@@ -92,13 +92,11 @@ export interface Persona {
 export interface Product {
   id: string
   name: string
-  description?: string
 }
 
 export interface Competitor {
   id: string
   name: string
-  description?: string
 }
 
 export interface CompanyProfile {

@@ -280,3 +280,46 @@ Our auth implementation uses Supabase Auth with Next.js 14, following these patt
 - Future: Will be resolved in upcoming Supabase updates
 
 [Rest of existing documentation...] 
+
+## Onboarding System
+
+### Flow Components
+1. Company Setup
+   - Company profile creation
+   - Account association
+   - Market focus definition
+
+2. Initial Analysis
+   - Simplified ICP generation
+   - NA market focus
+   - Basic competitor analysis
+   - Industry categorization
+
+3. Question Generation
+   - Initial query set
+   - Multi-engine support
+   - Basic journey coverage
+
+### Data Flow
+1. Company Creation
+   - Profile data collection
+   - Account linking
+   - Market definition
+
+2. ICP Generation
+   - Claude integration
+   - Simplified prompts
+   - Progress tracking
+   - Batch processing
+
+3. Question Setup
+   - Template-based generation
+   - Engine selection
+   - Response collection
+   - Citation processing
+
+### Progress Tracking
+- Real-time progress updates
+- Stage completion tracking
+- Error handling and recovery
+- Batch status monitoring 

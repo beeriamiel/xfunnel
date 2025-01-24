@@ -60,7 +60,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={GeistSans.className}>
+      <body className={GeistSans.className} suppressHydrationWarning>
         <SessionProvider initialSession={user ? {
           user,
           accessToken: null

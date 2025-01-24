@@ -20,9 +20,9 @@ export interface SelectableCardProps {
 }
 
 export interface CompletedStep {
-  type: 'company' | 'product' | 'data' | 'icps' | 'personas';
+  type: 'initial' | 'product' | 'competitors' | 'icps' | 'personas';
   title: string;
   summary: string;
 }
 
-export type StepId = 'initial' | 'product' | 'companyData' | 'icps' | 'personas' | 'complete' 
+export type StepId = 'initial' | 'product' | 'competitors' | 'icps' | 'personas'; 

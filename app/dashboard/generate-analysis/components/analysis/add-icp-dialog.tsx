@@ -28,10 +28,11 @@ import { Button } from "@/components/ui/button"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import { Input } from "@/components/ui/input"
 
 const formSchema = z.object({
   region: z.enum(['north_america', 'europe', 'asia_pacific', 'latin_america']),
-  vertical: z.enum(['technology', 'healthcare', 'finance', 'retail', 'manufacturing']),
+  vertical: z.string().min(1, "Vertical is required"),
   company_size: z.enum(['smb_under_500', 'mid_market_500_1000', 'enterprise_1000_plus']),
 })
 
@@ -48,7 +49,7 @@ export function AddICPDialog({ open, onOpenChange, onSubmit }: AddICPDialogProps
     resolver: zodResolver(formSchema),
     defaultValues: {
       region: 'north_america',
-      vertical: 'technology',
+      vertical: 'Technology',
       company_size: 'smb_under_500',
     },
   })
@@ -103,20 +104,9 @@ export function AddICPDialog({ open, onOpenChange, onSubmit }: AddICPDialogProps
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vertical</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a vertical" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="healthcare">Healthcare</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <Input placeholder="e.g. Technology, Healthcare, Finance" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

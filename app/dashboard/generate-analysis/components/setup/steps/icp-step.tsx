@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ChevronRight, Plus, Users, Pencil, X, Loader2, Sparkles } from "lucide-react"
+import { ChevronRight, Plus, Users, Pencil, X, Loader2, AlertCircle } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Dialog,
@@ -23,19 +23,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import { design } from '../../../lib/design-system'
-import { generateICPSuggestions } from '../../../utils/mock-suggestions'
-import type { ICP } from '../../../types/analysis'
+import { useDashboardStore } from '@/app/dashboard/store'
+import { createClient } from '@/app/supabase/client'
+import type { Product } from '../../../types/setup'
+
+interface ICPBase {
+  id: number;
+  vertical: string;
+  region: string;
+  company_size: string;
+  personas: any[]; // Assuming personas is an array of any type
+}
 
 interface ICPStepProps {
   industry: string;
-  products: Array<{ id: string; name: string }>;
-  icps: ICP[];
-  onAddICP: (icp: Omit<ICP, 'id'>) => void;
-  onEditICP: (icp: ICP) => void;
+  products: Product[];
+  icps: ICPBase[];
+  onAddICP: (icp: ICPBase) => void;
+  onEditICP: (icp: ICPBase) => void;
   onDeleteICP: (id: number) => void;
   onNext: () => void;
+  accountId: string;
 }
 
 const REGIONS = [
@@ -61,47 +72,136 @@ export function ICPStep({
   onAddICP, 
   onEditICP, 
   onDeleteICP,
-  onNext 
+  onNext,
+  accountId 
 }: ICPStepProps) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingICP, setEditingICP] = useState<ICP | null>(null)
-  const [newICP, setNewICP] = useState<Partial<ICP>>({
-    region: '',
-    vertical: '',
-    company_size: '',
-    personas: []
+  console.log('🔵 ICPStep Render:', {
+    industry,
+    productsCount: products.length,
+    icpsCount: icps.length,
+    icps: icps.map(icp => ({ 
+      id: icp.id, 
+      vertical: icp.vertical,
+      region: icp.region,
+      company_size: icp.company_size
+    }))
   })
-  const [isGenerating, setIsGenerating] = useState(false)
 
-  // Auto-generate ICPs when component mounts
+  const supabase = createClient()
+  const { selectedCompanyId } = useDashboardStore()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingICP, setEditingICP] = useState<ICPBase | null>(null)
+  const [newICP, setNewICP] = useState<Omit<ICPBase, 'id' | 'personas'>>({
+    vertical: '',
+    region: '',
+    company_size: ''
+  })
+  const [isLoadingGeneratedData, setIsLoadingGeneratedData] = useState(true)
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
+
+  // Log ICPs prop changes
   useEffect(() => {
-    const generateInitialICPs = async () => {
-      if (icps.length === 0) {
-        setIsGenerating(true)
-        try {
-          const suggestions = await generateICPSuggestions(
-            industry,
-            products.map(p => p.name)
-          )
-          suggestions.forEach(icp => {
-            onAddICP({
-              region: icp.region,
-              vertical: icp.vertical,
-              company_size: icp.company_size,
-              personas: []
-            })
-          })
-        } catch (error) {
-          console.error('Failed to generate ICP suggestions:', error)
+    console.log('🟡 ICPStep icps prop changed:', icps)
+  }, [icps])
+
+  // Log state changes
+  useEffect(() => {
+    console.log('🟡 ICPStep state changed:', {
+      dialogOpen,
+      editingICP,
+      isSubmitting,
+      isLoadingGeneratedData,
+      hasLoadedInitialData,
+      error,
+      newICP
+    })
+  }, [dialogOpen, editingICP, isSubmitting, isLoadingGeneratedData, hasLoadedInitialData, error, newICP])
+
+  // Load generated data once when mounted
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadGeneratedData() {
+      console.log('🟡 ICPStep loadGeneratedData starting:', {
+        selectedCompanyId,
+        hasLoadedInitialData,
+        currentICPs: icps.length
+      })
+
+      if (!selectedCompanyId || hasLoadedInitialData || icps.length > 0) {
+        console.log('🔴 ICPStep loadGeneratedData skipped:', {
+          reason: !selectedCompanyId 
+            ? 'no selectedCompanyId' 
+            : hasLoadedInitialData 
+              ? 'already loaded' 
+              : 'icps already exist'
+        })
+        return
+      }
+
+      try {
+        const { data: dbICPs } = await supabase
+          .from('ideal_customer_profiles')
+          .select('id, vertical, region, company_size')
+          .eq('company_id', selectedCompanyId)
+
+        console.log('🟡 ICPStep: DB ICPs fetched:', dbICPs)
+
+        if (dbICPs?.length && isMounted) {
+          // Map the ICPs from the database
+          const mappedICPs = dbICPs.map(icp => ({
+            id: icp.id,
+            vertical: icp.vertical,
+            region: icp.region,
+            company_size: icp.company_size
+          }))
+
+          console.log('🟢 ICPStep: Adding mapped ICPs:', mappedICPs)
+
+          // Add all ICPs at once by calling onAddICP for each one
+          for (const icp of mappedICPs) {
+            if (isMounted && !icps.some(c => c.id === icp.id)) {
+              console.log('🟢 ICPStep: Adding ICP:', icp)
+              onAddICP({
+                id: icp.id,
+                vertical: icp.vertical,
+                region: icp.region,
+                company_size: icp.company_size,
+                personas: []
+              })
+            }
+          }
+
+          // Update the store after adding ICPs
+          if (isMounted) {
+            setHasLoadedInitialData(true)
+            console.log('🟢 ICPStep loadGeneratedData complete')
+          }
         }
-        setIsGenerating(false)
+      } catch (error) {
+        console.error('🔴 ICPStep Error loading ICPs:', error)
+        if (isMounted) {
+          setError(error instanceof Error ? error.message : 'Failed to load ICPs')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGeneratedData(false)
+          setHasLoadedInitialData(true)
+          console.log('🟢 ICPStep loadGeneratedData complete')
+        }
       }
     }
 
-    generateInitialICPs()
-  }, []) // Only run once on mount
+    loadGeneratedData()
 
-  const handleEditICP = (icp: ICP) => {
+    return () => {
+      isMounted = false
+    }
+  }, [selectedCompanyId, onAddICP, hasLoadedInitialData, icps])
+
+  const handleEditICP = (icp: ICPBase) => {
     setEditingICP(icp)
     setNewICP(icp)
     setDialogOpen(true)
@@ -112,24 +212,124 @@ export function ICPStep({
     setNewICP({
       region: '',
       vertical: '',
-      company_size: '',
-      personas: []
+      company_size: ''
     })
     setDialogOpen(true)
   }
 
-  const handleUpdateICP = () => {
-    if (!newICP.vertical || !newICP.region || !newICP.company_size) return
-
-    if (editingICP) {
-      onEditICP({ ...editingICP, ...newICP as ICP })
-    } else {
-      onAddICP(newICP as Omit<ICP, 'id'>)
+  const handleDelete = async (icpId: number) => {
+    if (!selectedCompanyId) return
+    
+    setIsSubmitting(true)
+    setError(null)
+    
+    try {
+      // Delete from database
+      const { error: deleteError } = await supabase
+        .from('ideal_customer_profiles')
+        .delete()
+        .eq('id', icpId)
+        .eq('company_id', selectedCompanyId)
+        .eq('account_id', accountId)
+      
+      if (deleteError) throw deleteError
+      
+      // Only update parent state after successful DB deletion
+      onDeleteICP(icpId)
+    } catch (err) {
+      console.error('Error deleting ICP:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete ICP')
+    } finally {
+      setIsSubmitting(false)
     }
+  }
 
-    setEditingICP(null)
-    setNewICP({ region: '', vertical: '', company_size: '', personas: [] })
-    setDialogOpen(false)
+  const handleUpdateICP = async () => {
+    if (!newICP.vertical || !newICP.region || !newICP.company_size || !selectedCompanyId) return
+    
+    setIsSubmitting(true)
+    setError(null)
+    
+    try {
+      if (editingICP) {
+        // Update existing ICP
+        const { error: updateError } = await supabase
+          .from('ideal_customer_profiles')
+          .update({
+            vertical: newICP.vertical,
+            region: newICP.region,
+            company_size: newICP.company_size
+          })
+          .eq('id', editingICP.id)
+          .eq('company_id', selectedCompanyId)
+          .eq('account_id', accountId)
+
+        if (updateError) throw updateError
+
+        // Update parent state
+        onEditICP({
+          ...editingICP,
+          ...newICP
+        })
+      } else {
+        // Create new ICP
+        const { data: newICPData, error: insertError } = await supabase
+          .from('ideal_customer_profiles')
+          .insert({
+            company_id: selectedCompanyId,
+            account_id: accountId,
+            vertical: newICP.vertical,
+            region: newICP.region,
+            company_size: newICP.company_size
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        if (!newICPData) throw new Error('Failed to create ICP')
+
+        // Update parent state
+        onAddICP({
+          id: newICPData.id,
+          ...newICP,
+          personas: []
+        })
+      }
+      
+      setEditingICP(null)
+      setNewICP({ 
+        vertical: '', 
+        region: '', 
+        company_size: '' 
+      })
+      setDialogOpen(false)
+    } catch (err) {
+      console.error('Error updating ICP:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update ICP')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Validation for next step
+  const canProceed = icps.length > 0 && hasLoadedInitialData
+
+  if (isLoadingGeneratedData) {
+    return (
+      <Card className={cn(design.layout.card, design.spacing.card)}>
+        <div className="flex flex-col items-center justify-center p-8 space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-[#30035e]" />
+          <div className="space-y-2 text-center">
+            <h3 className={design.typography.title}>
+              Loading ICPs
+            </h3>
+            <p className={design.typography.subtitle}>
+              Checking for generated ICP data...
+            </p>
+          </div>
+        </div>
+      </Card>
+    )
   }
 
   return (
@@ -138,9 +338,16 @@ export function ICPStep({
         <div className={design.layout.header}>
           <div className={design.layout.headerContent}>
             <h3 className={design.typography.title}>Ideal Customer Profile (ICP)</h3>
-            <p className={design.typography.subtitle}>Define your target customer segments</p>
+            <p className={design.typography.subtitle}>Review generated ICPs or add your own</p>
           </div>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <AnimatePresence>
           <div className="min-h-[100px] flex flex-col gap-2">
@@ -167,6 +374,7 @@ export function ICPStep({
                     size="icon"
                     className={design.components.button.icon}
                     onClick={() => handleEditICP(icp)}
+                    disabled={isSubmitting}
                   >
                     <Pencil className={design.components.button.iconSize} />
                   </Button>
@@ -174,23 +382,17 @@ export function ICPStep({
                     variant="ghost"
                     size="icon"
                     className={cn(design.components.button.icon, "text-destructive")}
-                    onClick={() => onDeleteICP(icp.id)}
+                    onClick={() => handleDelete(icp.id)}
+                    disabled={isSubmitting}
                   >
                     <X className={design.components.button.iconSize} />
                   </Button>
                 </div>
               </motion.div>
             ))}
-            {icps.length === 0 && !isGenerating && (
-              <div className="h-[100px] flex flex-col items-center justify-center gap-2">
-                <Sparkles className={cn(design.components.listItem.icon, "h-8 w-8")} />
-                <p className={design.typography.subtitle}>Generating your ideal customer profiles...</p>
-              </div>
-            )}
-            {isGenerating && (
+            {icps.length === 0 && (
               <div className="h-[100px] flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[#30035e]" />
-                <p className={cn("ml-2", design.typography.subtitle)}>Generating suggestions...</p>
+                <p className={design.typography.subtitle}>Waiting for ICPs to be generated...</p>
               </div>
             )}
           </div>
@@ -203,6 +405,7 @@ export function ICPStep({
                 variant="outline" 
                 className={design.components.button.outline}
                 onClick={handleCreateICP}
+                disabled={isSubmitting}
               >
                 Add ICP <Plus className={cn("ml-2", design.components.button.iconSize)} />
               </Button>
@@ -264,17 +467,17 @@ export function ICPStep({
               <DialogFooter>
                 <Button 
                   onClick={handleUpdateICP}
-                  disabled={!newICP.vertical || !newICP.region || !newICP.company_size}
+                  disabled={!newICP.vertical || !newICP.region || !newICP.company_size || isSubmitting}
                   className={design.components.button.primary}
                 >
-                  {editingICP ? 'Update' : 'Create'} ICP
+                  {isSubmitting ? 'Saving...' : editingICP ? 'Update' : 'Create'} ICP
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Button
             onClick={onNext}
-            disabled={icps.length === 0 || isGenerating}
+            disabled={!canProceed || isSubmitting}
             className={design.components.button.primary}
           >
             Continue <ChevronRight className={cn("ml-2", design.components.button.iconSize)} />

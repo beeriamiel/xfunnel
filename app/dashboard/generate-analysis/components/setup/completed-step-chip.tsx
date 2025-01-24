@@ -22,9 +22,9 @@ export function CompletedStepChip({ step, onEdit }: CompletedStepChipProps) {
         className="px-4 py-2 flex items-center gap-2 bg-accent/5 hover:bg-[#f6efff] cursor-pointer transition-colors"
         onClick={onEdit}
       >
-        {step.type === 'company' && <Building2 className="h-4 w-4 text-[#f9a8c9]" />}
+        {step.type === 'initial' && <Building2 className="h-4 w-4 text-[#f9a8c9]" />}
         {step.type === 'product' && <Package className="h-4 w-4 text-[#f9a8c9]" />}
-        {step.type === 'data' && <CircleDot className="h-4 w-4 text-[#f9a8c9]" />}
+        {step.type === 'competitors' && <CircleDot className="h-4 w-4 text-[#f9a8c9]" />}
         {step.type === 'icps' && <Globe2 className="h-4 w-4 text-[#f9a8c9]" />}
         {step.type === 'personas' && <Users className="h-4 w-4 text-[#f9a8c9]" />}
         <div className="flex flex-col">

@@ -15,7 +15,8 @@ interface QueryState {
 
 export const useQueryStore = create<QueryState>((set) => ({
   queries: {},
-  setQueryState: (queryId, state) => 
+  setQueryState: (queryId, state) => {
+    console.log('🔵 QueryStore setQueryState:', { queryId, newState: state })
     set((prev) => ({
       queries: {
         ...prev.queries,
@@ -24,13 +25,19 @@ export const useQueryStore = create<QueryState>((set) => ({
           ...state
         }
       }
-    })),
+    }))
+  },
   initializeQuery: (queryId, initialState = {
-    availableActions: ['generate_response', 'view_responses'],
+    availableActions: ['generate_queries', 'view_queries'],
     status: 'idle',
     isLoading: false,
     error: null
-  }) =>
+  }) => {
+    console.log('🔵 QueryStore initializeQuery:', { 
+      queryId, 
+      initialState,
+      existingState: useQueryStore.getState().queries[queryId]
+    })
     set((prev) => ({
       queries: {
         ...prev.queries,
@@ -39,10 +46,17 @@ export const useQueryStore = create<QueryState>((set) => ({
           ...prev.queries[queryId]
         }
       }
-    })),
-  resetQueryState: (queryId) =>
+    }))
+    console.log('🟢 QueryStore State After Init:', {
+      queryId,
+      newState: useQueryStore.getState().queries[queryId]
+    })
+  },
+  resetQueryState: (queryId) => {
+    console.log('🔵 QueryStore resetQueryState:', { queryId })
     set((prev) => {
       const { [queryId]: _, ...rest } = prev.queries
       return { queries: rest }
     })
+  }
 })) 

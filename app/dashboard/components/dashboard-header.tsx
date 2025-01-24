@@ -14,15 +14,28 @@ import { useDashboardStore } from "../store"
 import AuthButton from "@/components/header-auth"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { createClient } from '@/app/supabase/client'
+import { useEffect } from 'react'
 
 interface DashboardHeaderProps {
   title?: string
 }
 
 export function DashboardHeader({ title }: DashboardHeaderProps) {
-  console.log('DashboardHeader mounting')
   const { activeView } = useDashboardStore()
   const supabase = createClient()
+  
+  // Add logging
+  useEffect(() => {
+    const header = document.querySelector('header')
+    if (header) {
+      console.log('Header dimensions:', {
+        width: header.clientWidth,
+        offsetWidth: header.offsetWidth,
+        scrollWidth: header.scrollWidth,
+        parentWidth: header.parentElement?.clientWidth
+      })
+    }
+  }, [])
   
   const viewTitle = title || (
     activeView === 'engine' 

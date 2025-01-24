@@ -93,7 +93,22 @@ export async function getCompanyProfile(companyId: number | null, accountId: str
           region,
           vertical,
           company_size,
-          personas (*)
+          personas (
+            id,
+            title,
+            department,
+            seniority_level,
+            queries (
+              id,
+              query_text,
+              buyer_journey_phase,
+              created_at
+            )
+          )
+        ),
+        competitors (
+          id,
+          competitor_name
         )
       `)
       .eq('id', companyId)

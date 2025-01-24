@@ -80,15 +80,15 @@ export async function generateQuestionsForAllPersonas(
     // Create a new batch for responses with accountId
     responseBatchId = await batchTracker.createBatch(
       'response', 
-      company.id.toString(),  // Convert to string for batch tracking
-      {
+      company.id,  // Keep as number
+      JSON.stringify({  // Stringify the metadata object
         model,
         systemPromptName,
         userPromptName,
         accountId,
         engines: Object.keys(engines).filter((k): k is keyof typeof engines => engines[k as keyof typeof engines]),
         icpBatchId
-      }
+      })
     );
 
     // Update progress tracking with accountId
@@ -163,7 +163,7 @@ export async function generateQuestionsForAllPersonas(
               const result = await generateQuestions(
                 companyName,
                 engines,
-                parseInt(persona.id),
+                persona.id,
                 systemPromptName,
                 userPromptName,
                 model,

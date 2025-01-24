@@ -5,11 +5,16 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { format } from 'date-fns'
-import { FileText } from 'lucide-react'
+import { FileText, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Query } from '../../types/analysis'
+import { generateResponsesAction, type EngineSelection } from '@/app/company-actions'
 
 interface ExpandedQueryRowProps {
   queries: Query[]
+  companyId: number
+  personaId: number
+  accountId: string
   onGenerateResponse: () => void
 }
 
@@ -49,11 +54,13 @@ function PhaseGroup({ phase, queries }: { phase: string; queries: Query[] }) {
   )
 }
 
-export function ExpandedQueryRow({ queries, onGenerateResponse }: ExpandedQueryRowProps) {
+export function ExpandedQueryRow({ queries, companyId, personaId, accountId, onGenerateResponse }: ExpandedQueryRowProps) {
+  const [isGenerating, setIsGenerating] = React.useState(false)
+
   // Group queries by buyer journey phase
   const groupedQueries = React.useMemo(() => {
     return queries.reduce((acc, query) => {
-      const phase = query.buyer_journey_phase[0]
+      const phase = query.buyer_journey_phase?.[0] || 'unknown'
       if (!acc[phase]) {
         acc[phase] = []
       }
@@ -61,6 +68,36 @@ export function ExpandedQueryRow({ queries, onGenerateResponse }: ExpandedQueryR
       return acc
     }, {} as Record<string, Query[]>)
   }, [queries])
+
+  const handleGenerateResponse = async () => {
+    setIsGenerating(true)
+    try {
+      // Enable all engines
+      const engines: EngineSelection = {
+        perplexity: true,
+        gemini: true,
+        claude: true,
+        openai: true,
+        google_search: true
+      }
+
+      await generateResponsesAction(
+        companyId,
+        [personaId],
+        engines,
+        'gpt-4-turbo-preview',
+        accountId
+      )
+
+      toast.success('Successfully generated responses')
+      onGenerateResponse()
+    } catch (error) {
+      console.error('Error generating responses:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to generate responses')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   return (
     <div className="border-t">
@@ -82,9 +119,17 @@ export function ExpandedQueryRow({ queries, onGenerateResponse }: ExpandedQueryR
         <Button 
           variant="default"
           className="ml-auto"
-          onClick={onGenerateResponse}
+          onClick={handleGenerateResponse}
+          disabled={isGenerating}
         >
-          Generate Response
+          {isGenerating ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            'Generate Response'
+          )}
         </Button>
       </CardFooter>
     </div>

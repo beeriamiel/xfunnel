@@ -1,8 +1,7 @@
 'use client'
 
-import { ChangeEvent, useState, FormEvent } from 'react'
+import { FormEvent } from 'react'
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
 import { Card } from "@/components/ui/card"
@@ -19,8 +18,6 @@ interface InitialStepProps {
 }
 
 export function InitialStep({ accountId, onNext }: InitialStepProps) {
-  console.log('🔵 InitialStep Render:', { accountId })
-
   const form = useForm<InitialFormData>({
     resolver: zodResolver(initialFormSchema),
     defaultValues: {
@@ -29,19 +26,11 @@ export function InitialStep({ accountId, onNext }: InitialStepProps) {
   })
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    console.log('🔵 InitialStep handleSubmit START')
     e.preventDefault()
     
-    try {
-      console.log('🟡 Validating form...')
-      form.handleSubmit(async (data) => {
-        console.log('🟡 Submitting:', data)
-        await onNext(data.companyName)
-        console.log('🟢 InitialStep Submit SUCCESS')
-      })(e)
-    } catch (error) {
-      console.error('🔴 InitialStep Submit ERROR:', error)
-    }
+    form.handleSubmit(async (data) => {
+      await onNext(data.companyName)
+    })(e)
   }
 
   return (

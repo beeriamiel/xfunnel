@@ -2,12 +2,18 @@
 
 import { useEffect, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Plus, Loader2 } from "lucide-react"
 import type { Query, QueryState, QueryAction } from '../../types/analysis'
 import { useQueryStore } from '../../store/query-store'
+import { useToast } from '@/components/hooks/use-toast'
+import { generateQuestionsAction } from '../../actions/generate'
+import type { EngineSelection } from '@/app/company-actions'
 
 interface RowQuery {
   id: string;
+  companyName?: string;
+  personaId?: number;
+  accountId?: string;
   queries?: {
     id: string;
     text: string;
@@ -15,22 +21,73 @@ interface RowQuery {
 }
 
 interface QueryRowProps {
-  query: RowQuery;  // Use RowQuery instead of Query
+  query: RowQuery;
   isExpanded: boolean;
   onToggle: () => void;
   onGenerateResponse?: (queryId: string) => Promise<void>;
+}
+
+interface ExtendedQueryState {
+  isLoading?: boolean;
+  error?: string | null;
+  status?: 'idle' | 'running' | 'completed' | 'failed';
+  availableActions?: QueryAction[];
+}
+
+async function handleGenerateQueries(
+  queryId: string,
+  companyName: string,
+  personaId: number,
+  accountId: string,
+  setQueryState: (queryId: string, state: Partial<ExtendedQueryState>) => void,
+  toast: ReturnType<typeof useToast>['toast']
+) {
+  try {
+    setQueryState(queryId, { isLoading: true, error: null });
+    
+    const result = await generateQuestionsAction(
+      companyName,
+      personaId,
+      accountId
+    );
+
+    setQueryState(queryId, { 
+      isLoading: false, 
+      status: 'completed',
+      availableActions: ['view_queries']
+    });
+
+    toast({
+      title: "Success",
+      description: `Generated ${result.queries.length} queries successfully`
+    });
+
+  } catch (error) {
+    console.error('Failed to generate queries:', error);
+    setQueryState(queryId, { 
+      isLoading: false, 
+      error: error instanceof Error ? error.message : 'Failed to generate queries',
+      status: 'failed'
+    });
+
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : 'Failed to generate queries',
+      variant: "destructive"
+    });
+  }
 }
 
 function ActionButton({ 
   action, 
   onClick, 
   disabled,
-  queryCount 
+  isLoading
 }: { 
   action: QueryAction
   onClick: () => void 
   disabled?: boolean
-  queryCount?: number
+  isLoading?: boolean
 }) {
   switch (action) {
     case 'generate_queries':
@@ -39,21 +96,14 @@ function ActionButton({
           variant="default" 
           className="bg-purple-800 hover:bg-purple-700"
           onClick={onClick}
-          disabled={disabled}
+          disabled={disabled || isLoading}
         >
-          <Plus className="mr-2 h-4 w-4" />
+          {isLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-4 w-4" />
+          )}
           Generate Queries (Free)
-        </Button>
-      )
-    case 'view_queries':
-      return (
-        <Button 
-          variant="outline" 
-          className="border-purple-800 text-purple-800 hover:bg-purple-50"
-          onClick={onClick}
-          disabled={disabled}
-        >
-          View Queries {queryCount ? `(${queryCount})` : ''}
         </Button>
       )
     default:
@@ -61,46 +111,43 @@ function ActionButton({
   }
 }
 
-export function QueryRow({ query, isExpanded, onToggle, onGenerateResponse }: QueryRowProps) {
-  // Add null check for query
-  if (!query?.id) {
-    return null;
-  }
+export function QueryRow({ query, onGenerateResponse }: QueryRowProps) {
+  const { toast } = useToast()
+  const queryState = useQueryStore(state => state.queries[query.id])
+  const setQueryState = useQueryStore(state => state.setQueryState)
+  const initializeQuery = useQueryStore(state => state.initializeQuery)
 
-  // Memoize the default state
-  const defaultState = useMemo(() => ({
-    availableActions: ['generate_queries', 'view_queries'] as QueryAction[],
-    status: 'idle' as const,
-    isLoading: false,
-    error: null
-  }), [])
-
-  // Get query state from store
-  const queryState = useQueryStore(
-    useMemo(
-      () => (state) => state.queries[query.id] || defaultState,
-      [query.id, defaultState]
-    )
-  )
-
-  // Initialize query state if it doesn't exist
   useEffect(() => {
-    const store = useQueryStore.getState()
-    if (query.id && !store.queries[query.id]) {
-      store.initializeQuery(query.id)
+    if (query.id) {
+      initializeQuery(query.id)
     }
-  }, [query.id])
+  }, [query.id, initializeQuery])
+
+  const handleAction = async (action: QueryAction) => {
+    if (action === 'generate_queries' && query.companyName && query.personaId && query.accountId) {
+      await handleGenerateQueries(
+        query.id,
+        query.companyName,
+        query.personaId,
+        query.accountId,
+        setQueryState,
+        toast
+      )
+    }
+  }
 
   return (
     <div className="flex items-center justify-end gap-2">
       {queryState?.availableActions?.map((action) => (
-        <ActionButton 
-          key={action}
-          action={action}
-          onClick={onToggle}
-          disabled={queryState.isLoading}
-          queryCount={action === 'view_queries' ? query.queries?.length : undefined}
-        />
+        action === 'generate_queries' && (
+          <ActionButton 
+            key={action}
+            action={action}
+            onClick={() => handleAction(action)}
+            disabled={queryState.isLoading}
+            isLoading={queryState.isLoading}
+          />
+        )
       ))}
     </div>
   )

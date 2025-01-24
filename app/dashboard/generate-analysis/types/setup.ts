@@ -31,4 +31,19 @@ export interface Competitor {
 export interface InitialFormData {
   companyName: string;
   industry?: string;
+}
+
+export interface PersonaChip {
+  id: number;
+  title: string;
+  department: string;
+  seniority_level: string;
+}
+
+export interface ICPBase {
+  id: number;
+  vertical: string;
+  region: string;
+  company_size: string;
+  personas: PersonaChip[];
 } 

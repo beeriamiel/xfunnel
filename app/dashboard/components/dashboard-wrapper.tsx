@@ -53,17 +53,37 @@ export function DashboardWrapper({
   isOnboarding,
   children
 }: DashboardWrapperProps) {
+  console.log('🔵 DashboardWrapper Render:', {
+    selectedCompany,
+    accountId,
+    initialCompaniesCount: initialCompanies.length,
+    isOnboarding,
+    storeState: useDashboardStore.getState(),
+    pathname: window?.location?.pathname,
+    search: window?.location?.search
+  })
+
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setSelectedCompanyId, setCompanies, setCurrentStep } = useDashboardStore()
+  const { setSelectedCompanyId, setCompanies, setWizardStep } = useDashboardStore()
   const hasRedirected = useRef(false)
 
   useEffect(() => {
+    console.log('🟡 DashboardWrapper setting companies:', {
+      initialCompanies,
+      currentStoreState: useDashboardStore.getState(),
+      pathname: window?.location?.pathname
+    })
     setCompanies(initialCompanies)
     
     // Only check onboarding for single company
     if (initialCompanies.length === 1 && !hasRedirected.current) {
       const company = initialCompanies[0]
+      console.log('🟡 Setting selectedCompanyId for single company:', {
+        companyId: company.id,
+        hasRedirected: hasRedirected.current,
+        pathname: window?.location?.pathname
+      })
       setSelectedCompanyId(company.id)
       
       // Prevent multiple redirects
@@ -71,24 +91,50 @@ export function DashboardWrapper({
       
       // Check onboarding status and redirect if needed
       checkOnboardingStatus(company.id).then(incompleteStep => {
+        console.log('🟡 Onboarding check result:', { 
+          incompleteStep,
+          currentStep: searchParams.get('step'),
+          pathname: window?.location?.pathname
+        })
         if (incompleteStep) {
           // Only redirect if we're not already on the correct step
           const currentStep = searchParams.get('step')
           if (currentStep !== incompleteStep) {
+            console.log('🟡 Redirecting to step:', incompleteStep)
             router.replace(`/dashboard/generate-analysis?step=${incompleteStep}`)
           }
-          setCurrentStep(incompleteStep)
+          setWizardStep(incompleteStep)
         }
       })
     }
-  }, [initialCompanies, setCompanies, setSelectedCompanyId, router, searchParams, setCurrentStep])
+  }, [initialCompanies, setCompanies, setSelectedCompanyId, router, searchParams, setWizardStep])
 
   let mainContent
   if (isOnboarding || searchParams.get('step')) {
+    console.log('🟡 Rendering onboarding content:', {
+      isOnboarding,
+      step: searchParams.get('step'),
+      pathname: window?.location?.pathname
+    })
     mainContent = <div className="w-full px-8 py-6">{children}</div>
-  } else if (initialCompanies.length > 0 && !selectedCompany) {
+  } else if (!selectedCompany && !searchParams.get('companyId') && !searchParams.get('company')) {
+    // Only show NoCompanySelected if we don't have a company ID in URL
+    console.log('🟡 Rendering NoCompanySelected:', {
+      initialCompaniesCount: initialCompanies.length,
+      selectedCompany,
+      hasCompanyId: !!searchParams.get('companyId'),
+      hasCompany: !!searchParams.get('company'),
+      pathname: window?.location?.pathname
+    })
     mainContent = <NoCompanySelected />
   } else {
+    console.log('🟡 Rendering main content:', {
+      selectedCompany,
+      hasCompanyId: !!searchParams.get('companyId'),
+      hasCompany: !!searchParams.get('company'),
+      pathname: window?.location?.pathname,
+      children: !!children
+    })
     mainContent = <div className="flex-1">{children}</div>
   }
 
@@ -99,7 +145,7 @@ export function DashboardWrapper({
           <Suspense fallback={<LoadingSkeleton />}>
             <DashboardHeader />
           </Suspense>
-          <div className="flex flex-1">
+          <div className="flex flex-1 w-full">
             <AppSidebar />
             <main className="flex-1 w-full">
               {mainContent}
