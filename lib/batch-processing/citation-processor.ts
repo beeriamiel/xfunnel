@@ -58,6 +58,7 @@ interface CitationMetadata {
   root_domains_to_root_domain?: number | null;
   external_links_to_root_domain?: number | null;
   account_id: string;
+  answer_engine?: string | null;
 }
 
 export interface ParsedCitation {
@@ -106,6 +107,7 @@ export async function processCitations(
       ranking_position: responseAnalysis.ranking_position,
       query_text: responseAnalysis.query_text ?? '',
       account_id: accountId,
+      answer_engine: responseAnalysis.answer_engine
     };
 
     console.log('Created citation metadata:', {
@@ -174,7 +176,8 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         spam_score: citation.spam_score,
         root_domains_to_root_domain: citation.root_domains_to_root_domain,
         external_links_to_root_domain: citation.external_links_to_root_domain,
-        account_id: citation.account_id
+        account_id: citation.account_id,
+        answer_engine: citation.answer_engine
       })))
       .select('id');
 
@@ -310,7 +313,8 @@ export async function processCitationsTransaction(
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
       query_text: responseAnalysis.query_text ?? '',
-      account_id: accountId
+      account_id: accountId,
+      answer_engine: responseAnalysis.answer_engine
     }));
 
     // Type-safe handling of reusable citations
@@ -369,26 +373,12 @@ export async function processCitationsTransaction(
         page_authority: existing.page_authority,
         spam_score: existing.spam_score,
         root_domains_to_root_domain: existing.root_domains_to_root_domain,
-        external_links_to_root_domain: existing.external_links_to_root_domain
+        external_links_to_root_domain: existing.external_links_to_root_domain,
+        answer_engine: responseAnalysis.answer_engine
       };
 
       // Return combined citation with existing data
-      return {
-        ...baseCitation,
-        is_original: false,
-        origin_citation_id: existing.id,
-        content_markdown: existing.content_markdown,
-        moz_last_updated: existing.moz_last_updated,
-        content_scraped_at: existing.content_scraped_at,
-        content_analysis: existing.content_analysis,
-        content_analysis_updated_at: existing.content_analysis_updated_at,
-        domain_authority: existing.domain_authority,
-        source_type: existing.source_type,
-        page_authority: existing.page_authority,
-        spam_score: existing.spam_score,
-        root_domains_to_root_domain: existing.root_domains_to_root_domain,
-        external_links_to_root_domain: existing.external_links_to_root_domain
-      };
+      return baseCitation;
     });
 
     // Combine all citations and proceed with insertion
