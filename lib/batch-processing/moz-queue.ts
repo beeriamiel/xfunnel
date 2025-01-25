@@ -97,45 +97,90 @@ export class MozEnrichmentQueue {
     if (citations.length === 0) return;
 
     const startTime = Date.now();
-    console.log('Starting batch processing:', {
+    console.log('Starting Moz batch processing:', {
       batchId,
       timestamp: new Date().toISOString(),
       citationCount: citations.length,
-      firstCitation: citations[0].citation_url,
-      lastCitation: citations[citations.length - 1].citation_url
+      urls: citations.map(c => c.citation_url)
     });
 
     try {
-      // Ensure all URLs are properly formatted before sending to Moz API
+      // Log pre-Moz API call
+      console.log('Preparing Moz API call:', {
+        batchId,
+        urlCount: citations.length,
+        formattedUrls: citations.map(c => this.ensureValidUrl(c.citation_url))
+      });
+
       const mozResponse = await fetchMozMetrics(citations.map(c => this.ensureValidUrl(c.citation_url))) as MozResponse;
+      
+      // Log full Moz API response
+      console.log('Moz API Response:', {
+        batchId,
+        hasResponse: !!mozResponse,
+        responseStructure: {
+          hasResult: !!mozResponse?.result,
+          resultCount: mozResponse?.result?.results_by_site?.length || 0,
+          hasErrors: !!mozResponse?.errors_by_site?.length,
+          errorCount: mozResponse?.errors_by_site?.length || 0
+        },
+        firstResult: mozResponse?.result?.results_by_site?.[0] || null,
+        firstError: mozResponse?.errors_by_site?.[0] || null
+      });
+
       const adminClient = await createAdminClient();
 
       let batchSuccesses = 0;
       let batchFailures = 0;
 
-      // Add null check and proper response structure handling
       if (!mozResponse || !mozResponse.result || !mozResponse.result.results_by_site) {
-        console.error('Invalid Moz API response structure:', mozResponse);
+        console.error('Invalid Moz API response structure:', {
+          batchId,
+          response: mozResponse,
+          error: 'Missing required response structure'
+        });
         throw new Error('Invalid Moz API response structure');
       }
-
-      console.log('Moz API response structure:', {
-        hasResponse: !!mozResponse,
-        hasResult: !!(mozResponse && mozResponse.result),
-        hasResultsBySite: !!(mozResponse && mozResponse.result && mozResponse.result.results_by_site),
-        resultCount: mozResponse?.result?.results_by_site?.length || 0,
-        firstResult: mozResponse?.result?.results_by_site?.[0] || null
-      });
 
       for (const citation of citations) {
         const citationStartTime = Date.now();
         try {
-          // Find matching result in Moz response
+          // Log citation processing start
+          console.log('Processing Moz metrics for citation:', {
+            batchId,
+            citationId: citation.id,
+            url: citation.citation_url,
+            timestamp: new Date().toISOString()
+          });
+
           const result = mozResponse.result.results_by_site.find(
             r => this.normalizeUrl(r.site_query.query) === this.normalizeUrl(citation.citation_url)
           );
 
+          // Log Moz result match
+          console.log('Moz result match:', {
+            batchId,
+            citationId: citation.id,
+            url: citation.citation_url,
+            found: !!result,
+            metrics: result?.site_metrics || null
+          });
+
           if (result?.site_metrics) {
+            // Log pre-update data
+            console.log('Updating citation with Moz metrics:', {
+              batchId,
+              citationId: citation.id,
+              metrics: {
+                domainAuthority: result.site_metrics.domain_authority,
+                pageAuthority: result.site_metrics.page_authority,
+                spamScore: result.site_metrics.spam_score,
+                rootDomains: result.site_metrics.root_domains_to_root_domain,
+                externalLinks: result.site_metrics.external_pages_to_root_domain,
+                lastCrawled: result.site_metrics.last_crawled
+              }
+            });
+
             const { error: updateError } = await adminClient
               .from('citations')
               .update({
@@ -149,8 +194,30 @@ export class MozEnrichmentQueue {
               })
               .eq('id', citation.id);
 
+            // Enhanced database update logging
+            console.log('Moz metrics database update details:', {
+              batchId,
+              citationId: citation.id,
+              url: citation.citation_url,
+              updateAttempt: {
+                timestamp: new Date().toISOString(),
+                success: !updateError,
+                error: updateError
+              },
+              updatedFields: {
+                domainAuthority: result.site_metrics.domain_authority,
+                pageAuthority: result.site_metrics.page_authority,
+                spamScore: result.site_metrics.spam_score,
+                rootDomains: result.site_metrics.root_domains_to_root_domain,
+                externalLinks: result.site_metrics.external_pages_to_root_domain,
+                lastCrawled: result.site_metrics.last_crawled,
+                lastUpdated: new Date().toISOString()
+              }
+            });
+
+            // Log update result
             if (updateError) {
-              console.error('Citation update failed:', {
+              console.error('Moz metrics update failed:', {
                 batchId,
                 citationId: citation.id,
                 url: citation.citation_url,
@@ -161,15 +228,10 @@ export class MozEnrichmentQueue {
               this.stats.failedCitations++;
               batchFailures++;
             } else {
-              console.log('Citation processed successfully:', {
+              console.log('Moz metrics update successful:', {
                 batchId,
                 citationId: citation.id,
                 url: citation.citation_url,
-                metrics: {
-                  domainAuthority: result.site_metrics.domain_authority,
-                  pageAuthority: result.site_metrics.page_authority,
-                  spamScore: result.site_metrics.spam_score
-                },
                 duration: Date.now() - citationStartTime
               });
               this.stats.processedCitations++;
@@ -179,7 +241,7 @@ export class MozEnrichmentQueue {
             const error = mozResponse.errors_by_site?.find(
               e => e.site_query.query === citation.citation_url
             );
-            console.error('No metrics found for citation:', {
+            console.error('No Moz metrics found for citation:', {
               batchId,
               citationId: citation.id,
               url: citation.citation_url,
@@ -191,7 +253,7 @@ export class MozEnrichmentQueue {
             batchFailures++;
           }
         } catch (error) {
-          console.error('Citation processing error:', {
+          console.error('Moz citation processing error:', {
             batchId,
             citationId: citation.id,
             url: citation.citation_url,

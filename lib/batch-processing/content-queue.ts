@@ -13,6 +13,14 @@ interface QueueStats {
 interface Citation {
   id: number;
   citation_url: string;
+  query_text?: string | null;
+  response_text?: string | null;
+  content_markdown?: string | null;
+  content_scraped_at?: string | null;
+  content_scraping_error?: string | null;
+  is_original?: boolean | null;
+  content_analysis?: string | null;
+  content_analysis_updated_at?: string | null;
 }
 
 export class ContentScrapingQueue {

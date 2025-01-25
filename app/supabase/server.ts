@@ -62,6 +62,13 @@ export async function createDirectClient() {
 export async function createAdminClient() {
   const cookieStore = await cookies()
   
+  // Debug logging
+  console.log('Creating admin client with:', {
+    hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0
+  });
+  
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

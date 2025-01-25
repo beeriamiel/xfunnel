@@ -97,6 +97,44 @@ export class ContentAnalysisService {
     accountId: string
   ): Promise<ContentAnalysisResponse> {
     try {
+      // Direct markdown testing logs
+      console.log('Raw content check:', {
+        markdownContent: {
+          raw: contentMarkdown,
+          type: typeof contentMarkdown,
+          length: contentMarkdown?.length || 0,
+          isString: typeof contentMarkdown === 'string',
+          firstChar: contentMarkdown?.[0],
+          lastChar: contentMarkdown?.[contentMarkdown.length - 1],
+          hasContent: !!contentMarkdown,
+          preview: contentMarkdown?.substring(0, 150)
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      // Enhanced initial logging
+      console.log('Starting content analysis with details:', {
+        queryText: {
+          length: queryText?.length || 0,
+          preview: queryText?.substring(0, 100) + '...',
+          isEmpty: !queryText
+        },
+        responseText: {
+          length: responseText?.length || 0,
+          preview: responseText?.substring(0, 100) + '...',
+          isEmpty: !responseText
+        },
+        contentMarkdown: {
+          length: contentMarkdown?.length || 0,
+          preview: contentMarkdown?.substring(0, 100) + '...',
+          isEmpty: !contentMarkdown,
+          isNull: contentMarkdown === null,
+          isUndefined: contentMarkdown === undefined
+        },
+        accountId,
+        timestamp: new Date().toISOString()
+      });
+
       console.log('Starting content analysis:', {
         queryTextLength: queryText?.length || 0,
         responseTextLength: responseText?.length || 0,
@@ -123,19 +161,82 @@ export class ContentAnalysisService {
         throw new Error('Missing required prompts for content analysis');
       }
 
-      // Format XML content
+      // Add logging for prompts
+      console.log('Content Analysis Prompts:', {
+        systemPromptLength: systemPrompt.length,
+        userPromptLength: userPrompt.length,
+        systemPromptPreview: systemPrompt.substring(0, 200) + '...',
+        userPromptPreview: userPrompt.substring(0, 200) + '...'
+      });
+
+      // Format XML content with enhanced validation
+      const hasValidContent = contentMarkdown && contentMarkdown.length > 0;
+      console.log('Content validation check:', {
+        hasValidContent,
+        contentType: typeof contentMarkdown,
+        contentLength: contentMarkdown?.length || 0,
+        timestamp: new Date().toISOString()
+      });
+
       const formattedContent = `
 <query>${queryText}</query>
 <response>${responseText}</response>
 <markdown>${contentMarkdown}</markdown>
       `.trim();
 
+      // Enhanced XML formatting logs
+      console.log('XML Content Formatting:', {
+        preFormatting: {
+          queryLength: queryText?.length || 0,
+          responseLength: responseText?.length || 0,
+          markdownLength: contentMarkdown?.length || 0
+        },
+        postFormatting: {
+          totalLength: formattedContent.length,
+          queryTag: {
+            start: formattedContent.indexOf('<query>'),
+            end: formattedContent.indexOf('</query>')
+          },
+          responseTag: {
+            start: formattedContent.indexOf('<response>'),
+            end: formattedContent.indexOf('</response>')
+          },
+          markdownTag: {
+            start: formattedContent.indexOf('<markdown>'),
+            end: formattedContent.indexOf('</markdown>')
+          }
+        },
+        validation: {
+          hasAllTags: 
+            formattedContent.includes('<query>') && 
+            formattedContent.includes('</query>') &&
+            formattedContent.includes('<response>') &&
+            formattedContent.includes('</response>') &&
+            formattedContent.includes('<markdown>') &&
+            formattedContent.includes('</markdown>')
+        },
+        timestamp: new Date().toISOString()
+      });
+
       // Select model based on environment variable
       const selectedModel = process.env.CONTENT_ANALYSIS_MODEL || 'claude';
       
+      console.log('Selected AI Model:', {
+        model: selectedModel,
+        envVar: process.env.CONTENT_ANALYSIS_MODEL,
+        timestamp: new Date().toISOString()
+      });
+
       let message;
       try {
         if (selectedModel === 'deepseek') {
+          console.log('Initiating Deepseek request:', {
+            model: 'deepseek-chat',
+            maxTokens: 4096,
+            inputSize: (systemPrompt + userPrompt + formattedContent).length,
+            timestamp: new Date().toISOString()
+          });
+
           message = await this.deepseekService.messages.create({
             model: 'deepseek-chat',
             max_tokens: 4096,
@@ -143,6 +244,14 @@ export class ContentAnalysisService {
             messages: [
               { role: 'user', content: userPrompt + '\n\n' + formattedContent }
             ]
+          });
+
+          console.log('Deepseek raw response:', {
+            hasContent: !!message.content,
+            contentLength: message.content?.length || 0,
+            firstContentType: message.content?.[0]?.type,
+            rawResponsePreview: JSON.stringify(message).substring(0, 200) + '...',
+            timestamp: new Date().toISOString()
           });
         } else {
           message = await this.claudeService.messages.create({
@@ -173,6 +282,7 @@ export class ContentAnalysisService {
           model: selectedModel,
           contentLength: message.content?.length || 0,
           contentType: message.content[0]?.type,
+          rawContent: JSON.stringify(message.content).substring(0, 200) + '...',
           timestamp: new Date().toISOString()
         };
         console.error('Invalid model response structure:', errorDetails);
@@ -182,15 +292,35 @@ export class ContentAnalysisService {
       // Use the same cleaning function from claude-service.ts
       const cleanJSON = this.cleanMarkdownJSON(message.content[0].text);
       
-      // Log cleaned response for debugging
-      console.log('Cleaned Claude response:', {
-        length: cleanJSON.length,
-        preview: cleanJSON.substring(0, 200) + '...',
+      // Log cleaned response and parsing attempt
+      console.log('Model response cleaning:', {
+        model: selectedModel,
+        originalLength: message.content[0].text.length,
+        cleanedLength: cleanJSON.length,
+        cleanedPreview: cleanJSON.substring(0, 200) + '...',
         timestamp: new Date().toISOString()
       });
 
-      const parsedResponse = JSON.parse(cleanJSON);
-      
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(cleanJSON);
+        console.log('JSON parsing successful:', {
+          model: selectedModel,
+          hasMetrics: !!parsedResponse.metrics,
+          hasAnalysisDetails: !!parsedResponse.analysis_details,
+          responseKeys: Object.keys(parsedResponse),
+          timestamp: new Date().toISOString()
+        });
+      } catch (parseError) {
+        console.error('JSON parsing failed:', {
+          model: selectedModel,
+          error: parseError,
+          cleanedJSON: cleanJSON.substring(0, 200) + '...',
+          timestamp: new Date().toISOString()
+        });
+        throw parseError;
+      }
+
       // Validate the response
       const validatedResponse = this.validateAnalysisResponse(parsedResponse);
 
@@ -199,6 +329,17 @@ export class ContentAnalysisService {
         totalWords: validatedResponse.analysis_details.total_words,
         timestamp: new Date().toISOString()
       });
+
+      // Enhanced model response logging
+      if (message.content[0] && message.content[0].type === 'text') {
+        console.log('Model response content details:', {
+          model: selectedModel,
+          responseType: message.content[0].type,
+          responseLength: message.content[0].text.length,
+          responsePreview: message.content[0].text.substring(0, 200) + '...',
+          timestamp: new Date().toISOString()
+        });
+      }
 
       return validatedResponse;
 
