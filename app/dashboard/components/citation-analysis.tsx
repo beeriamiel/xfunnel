@@ -1463,10 +1463,18 @@ function ChartLoadingState() {
   )
 }
 
+// Feature flag to control legacy citation analysis visibility
+const SHOW_LEGACY_CITATIONS = false
+
 export function CitationAnalysis({ 
   companyId, 
   accountId
 }: CitationAnalysisProps) {
+  // Return null if feature flag is disabled
+  if (!SHOW_LEGACY_CITATIONS) {
+    return null
+  }
+
   const [currentCompanyName, setCurrentCompanyName] = useState<string | null>(null)
   const [selectedMentionCompetitor, setSelectedMentionCompetitor] = useState<string | null>(null)
   const [selectedRankingCompetitor, setSelectedRankingCompetitor] = useState<string | null>(null)

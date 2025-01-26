@@ -112,7 +112,15 @@ function processCompanyMentions(companies: string[] | undefined): string[] {
     .map(company => `${company.name} (${company.count})`)
 }
 
+// Feature flag to control legacy citation analysis visibility
+const SHOW_LEGACY_CITATIONS = false
+
 export const SourceCard = memo(function SourceCard({ data, type }: SourceCardProps) {
+  // Return null if feature flag is disabled
+  if (!SHOW_LEGACY_CITATIONS) {
+    return null
+  }
+
   const [isOpen, setIsOpen] = useState(false)
   
   // Process company mentions

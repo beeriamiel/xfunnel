@@ -16,6 +16,7 @@ import { PersonalSettings } from "./personal-settings"
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from '@/components/error-boundary'
 import { createClient } from '@/app/supabase/client'
+import { OverallCitations } from './source-analysis/overall-citations'
 
 interface Company {
   id: number
@@ -82,10 +83,16 @@ function DashboardView({
           ) : activeView === 'icp' ? (
             <NewICPAnalysis companyId={selectedCompany.id} accountId={accountId} />
           ) : activeView === 'citation' ? (
-            <CitationAnalysis 
-              companyId={selectedCompany.id}
-              accountId={accountId}
-            />
+            <>
+              <OverallCitations 
+                companyId={selectedCompany.id}
+                accountId={accountId}
+              />
+              <CitationAnalysis 
+                companyId={selectedCompany.id}
+                accountId={accountId}
+              />
+            </>
           ) : activeView === 'takeaways' ? (
             <KeyTakeaways 
               companyId={selectedCompany.id}

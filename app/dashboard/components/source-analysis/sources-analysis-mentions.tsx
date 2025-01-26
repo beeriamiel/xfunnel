@@ -15,10 +15,18 @@ interface Props {
   selectedCompetitor?: string
 }
 
+// Feature flag to control legacy citation analysis visibility
+const SHOW_LEGACY_CITATIONS = false
+
 export const SourcesAnalysisMentions = memo(function SourcesAnalysisMentions({ 
   companyId, 
   selectedCompetitor 
 }: Props) {
+  // Return null if feature flag is disabled
+  if (!SHOW_LEGACY_CITATIONS) {
+    return null
+  }
+
   const [sources, setSources] = useState<SourceData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
