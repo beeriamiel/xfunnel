@@ -149,13 +149,14 @@ function ContentMetricsChart({ metrics, details }: {
               fillOpacity={0.2}
             />
             <Tooltip
-              content={({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { subject: string } }> }) => {
+              content={({ active, payload }) => {
                 if (active && payload && payload.length) {
+                  const data = payload[0]
                   return (
                     <div className="rounded-lg border bg-background p-2 shadow-md">
-                      <p className="font-medium">{payload[0].payload.subject}</p>
+                      <p className="font-medium">{data.payload.subject}</p>
                       <p className="text-sm text-muted-foreground">
-                        Score: {payload[0].value}
+                        Score: {data.value}
                       </p>
                     </div>
                   )
@@ -169,27 +170,74 @@ function ContentMetricsChart({ metrics, details }: {
 
       {details && (
         <Card className="p-4">
-          <h4 className="text-sm font-medium mb-3">Analysis Details</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Average Sentence Length</p>
-              <p className="text-sm font-medium">{details.avg_sentence_length.toFixed(1)} words</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Keyword Density</p>
-              <p className="text-sm font-medium">{(details.keyword_density * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Technical Terms</p>
-              <p className="text-sm font-medium">{details.technical_term_count}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Words</p>
-              <p className="text-sm font-medium">{details.total_words}</p>
-            </div>
+          <h4 className="text-sm font-medium mb-4">Analysis Details</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <MetricItem
+              label="Total Words"
+              value={details.total_words}
+              tooltip="Total number of words in the content"
+            />
+            <MetricItem
+              label="Average Sentence Length"
+              value={`${details.avg_sentence_length.toFixed(1)} words`}
+              tooltip="Average number of words per sentence"
+            />
+            <MetricItem
+              label="Keyword Density"
+              value={`${(details.keyword_density * 100).toFixed(1)}%`}
+              tooltip="Percentage of keywords relative to total words"
+            />
+            <MetricItem
+              label="Technical Terms"
+              value={details.technical_term_count}
+              tooltip="Number of industry-specific technical terms used"
+            />
+            <MetricItem
+              label="Statistics Used"
+              value={details.statistics_count}
+              tooltip="Number of statistical data points referenced"
+            />
+            <MetricItem
+              label="Quotes"
+              value={details.quote_count}
+              tooltip="Number of direct quotations"
+            />
+            <MetricItem
+              label="Citations"
+              value={details.citation_count}
+              tooltip="Number of external sources cited"
+            />
           </div>
         </Card>
       )}
+    </div>
+  )
+}
+
+// Add MetricItem component
+function MetricItem({ 
+  label, 
+  value, 
+  tooltip 
+}: { 
+  label: string
+  value: string | number
+  tooltip: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <HoverCard>
+          <HoverCardTrigger>
+            <Info className="h-4 w-4 text-muted-foreground/50" />
+          </HoverCardTrigger>
+          <HoverCardContent>
+            <p className="text-sm">{tooltip}</p>
+          </HoverCardContent>
+        </HoverCard>
+      </div>
+      <p className="text-sm font-medium">{value}</p>
     </div>
   )
 }
