@@ -89,13 +89,14 @@ async function processCitationsWithRedirects(urls: string[]): Promise<string[]> 
 
 export async function generateGeminiResponse(query: string) {
   const genAI = createGeminiClient();
+  console.log('Initializing Gemini model: models/gemini-1.5-flash-latest');
   const model = genAI.getGenerativeModel({ 
-    model: "models/gemini-1.5-pro-002",
+    model: "models/gemini-1.5-flash-latest",
     tools: [{
       googleSearchRetrieval: {
         dynamicRetrievalConfig: {
           mode: DynamicRetrievalMode.MODE_DYNAMIC,
-          dynamicThreshold: 0.7,
+          dynamicThreshold: 0.3,
         },
       },
     }],
