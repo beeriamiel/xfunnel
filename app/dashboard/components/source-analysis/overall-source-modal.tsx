@@ -34,6 +34,25 @@ import {
   HoverCardContent,
 } from "@/components/ui/hover-card"
 
+// Add badge style variants
+const badgeVariants = {
+  buyerJourneyPhase: "bg-gradient-to-r from-blue-50/50 to-indigo-50/50 text-blue-700 border-blue-200/50 hover:bg-blue-100/50",
+  sourceType: "bg-gradient-to-r from-emerald-50/50 to-green-50/50 text-emerald-700 border-emerald-200/50 hover:bg-emerald-100/50",
+  answerEngine: "bg-gradient-to-r from-orange-50/50 to-amber-50/50 text-orange-700 border-orange-200/50 hover:bg-amber-100/50",
+  buyerPersona: "bg-gradient-to-r from-purple-50/50 to-violet-50/50 text-purple-700 border-purple-200/50 hover:bg-purple-100/50",
+  company: "bg-gradient-to-r from-slate-50/50 to-gray-50/50 text-slate-700 border-slate-200/50 hover:bg-slate-100/50",
+  metric: "bg-gradient-to-r from-muted/50 to-muted/30 text-muted-foreground border-muted/50"
+} as const
+
+// Add journey phase mapping
+const JOURNEY_PHASE_LABELS: Record<string, string> = {
+  'problem_exploration': 'Problem Exploration',
+  'solution_education': 'Solution Education',
+  'solution_comparison': 'Solution Comparison',
+  'solution_evaluation': 'Solution Evaluation',
+  'final_research': 'User Feedback'
+}
+
 interface Props {
   source: OverallSourceData | null
   isOpen: boolean
@@ -130,7 +149,7 @@ function ContentMetricsChart({ metrics, details }: {
               fillOpacity={0.2}
             />
             <Tooltip
-              content={({ active, payload }) => {
+              content={({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { subject: string } }> }) => {
                 if (active && payload && payload.length) {
                   return (
                     <div className="rounded-lg border bg-background p-2 shadow-md">
@@ -221,62 +240,112 @@ export function OverallSourceModal({ source, isOpen, onClose }: Props) {
             <div className="grid grid-cols-2 gap-6">
               <Card className="p-6 space-y-4">
                 <h3 className="text-sm font-medium">Source Details</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Citations</span>
-                    <span className="text-sm font-medium">{source.citation_count}x cited</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Type:</span>
+                    <Badge variant="outline" className={badgeVariants.sourceType}>
+                      {source.source_type || 'Earned'}
+                    </Badge>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Journey Phases</span>
-                    <div className="flex gap-2">
-                      {source.buyer_journey_phases.map((phase, i) => (
-                        <Badge key={i} variant="outline" className="capitalize">
-                          {phase.replace('_', ' ')}
-                        </Badge>
-                      ))}
+                  
+                  {/* Buyer Personas */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Buyer Personas:</span>
+                    <div className="flex gap-1.5">
+                      {source.buyer_personas && source.buyer_personas.length > 0 ? (
+                        source.buyer_personas.map((persona, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline"
+                            className={badgeVariants.buyerPersona}
+                          >
+                            {persona}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not specified</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Journey Phases */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Journey Phases:</span>
+                    <div className="flex gap-1.5">
+                      {source.buyer_journey_phases && source.buyer_journey_phases.length > 0 ? (
+                        source.buyer_journey_phases.map((phase, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline"
+                            className={badgeVariants.buyerJourneyPhase}
+                          >
+                            {JOURNEY_PHASE_LABELS[phase] || phase}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not specified</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Answer Engines */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Answer Engines:</span>
+                    <div className="flex gap-1.5">
+                      {source.answer_engines && source.answer_engines.length > 0 ? (
+                        source.answer_engines.map((engine, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline"
+                            className={badgeVariants.answerEngine}
+                          >
+                            {ANSWER_ENGINE_LABELS[engine] || engine}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not specified</span>
+                      )}
                     </div>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Domain Authority</span>
-                    <span className="text-sm font-medium">{source.domain_authority || 'N/A'}</span>
+                    <span className="text-sm text-muted-foreground">Citations</span>
+                    <Badge variant="outline" className={badgeVariants.metric}>
+                      {source.citation_count}x cited
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Source Type</span>
-                    <Badge variant="outline" className="capitalize">
-                      {source.source_type || 'N/A'}
+                    <span className="text-sm text-muted-foreground">Domain Authority</span>
+                    <Badge variant="outline" className={badgeVariants.metric}>
+                      {source.domain_authority || 'N/A'}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">External Links</span>
-                    <span className="text-sm font-medium">
+                    <Badge variant="outline" className={badgeVariants.metric}>
                       {source.external_links_to_root_domain?.toLocaleString() || 'N/A'}
-                    </span>
+                    </Badge>
                   </div>
-                  {source.citation_orders.length > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">
-                        Average Position
-                        <HoverCard>
-                          <HoverCardTrigger>
-                            <Info className="h-4 w-4 ml-1 text-muted-foreground hover:text-primary cursor-help inline-block" />
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80">
-                            <p className="text-sm">
-                              The average position of this source in AI answers. A value of 0 means it appears first in answers, 1 means second, and so on. Lower numbers indicate the source is typically mentioned earlier and more prominently in responses.
-                            </p>
-                          </HoverCardContent>
-                        </HoverCard>
-                      </span>
-                      <div className="flex gap-1">
-                        <Badge variant="outline">
-                          {source.average_citation_order?.toFixed(1) || 'N/A'}
-                        </Badge>
-                        <div className="text-xs text-muted-foreground">
-                          (from {source.citation_orders.length} citations)
-                        </div>
-                      </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Average Position</span>
+                      <HoverCard>
+                        <HoverCardTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </HoverCardTrigger>
+                        <HoverCardContent>
+                          Average position across all citations
+                        </HoverCardContent>
+                      </HoverCard>
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={badgeVariants.metric}>
+                        {source.average_citation_order}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        (from {source.citation_count} citations)
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </Card>
 

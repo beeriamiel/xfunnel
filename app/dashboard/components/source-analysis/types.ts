@@ -9,6 +9,7 @@ export interface CitationRow {
   recommended: boolean | null
   company_mentioned: boolean | null
   buyer_journey_phase: string | null
+  buyer_persona: string | null
   rank_list: string | null
   mentioned_companies: string[] | null
   mentioned_companies_count: string[]
@@ -101,6 +102,7 @@ export interface OverallSourceData {
   domain_authority?: number;
   source_type?: 'owned' | 'ugc' | 'affiliate';
   buyer_journey_phases: string[];
+  buyer_personas: string[];
   mentioned_companies_count: string[];
   rank_list?: string;
   content_analysis?: ContentAnalysis;
@@ -119,7 +121,8 @@ export interface OverallSourceCardProps {
 }
 
 export interface LocalFilterOptions {
-  buyingJourneyPhase: string | null;
+  buyingJourneyPhase: string[] | null;
   sourceType: CitationSourceType | null;
-  answerEngine: AnswerEngine | null;
+  answerEngine: string[] | null;
+  buyerPersona: string[] | null;
 } 

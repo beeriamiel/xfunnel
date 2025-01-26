@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
 import {
   Select,
@@ -39,6 +39,11 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { FilterButton } from './filter-sidebar/filter-button'
+import { FilterSidebar } from './filter-sidebar/filter-sidebar'
+import { FilterSection } from './filter-sidebar/filter-section'
+import { FilterBadgeGroup } from './filter-sidebar/filter-badge-group'
 
 const JOURNEY_PHASES = [
   { value: 'problem_exploration', label: 'Problem Exploration' },
@@ -56,9 +61,9 @@ const SOURCE_TYPES = [
 ] as const
 
 const ANSWER_ENGINES = [
-  { value: 'google_search', label: 'Google Search (AIO)' },
-  { value: 'open_ai', label: 'SearchGPT (OpenAI)' },
-  { value: 'claude', label: 'Claude (Anthropic)' },
+  { value: 'google', label: 'Google Search (AIO)' },
+  { value: 'openai', label: 'SearchGPT (OpenAI)' },
+  { value: 'anthropic', label: 'Claude (Anthropic)' },
   { value: 'perplexity', label: 'Perplexity' },
   { value: 'gemini', label: 'Gemini (Google)' }
 ] as const
@@ -145,9 +150,9 @@ const CHART_COLORS = {
   final_research: '#06b6d4',      // Cyan
   
   // Answer Engines
-  google_search: '#06b6d4',      // Cyan (AIO)
-  open_ai: '#4f46e5',           // Indigo (SearchGPT)
-  claude: '#2563eb',            // Royal blue
+  google: '#06b6d4',      // Cyan (AIO)
+  openai: '#4f46e5',           // Indigo (SearchGPT)
+  anthropic: '#2563eb',            // Royal blue
   perplexity: '#9333ea',        // Bright purple
   gemini: '#db2777',            // Deep pink
 } as const
@@ -178,9 +183,9 @@ const journeyPhaseConfig = {
 
 const answerEngineConfig = {
   value: { label: 'Citations' },
-  google_search: { label: 'Google Search (AIO)', color: CHART_COLORS.google_search },
-  open_ai: { label: 'SearchGPT (OpenAI)', color: CHART_COLORS.open_ai },
-  claude: { label: 'Claude (Anthropic)', color: CHART_COLORS.claude },
+  google: { label: 'Google Search (AIO)', color: CHART_COLORS.google },
+  openai: { label: 'SearchGPT (OpenAI)', color: CHART_COLORS.openai },
+  anthropic: { label: 'Claude (Anthropic)', color: CHART_COLORS.anthropic },
   perplexity: { label: 'Perplexity', color: CHART_COLORS.perplexity },
   gemini: { label: 'Gemini (Google)', color: CHART_COLORS.gemini },
 } as const
@@ -189,7 +194,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
   const [filters, setFilters] = useState<LocalFilterOptions>({
     buyingJourneyPhase: null,
     sourceType: null,
-    answerEngine: null
+    answerEngine: null,
+    buyerPersona: null
   })
   const [sources, setSources] = useState<OverallSourceData[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -197,6 +203,58 @@ export function OverallCitations({ companyId, accountId }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [selectedSource, setSelectedSource] = useState<OverallSourceData | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [buyerPersonas, setBuyerPersonas] = useState<string[]>([])
+
+  // Add new state for filter UI
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [stagedFilters, setStagedFilters] = useState<LocalFilterOptions>(filters)
+  
+  // Transform active filters into badge format
+  const activeFilterBadges = useMemo(() => {
+    const badges = []
+    
+    if (filters.sourceType) {
+      badges.push({
+        category: 'sourceType',
+        label: filters.sourceType,
+        value: filters.sourceType
+      })
+    }
+    
+    if (filters.buyingJourneyPhase) {
+      filters.buyingJourneyPhase.forEach(phase => {
+        const label = JOURNEY_PHASES.find(p => p.value === phase)?.label || phase
+        badges.push({
+          category: 'buyingJourneyPhase',
+          label,
+          value: phase
+        })
+      })
+    }
+    
+    if (filters.answerEngine) {
+      filters.answerEngine.forEach(engine => {
+        const label = ANSWER_ENGINES.find(e => e.value === engine)?.label || engine
+        badges.push({
+          category: 'answerEngine',
+          label,
+          value: engine
+        })
+      })
+    }
+    
+    if (filters.buyerPersona) {
+      filters.buyerPersona.forEach(persona => {
+        badges.push({
+          category: 'buyerPersona',
+          label: persona,
+          value: persona
+        })
+      })
+    }
+    
+    return badges
+  }, [filters])
 
   // Calculate pagination
   const totalPages = Math.ceil(sources.length / PAGE_SIZE)
@@ -226,7 +284,6 @@ export function OverallCitations({ companyId, accountId }: Props) {
 
         const supabase = createClient()
         
-        // Build query with filters
         let query = supabase
           .from('citations')
           .select(`
@@ -238,6 +295,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
             recommended,
             company_mentioned,
             buyer_journey_phase,
+            buyer_persona,
             rank_list,
             mentioned_companies,
             mentioned_companies_count,
@@ -253,17 +311,20 @@ export function OverallCitations({ companyId, accountId }: Props) {
             page_authority,
             created_at,
             answer_engine
-          `) as any // Type assertion needed due to dynamic column selection
+          `) as any
 
         // Apply filters
         if (filters.buyingJourneyPhase) {
-          query = query.eq('buyer_journey_phase', filters.buyingJourneyPhase)
+          query = query.in('buyer_journey_phase', filters.buyingJourneyPhase)
         }
         if (filters.sourceType) {
           query = query.eq('source_type', filters.sourceType)
         }
         if (filters.answerEngine) {
-          query = query.eq('answer_engine', filters.answerEngine)
+          query = query.in('answer_engine', filters.answerEngine)
+        }
+        if (filters.buyerPersona) {
+          query = query.in('buyer_persona', filters.buyerPersona)
         }
 
         query = query.eq('company_id', companyId)
@@ -272,14 +333,24 @@ export function OverallCitations({ companyId, accountId }: Props) {
 
         if (fetchError) throw fetchError
 
+        // Extract unique buyer personas
+        const uniquePersonas = Array.from(new Set(
+          (data as CitationRow[])
+            .map(citation => citation.buyer_persona)
+            .filter((persona): persona is string => Boolean(persona))
+        )).sort()
+        
+        setBuyerPersonas(uniquePersonas)
+
         // Process and group citations by URL
         const groupedCitations = new Map<string, OverallSourceData>()
-        const companyMentionsMap = new Map<string, Map<string, number>>() // URL -> (Company -> MaxCount)
-        const journeyPhasesMap = new Map<string, Set<string>>() // URL -> Set of phases
-        const answerEnginesMap = new Map<string, Set<string>>() // URL -> Set of engines
-        const citationOrdersMap = new Map<string, number[]>() // URL -> Array of citation orders
+        const companyMentionsMap = new Map<string, Map<string, number>>()
+        const journeyPhasesMap = new Map<string, Set<string>>()
+        const answerEnginesMap = new Map<string, Set<string>>()
+        const buyerPersonasMap = new Map<string, Set<string>>()
+        const citationOrdersMap = new Map<string, number[]>()
 
-        // First pass: collect all company mentions, phases, engines, and citation orders
+        // First pass: collect all data
         const citations = data as CitationRow[]
         citations.forEach((citation) => {
           const url = citation.citation_url
@@ -294,16 +365,19 @@ export function OverallCitations({ companyId, accountId }: Props) {
           if (!answerEnginesMap.has(url)) {
             answerEnginesMap.set(url, new Set())
           }
+          if (!buyerPersonasMap.has(url)) {
+            buyerPersonasMap.set(url, new Set())
+          }
           if (!citationOrdersMap.has(url)) {
             citationOrdersMap.set(url, [])
           }
-          
+
           // Collect citation orders
           if (typeof citation.citation_order === 'number') {
             citationOrdersMap.get(url)!.push(citation.citation_order)
           }
 
-          // Process company mentions for this citation
+          // Process company mentions
           const mentionsForUrl = companyMentionsMap.get(url)!
           if (Array.isArray(citation.mentioned_companies_count)) {
             citation.mentioned_companies_count.forEach(mention => {
@@ -324,6 +398,11 @@ export function OverallCitations({ companyId, accountId }: Props) {
           // Collect answer engines
           if (citation.answer_engine) {
             answerEnginesMap.get(url)!.add(citation.answer_engine)
+          }
+
+          // Collect buyer personas
+          if (citation.buyer_persona) {
+            buyerPersonasMap.get(url)!.add(citation.buyer_persona)
           }
         })
 
@@ -352,6 +431,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
             // Get journey phases and answer engines
             const journeyPhases = Array.from(journeyPhasesMap.get(url)!).sort()
             const answerEngines = Array.from(answerEnginesMap.get(url)!).sort()
+            const buyerPersonas = Array.from(buyerPersonasMap.get(url)!).sort()
 
             groupedCitations.set(url, {
               domain,
@@ -360,6 +440,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
               domain_authority: citation.domain_authority ?? undefined,
               source_type: citation.source_type?.toLowerCase() as 'owned' | 'ugc' | 'affiliate',
               buyer_journey_phases: journeyPhases,
+              buyer_personas: buyerPersonas,
               mentioned_companies_count: standardizedMentions,
               rank_list: citation.rank_list || undefined,
               content_analysis: citation.content_analysis ? JSON.parse(citation.content_analysis) : undefined,
@@ -409,315 +490,351 @@ export function OverallCitations({ companyId, accountId }: Props) {
     setIsModalOpen(true)
   }
 
+  const handleApplyFilters = useCallback(() => {
+    setFilters(stagedFilters)
+    setIsFilterOpen(false)
+  }, [stagedFilters])
+
+  const handleResetFilters = useCallback(() => {
+    const resetFilters = {
+      buyingJourneyPhase: null,
+      sourceType: null,
+      answerEngine: null,
+      buyerPersona: null
+    }
+    setStagedFilters(resetFilters)
+    setFilters(resetFilters)
+    setIsFilterOpen(false)
+  }, [])
+
+  const handleRemoveFilter = useCallback((category: string, value: string) => {
+    setFilters(prev => {
+      const updated = { ...prev }
+      if (category === 'sourceType') {
+        updated.sourceType = null
+      } else if (category === 'buyingJourneyPhase') {
+        updated.buyingJourneyPhase = prev.buyingJourneyPhase?.filter(v => v !== value) || null
+      } else if (category === 'answerEngine') {
+        updated.answerEngine = prev.answerEngine?.filter(v => v !== value) || null
+      } else if (category === 'buyerPersona') {
+        updated.buyerPersona = prev.buyerPersona?.filter(v => v !== value) || null
+      }
+      return updated as LocalFilterOptions
+    })
+  }, [])
+
   return (
-    <div className="space-y-4">
-      {/* Overall Metrics and Distribution Charts */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Metrics Card - Top Left */}
-        <Card className="flex flex-col justify-center">
-          <CardContent className="pt-6">
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-muted-foreground">Total Citations</p>
-                  <span className="text-sm text-emerald-600">+12% from last month</span>
+    <div>
+      <div className="space-y-4">
+        {/* Overall Metrics and Distribution Charts */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Metrics Card - Top Left */}
+            <Card className="flex flex-col justify-center">
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">Total Citations</p>
+                      <span className="text-sm text-emerald-600">+12% from last month</span>
+                    </div>
+                    <p className="text-3xl font-bold">
+                      {sources.reduce((sum, source) => sum + source.citation_count, 0).toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="h-[1px] bg-border" />
+                  
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">Unique Sources</p>
+                      <span className="text-sm text-emerald-600">+5% from last month</span>
+                    </div>
+                    <p className="text-3xl font-bold">
+                      {sources.length.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="h-[1px] bg-border" />
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">Companies Mentioned</p>
+                      <span className="text-sm text-emerald-600">8 new this month</span>
+                    </div>
+                    <p className="text-3xl font-bold">
+                      {Array.from(new Set(
+                        sources.flatMap(source => 
+                          source.mentioned_companies_count.map(mention => mention.split(':')[0])
+                        )
+                      )).length.toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-3xl font-bold">
-                  {sources.reduce((sum, source) => sum + source.citation_count, 0).toLocaleString()}
-                </p>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="h-[1px] bg-border" />
-              
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-muted-foreground">Unique Sources</p>
-                  <span className="text-sm text-emerald-600">+5% from last month</span>
-                </div>
-                <p className="text-3xl font-bold">
-                  {sources.length.toLocaleString()}
-                </p>
-              </div>
-
-              <div className="h-[1px] bg-border" />
-
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-muted-foreground">Companies Mentioned</p>
-                  <span className="text-sm text-emerald-600">8 new this month</span>
-                </div>
-                <p className="text-3xl font-bold">
-                  {Array.from(new Set(
-                    sources.flatMap(source => 
-                      source.mentioned_companies_count.map(mention => mention.split(':')[0])
-                    )
-                  )).length.toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Buyer Journey Chart - Top Right */}
-        <Card className="flex flex-col">
-          <CardHeader className="items-center pb-0">
-            <CardTitle className="text-base">Buyer Journey Phases</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 pb-0">
-            <ChartContainer 
-              config={journeyPhaseConfig}
-              className="mx-auto aspect-square max-h-[300px]"
-            >
-              <PieChart>
-                <Pie
-                  data={sources.reduce((acc, source) => {
-                    source.buyer_journey_phases.forEach(phase => {
-                      const existing = acc.find(item => item.name === phase)
-                      if (existing) {
-                        existing.value += source.citation_count
-                      } else {
-                        acc.push({ 
-                          name: phase,
-                          label: JOURNEY_PHASES.find(p => p.value === phase)?.label || phase,
-                          value: source.citation_count,
-                          fill: getChartColor(phase)
+            {/* Buyer Journey Chart - Top Right */}
+            <Card className="flex flex-col">
+              <CardHeader className="items-center pb-0">
+                <CardTitle className="text-base">Buyer Journey Phases</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 pb-0">
+                <ChartContainer 
+                  config={journeyPhaseConfig}
+                  className="mx-auto aspect-square max-h-[300px]"
+                >
+                  <PieChart>
+                    <Pie
+                      data={sources.reduce((acc, source) => {
+                        source.buyer_journey_phases.forEach(phase => {
+                          const existing = acc.find(item => item.name === phase)
+                          if (existing) {
+                            existing.value += source.citation_count
+                          } else {
+                            acc.push({ 
+                              name: phase,
+                              label: JOURNEY_PHASES.find(p => p.value === phase)?.label || phase,
+                              value: source.citation_count,
+                              fill: getChartColor(phase)
+                            })
+                          }
                         })
-                      }
-                    })
-                    return acc
-                  }, [] as { name: string; label: string; value: number; fill: string }[])}
-                  dataKey="value"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                />
-                <ChartLegend
-                  content={<ChartLegendContent />}
-                  className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                />
-              </PieChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+                        return acc
+                      }, [] as { name: string; label: string; value: number; fill: string }[])}
+                      dataKey="value"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                    />
+                    <ChartLegend
+                      content={<ChartLegendContent />}
+                      className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                    />
+                  </PieChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
 
-        {/* Citation Sources Chart - Bottom Left */}
-        <Card className="flex flex-col">
-          <CardHeader className="items-center pb-0">
-            <CardTitle className="text-base">Citation Sources</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 pb-0">
-            <ChartContainer 
-              config={sourceTypeConfig}
-              className="mx-auto aspect-square max-h-[300px]"
-            >
-              <PieChart>
-                <Pie
-                  data={sources.reduce((acc, source) => {
-                    const type = source.source_type?.toUpperCase() || 'UNKNOWN'
-                    const existing = acc.find(item => item.name === type)
-                    if (existing) {
-                      existing.value += source.citation_count
-                    } else {
-                      acc.push({ 
-                        name: type, 
-                        value: source.citation_count,
-                        fill: getChartColor(type)
-                      })
-                    }
-                    return acc
-                  }, [] as { name: string; value: number; fill: string }[])}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                />
-                <ChartLegend
-                  content={<ChartLegendContent />}
-                  className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                />
-              </PieChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+            {/* Citation Sources Chart - Bottom Left */}
+            <Card className="flex flex-col">
+              <CardHeader className="items-center pb-0">
+                <CardTitle className="text-base">Citation Sources</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 pb-0">
+                <ChartContainer 
+                  config={sourceTypeConfig}
+                  className="mx-auto aspect-square max-h-[300px]"
+                >
+                  <PieChart>
+                    <Pie
+                      data={sources.reduce((acc, source) => {
+                        const type = source.source_type?.toUpperCase() || 'UNKNOWN'
+                        const existing = acc.find(item => item.name === type)
+                        if (existing) {
+                          existing.value += source.citation_count
+                        } else {
+                          acc.push({ 
+                            name: type, 
+                            value: source.citation_count,
+                            fill: getChartColor(type)
+                          })
+                        }
+                        return acc
+                      }, [] as { name: string; value: number; fill: string }[])}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                    />
+                    <ChartLegend
+                      content={<ChartLegendContent />}
+                      className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                    />
+                  </PieChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
 
-        {/* Answer Engines Chart - Bottom Right */}
-        <Card className="flex flex-col">
-          <CardHeader className="items-center pb-0">
-            <CardTitle className="text-base">Answer Engines</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 pb-0">
-            <ChartContainer 
-              config={answerEngineConfig}
-              className="mx-auto aspect-square max-h-[300px]"
-            >
-              <PieChart>
-                <Pie
-                  data={sources.reduce((acc, source) => {
-                    source.answer_engines.forEach(engine => {
-                      const existing = acc.find(item => item.name === engine)
-                      if (existing) {
-                        existing.value += source.citation_count
-                      } else {
-                        acc.push({ 
-                          name: engine,
-                          label: ANSWER_ENGINES.find(e => e.value === engine)?.label || engine,
-                          value: source.citation_count,
-                          fill: getChartColor(engine)
+            {/* Answer Engines Chart - Bottom Right */}
+            <Card className="flex flex-col">
+              <CardHeader className="items-center pb-0">
+                <CardTitle className="text-base">Answer Engines</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 pb-0">
+                <ChartContainer 
+                  config={answerEngineConfig}
+                  className="mx-auto aspect-square max-h-[300px]"
+                >
+                  <PieChart>
+                    <Pie
+                      data={sources.reduce((acc, source) => {
+                        source.answer_engines.forEach(engine => {
+                          const existing = acc.find(item => item.name === engine)
+                          if (existing) {
+                            existing.value += source.citation_count
+                          } else {
+                            acc.push({ 
+                              name: engine,
+                              label: ANSWER_ENGINES.find(e => e.value === engine)?.label || engine,
+                              value: source.citation_count,
+                              fill: getChartColor(engine)
+                            })
+                          }
                         })
-                      }
-                    })
-                    return acc
-                  }, [] as { name: string; label: string; value: number; fill: string }[])}
-                  dataKey="value"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                />
-                <ChartLegend
-                  content={<ChartLegendContent />}
-                  className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                />
-              </PieChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Overall Citations Analysis</CardTitle>
-          <CardDescription>
-            Analyze all citations across different sources and metrics
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="w-[200px]">
-              <Label>Buying Journey Phase</Label>
-              <Select
-                value={filters.buyingJourneyPhase || "all"}
-                onValueChange={(value) =>
-                  setFilters(prev => ({ 
-                    ...prev, 
-                    buyingJourneyPhase: value === "all" ? null : value 
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select phase" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Phases</SelectItem>
-                  {JOURNEY_PHASES.map(phase => (
-                    <SelectItem key={phase.value} value={phase.value}>
-                      {phase.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="w-[200px]">
-              <Label>Source Type</Label>
-              <Select
-                value={filters.sourceType || "all"}
-                onValueChange={(value) =>
-                  setFilters(prev => ({ 
-                    ...prev, 
-                    sourceType: value === "all" ? null : value as CitationSourceType 
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {SOURCE_TYPES.map(type => (
-                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="w-[200px]">
-              <Label>Answer Engine</Label>
-              <Select
-                value={filters.answerEngine || "all"}
-                onValueChange={(value) =>
-                  setFilters(prev => ({ 
-                    ...prev, 
-                    answerEngine: value === "all" ? null : value as AnswerEngine 
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select engine" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Engines</SelectItem>
-                  {ANSWER_ENGINES.map(engine => (
-                    <SelectItem key={engine.value} value={engine.value}>
-                      {engine.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                        return acc
+                      }, [] as { name: string; label: string; value: number; fill: string }[])}
+                      dataKey="value"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                    />
+                    <ChartLegend
+                      content={<ChartLegendContent />}
+                      className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                    />
+                  </PieChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
-
-      {isLoading ? (
-        <div className="flex justify-center p-8">
-          <Spinner />
+          
+          <div className="h-px bg-border" />
         </div>
-      ) : error ? (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : sources.length === 0 ? (
-        <EmptyState
-          title="No citations found"
-          description="Try adjusting your filters or adding more citations"
-        />
-      ) : (
-        <>
-          <div id="citations-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {currentSources.map((source, index) => (
-              <OverallSourceCard 
-                key={index} 
-                source={source} 
-                onClick={() => handleSourceClick(source)}
-              />
-            ))}
+
+        {/* New Header with Filter Button */}
+        <div className="px-4">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">Overall Citations Analysis</h2>
+              <p className="text-muted-foreground">
+                Analyze all citations across different sources and metrics
+              </p>
+            </div>
+            <FilterButton 
+              onOpenChange={() => setIsFilterOpen(true)} 
+              totalFilters={activeFilterBadges.length} 
+            />
           </div>
 
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            isLoading={isLoading}
+          {/* Active Filter Badges */}
+          <FilterBadgeGroup
+            filters={activeFilterBadges}
+            onRemove={handleRemoveFilter}
           />
-        </>
-      )}
+        </div>
 
-      <OverallSourceModal
-        source={selectedSource}
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setSelectedSource(null)
-        }}
-      />
+        {/* Filter Sidebar */}
+        <FilterSidebar
+          open={isFilterOpen}
+          onOpenChange={setIsFilterOpen}
+          onApply={handleApplyFilters}
+          onReset={handleResetFilters}
+        >
+          <FilterSection
+            title="Source Type"
+            options={[
+              { value: 'EARNED', label: 'Earned' },
+              { value: 'OWNED', label: 'Owned' },
+              { value: 'COMPETITOR', label: 'Competitor' },
+              { value: 'UGC', label: 'UGC' }
+            ]}
+            values={stagedFilters.sourceType ? [stagedFilters.sourceType] : []}
+            onChange={(values: string[]) => setStagedFilters(prev => ({
+              ...prev,
+              sourceType: (values[0] as CitationSourceType) || null
+            }))}
+          />
+          <FilterSection
+            title="Buying Journey Phase"
+            options={JOURNEY_PHASES.map(phase => ({
+              value: phase.value,
+              label: phase.label
+            }))}
+            values={stagedFilters.buyingJourneyPhase || []}
+            onChange={(values: string[]) => setStagedFilters(prev => ({
+              ...prev,
+              buyingJourneyPhase: values.length > 0 ? values : null
+            }))}
+          />
+          <FilterSection
+            title="Answer Engine"
+            options={ANSWER_ENGINES.map(engine => ({
+              value: engine.value,
+              label: engine.label
+            }))}
+            values={stagedFilters.answerEngine || []}
+            onChange={(values: string[]) => setStagedFilters(prev => ({
+              ...prev,
+              answerEngine: values.length > 0 ? values : null
+            }))}
+          />
+          <FilterSection
+            title="Buyer Persona"
+            options={buyerPersonas.map(persona => ({
+              value: persona,
+              label: persona
+            }))}
+            values={stagedFilters.buyerPersona || []}
+            onChange={(values: string[]) => setStagedFilters(prev => ({
+              ...prev,
+              buyerPersona: values.length > 0 ? values : null
+            }))}
+          />
+        </FilterSidebar>
+
+        {/* Citations Grid */}
+        {isLoading ? (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        ) : error ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : sources.length === 0 ? (
+          <EmptyState
+            title="No citations found"
+            description="Try adjusting your filters or adding more citations"
+          />
+        ) : (
+          <>
+            <div id="citations-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {currentSources.map((source, index) => (
+                <OverallSourceCard 
+                  key={index} 
+                  source={source} 
+                  onClick={() => handleSourceClick(source)}
+                />
+              ))}
+            </div>
+
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              isLoading={isLoading}
+            />
+          </>
+        )}
+
+        {/* Source Modal */}
+        {selectedSource && (
+          <OverallSourceModal
+            source={selectedSource}
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+          />
+        )}
+      </div>
     </div>
   )
 } 
