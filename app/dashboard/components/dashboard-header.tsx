@@ -56,6 +56,8 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
       ? 'Personal Settings'
       : activeView === 'faqs'
       ? 'FAQs'
+      : activeView === 'ai-overviews'
+      ? 'AI Overviews'
       : 'Dashboard'
   )
 

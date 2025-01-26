@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from '@/components/error-boundary'
 import { createClient } from '@/app/supabase/client'
 import { OverallCitations } from './source-analysis/overall-citations'
+import { AIOverviews } from './ai-overviews'
 
 interface Company {
   id: number
@@ -100,6 +101,11 @@ function DashboardView({
             />
           ) : activeView === 'personal' ? (
             <PersonalSettings accountId={accountId} />
+          ) : activeView === 'ai-overviews' ? (
+            <AIOverviews
+              companyId={selectedCompany.id}
+              accountId={accountId}
+            />
           ) : (
             <>
               <EngineMetricsChart 

@@ -854,6 +854,112 @@ export type Database = {
           },
         ]
       }
+      ai_overview_terms_test: {
+        Row: {
+          id: number
+          company_id: number
+          account_id: string
+          term: string
+          source: 'MOZ' | 'AI' | 'USER'
+          status: 'ACTIVE' | 'ARCHIVED'
+          created_at: string | null
+        }
+        Insert: {
+          id?: number
+          company_id: number
+          account_id: string
+          term: string
+          source: 'MOZ' | 'AI' | 'USER'
+          status: 'ACTIVE' | 'ARCHIVED'
+          created_at?: string | null
+        }
+        Update: {
+          id?: number
+          company_id?: number
+          account_id?: string
+          term?: string
+          source?: 'MOZ' | 'AI' | 'USER'
+          status?: 'ACTIVE' | 'ARCHIVED'
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_overview_terms_test_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_overview_terms_test_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      ai_overview_tracking_test: {
+        Row: {
+          id: number
+          term_id: number
+          company_id: number
+          account_id: string
+          has_ai_overview: boolean
+          company_mentioned: boolean
+          competitor_mentions: string[]
+          url: string | null
+          checked_at: string | null
+          content_snapshot: string | null
+        }
+        Insert: {
+          id?: number
+          term_id: number
+          company_id: number
+          account_id: string
+          has_ai_overview: boolean
+          company_mentioned: boolean
+          competitor_mentions?: string[]
+          url?: string | null
+          checked_at?: string | null
+          content_snapshot?: string | null
+        }
+        Update: {
+          id?: number
+          term_id?: number
+          company_id?: number
+          account_id?: string
+          has_ai_overview?: boolean
+          company_mentioned?: boolean
+          competitor_mentions?: string[]
+          url?: string | null
+          checked_at?: string | null
+          content_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_overview_tracking_test_term_id_fkey"
+            columns: ["term_id"]
+            isOneToOne: false
+            referencedRelation: "ai_overview_terms_test"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_overview_tracking_test_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_overview_tracking_test_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       persona_response_stats: {

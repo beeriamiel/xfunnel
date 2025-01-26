@@ -85,6 +85,13 @@ export function AppSidebar({ className }: SidebarProps) {
           view: 'engine',
         },
         {
+          title: "AI Overviews",
+          href: getHref("/dashboard"),
+          active: isDashboard && activeView === 'ai-overviews',
+          icon: <LineChart className="h-4 w-4" />,
+          view: 'ai-overviews',
+        },
+        {
           title: "ICP Analysis",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'icp',

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Company } from './generate-analysis/types/company'
 import { type Step } from './generate-analysis/types/setup'
 
-export type DashboardView = 'engine' | 'citation' | 'takeaways' | 'response' | 'personal' | 'faqs' | 'icp' | 'journey' | 'new-journey'
+export type DashboardView = 'engine' | 'citation' | 'takeaways' | 'response' | 'personal' | 'faqs' | 'icp' | 'journey' | 'new-journey' | 'ai-overviews'
 export type TimePeriod = 'weekly' | 'monthly'
 
 interface ICP {
