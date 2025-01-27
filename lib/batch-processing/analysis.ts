@@ -5,188 +5,76 @@ import Anthropic from '@anthropic-ai/sdk';
 // Add Claude-based ranking function
 async function findRankingWithClaude(text: string, ourCompanyName: string, competitors: string[]): Promise<InternalRankingResult | null> {
   console.log("\n=== Starting findRankingWithClaude ===");
-  
+  console.log("Input:", { 
+    textLength: text.length, 
+    ourCompanyName, 
+    competitors 
+  });
+
+  // Create a combined list of companies to look for
+  const allCompanies = [ourCompanyName, ...competitors];
+
+  if (!competitors || competitors.length === 0) {
+    console.log('No competitors provided, skipping Claude analysis');
+    return null;
+  }
+
   const anthropic = new Anthropic({
     apiKey: process.env.CLAUDE_API_KEY,
   });
 
-  const systemPrompt = `You are a specialized ranking extraction assistant. Your task is to analyze text and extract company names with rankings. Follow these rules strictly:
+  const systemPrompt = `You are a specialized ranking extraction assistant. Your task is to analyze text and identify mentions and rankings of specific competitor companies. Follow these rules strictly:
 
-1. Company Name Detection Rules:
-   A. ONLY include actual company names that are:
-      - Clearly identified business entities with distinct brand names
-      - Specific, named software vendors or technology companies
-      - Clearly mentioned as companies ("Company X offers/provides/develops")
-      
-   B. A company name MUST:
-      - Be a specific, named business entity
-      - Have a distinct brand or corporate identity
-      - Be clearly identifiable as a company (not a role or service)
+1. Company Detection Rules:
+   - ONLY look for the specific companies provided in the competitors list
+   - Use flexible matching to identify company names:
+     ✓ Exact matches ("Salesforce" matches "Salesforce")
+     ✓ Partial matches ("Chaos Technology" matches "Chaos.com")
+     ✓ Common variations ("ChaosHQ" matches "Chaos")
+     ✓ With/without suffixes ("Sage HR" matches "Sage")
    
-   C. DO NOT include as companies:
-      - Professional roles/titles ("engineers", "consultants", "counsel")
-      - Service providers without specific company names
-      - Job descriptions or positions ("property managers")
-      - Teams or departments
-      - Generic professional services
-      - Generic industry terms ("Risk Management")
-      - Service descriptions ("Insurance Services")
-      - Product categories ("Protection System")
-      - Industry practices ("Real Estate Management")
-      - Types of software ("Performance Management Tools")
+   - ALWAYS use the official company names from the provided competitors list
+   - When a match is found, use the exact name from the competitors list
+   - Example: If competitors list has "Chaos.com" and text mentions "Chaos Technology", use "Chaos.com"
 
-   D. Technology Categories and Solutions to EXCLUDE:
-      - Generic technology terms ("IoT Sensors", "AI Platforms", "Cloud Solutions")
-      - Technology descriptions ("Machine Learning Tools", "Blockchain Technology")
-      - Platform types ("Analytics Platforms", "Monitoring Systems")
-      - Software categories ("Risk Management Solutions", "Insurance Platforms")
-      - Infrastructure components ("Sensors", "Networks", "Databases")
-   
-   E. Service Provider Patterns to EXCLUDE:
-      - Generic terms + "Management" + (Acronym)
-        ❌ "Real Estate Risk Management (RERM)"
-        ❌ "Property Management Services (PMS)"
-        ❌ "Risk Placement Services (RPS)"
-      - Industry term combinations:
-        ❌ "[Industry] + Management"
-        ❌ "[Industry] + Services"
-        ❌ "[Industry] + Solutions"
-      - Generic service providers with acronyms:
-        ❌ "Business Process Management (BPM)"
-        ❌ "Enterprise Resource Planning (ERP)"
-   
-   F. List and Section Context:
-      - Items appearing in feature lists
-      - Bullet points under technology categories
-      - Items under "Tools", "Solutions", or "Technologies" headers
-      - Generic platform descriptions
-      - Service type listings
+2. Confidence Rules:
+   - Only include a company if you're at least 90% confident it's a match
+   - Consider context when matching (e.g., "Chaos" in "chaos in the market" is NOT a company reference)
+   - If unsure about a match, exclude it
 
-2. Company Name Standardization:
-   A. Special Cases - DO NOT MODIFY these exact company names:
-      - "BambooHR" (keep as is, don't remove HR)
-   
-   B. Company Name Variations and Aliases:
-      - When a company has multiple names, use the primary/first mentioned name
-      - DO NOT list variations as separate companies
-      - Examples of alias patterns to consolidate:
-        ✓ "Hibob, also known as Bob" -> use "Hibob" only
-        ✓ "Company X (aka Company Y)" -> use "Company X" only
-        ✓ "Full Name (Short Name)" -> use "Full Name" only
-        ✓ "Brand Name by Company Name" -> use "Company Name" only
-        ✓ "Name, or Name for short" -> use first "Name" only
-   
-   C. Alias Detection Phrases:
-      - "also known as"
-      - "aka"
-      - "or simply"
-      - "or for short"
-      - "doing business as"
-      - "d/b/a"
-      - "formerly"
-      - "now called"
-      - "branded as"
-   
-   D. For all other companies:
-      - Use core company name without product lines ("RoboMQ's Hire2Retire" -> "RoboMQ")
-      - Strip HR/HCM/HRMS suffixes when they're descriptive ("Sage HR" -> "Sage")
-      - Use primary name for merged companies ("TriNet Zenefits" -> "TriNet")
-      - Remove Inc., Ltd., LLC, Corp., ®, ™
-      - Use parent company for products ("Microsoft SharePoint" -> "Microsoft")
+3. RESPONSE FORMAT RULES:
+   A. If ANY companies are found:
+      - Return ONLY a numbered list using EXACT names from the provided list
+   B. If NO companies are found:
+      - Return EXACTLY: NO_EXPLICIT_RANKING
 
-3. Ranking Detection (in priority order):
-   - Explicit "Ranking" or "Final Ranking" sections
-   - Numbered lists (1., 2., 3.)
-   - Section hierarchy ("Specifically for" > "More General" > "Other")
-   - Recommendation strength ("highly recommended", "ideal solution")
-   - Comparative language ("better than", "preferred over")
-
-4. RESPONSE FORMAT RULES:
-   A. If ANY verified companies are found:
-      - Return ONLY a numbered list of company names
-      - Example:
-      1. Microsoft
-      2. Google
-      3. Apple
-
-   B. If NO verified companies are found:
-      - Return EXACTLY and ONLY the text: NO_EXPLICIT_RANKING
-      - Do not include any other text or numbers
-      - Do not include professional roles, services, or descriptions
-
-Examples of INVALID responses:
-❌ 1. NO_EXPLICIT_RANKING
-   2. Structural engineers
-   
-❌ NO_EXPLICIT_RANKING
-   But I found these roles:
-   1. Consultants
-
-Examples of VALID responses:
-✅ NO_EXPLICIT_RANKING
-
-OR
-
-✅ 1. Microsoft
-   2. Google
-
-Examples of CORRECT company name handling:
-Input: "Hibob, also known as Bob, provides..."
-✅ 1. Hibob
-
-Input: "Monday.com (formerly DaPulse) offers..."
-✅ 1. Monday.com
-
-Input: "Salesforce (SFDC) and their product..."
-✅ 1. Salesforce
-
-Examples of INCORRECT company name handling:
-Input: "Hibob, also known as Bob, provides..."
-❌ 1. Hibob
-   2. Bob
-
-Input: "Monday.com (formerly DaPulse) offers..."
-❌ 1. Monday.com
-   2. DaPulse
-
-Examples of what NOT to include:
-❌ "Structural engineers" (profession)
-❌ "Environmental consultants" (service)
-❌ "Legal counsel" (role)
-❌ "Insurance brokers" (profession)
-❌ "Property managers" (role)
-
-Examples of VALID company names:
-✅ "Microsoft" (specific company)
-✅ "BambooHR" (specific company)
-✅ "Salesforce" (specific company)
-
-Example text with NON-companies:
-"Technology Solutions:
-- IoT Sensors for monitoring
-- AI and Machine Learning Platforms
-- Cloud-based Analytics"
-✅ Response: NO_EXPLICIT_RANKING (none are companies)
-
-Example text with mixed content:
-"Solutions in the market:
-- Microsoft offers IoT platforms
-- Real Estate Risk Management (RERM) provides services
-- Deloitte's analytics solutions"
+Examples:
+Text: "Chaos Technology offers better solutions than ServiceNow..."
+Companies: ["Chaos.com", "ServiceNow", "Workday"]
 ✅ Response:
-1. Microsoft
-2. Deloitte
+1. Chaos.com
+2. ServiceNow
 
-[Rest of prompt remains the same...]`;
+Text: "The market is in chaos, while Workday leads..."
+Companies: ["Chaos.com", "Workday"]
+✅ Response:
+1. Workday
+(Note: "chaos" here is not referring to Chaos.com)`;
 
   const userPrompt = `Extract ALL companies from the following text. Return them in a numbered list, using ranking structure if it exists, or order of appearance if no ranking exists. Only return NO_EXPLICIT_RANKING if no companies are found.
+
+Companies List:
+${allCompanies.join('\n')}
 
 Text to analyze:
 ${text}`;
 
   try {
-    console.log('Calling Claude API with text length:', text.length);
-    
+    console.log('Calling Claude API with:', {
+      textLength: text.length,
+      companiesCount: allCompanies.length
+    });
+
     const message = await anthropic.messages.create({
       model: 'claude-3-haiku-20240307',
       max_tokens: 1024,
@@ -218,9 +106,16 @@ ${text}`;
       })
       .filter((name): name is string => name !== null);
 
-    if (companies.length < 2) {
-      console.log('Not enough companies found in Claude response');
+    if (companies.length < 1) {
+      console.log('No companies found in Claude response');
       return null;
+    }
+
+    // Validate that all returned companies are from our combined list
+    const invalidCompanies = companies.filter(name => !allCompanies.includes(name));
+    if (invalidCompanies.length > 0) {
+      console.warn('Claude returned companies not in the provided list:', invalidCompanies);
+      // Continue anyway as the companies might be valid matches with different naming
     }
 
     const rank_list = companies
@@ -234,7 +129,7 @@ ${text}`;
     return {
       rank_list,
       ranking_position,
-      confidence: 1.0, // Highest confidence since it's our primary method
+      confidence: 1.0, // High confidence since we're using a curated list
       method: 'claude'
     };
 
@@ -257,6 +152,7 @@ export type Response = {
     id: number;
     company_id: number;
     query_text: string;
+    account_id: string;
     prompt_id?: number | null;
     buyer_journey_phase?: string[] | null;
     persona?: {
@@ -635,7 +531,7 @@ function formatRankList(
 }
 
 async function fetchCompetitors(companyId: number): Promise<string[]> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   try {
     const { data: competitors } = await adminClient
@@ -643,7 +539,11 @@ async function fetchCompetitors(companyId: number): Promise<string[]> {
       .select('competitor_name')
       .eq('company_id', companyId);
 
-    return competitors?.map(c => c.competitor_name) || [];
+    // Check if competitors is an array and has the expected structure
+    if (Array.isArray(competitors) && competitors.every(c => 'competitor_name' in c)) {
+      return competitors.map(c => c.competitor_name);
+    }
+    return [];
   } catch (error) {
     console.error('Error fetching competitors:', error);
     return [];
@@ -904,10 +804,6 @@ export async function analyzeResponse(response: Response): Promise<AnalyzedRespo
     // Calculate sentiment only for our company
     analysis.sentiment_score = analyzeOurCompanySentiment(responseText, ourCompanyName);
 
-    // Check if our company is mentioned
-    const ourCompanyRegex = new RegExp(`\\b${ourCompanyName}\\b`, 'gi');
-    analysis.company_mentioned = ourCompanyRegex.test(responseText);
-
     // Competitor Analysis and Ranking List
     if (query.company) {
       const rankingResult = await findRanking(responseText, ourCompanyName, competitors);
@@ -925,12 +821,22 @@ export async function analyzeResponse(response: Response): Promise<AnalyzedRespo
           })
           .filter((name): name is string => name !== null);
 
+        // Set company_mentioned based on rank_list
+        analysis.company_mentioned = analysis.mentioned_companies.some(
+          company => normalizeCompanyName(company) === normalizeCompanyName(ourCompanyName)
+        );
+
         console.log('Ranking analysis result:', {
           rank_list: rankingResult.rank_list,
           ranking_position: rankingResult.ranking_position,
           confidence: rankingResult.confidence,
-          mentioned_companies: analysis.mentioned_companies
+          mentioned_companies: analysis.mentioned_companies,
+          company_mentioned: analysis.company_mentioned
         });
+      } else {
+        // Fallback to checking response text if no rank_list
+        const ourCompanyRegex = new RegExp(`\\b${ourCompanyName}\\b`, 'gi');
+        analysis.company_mentioned = ourCompanyRegex.test(responseText);
       }
     }
 

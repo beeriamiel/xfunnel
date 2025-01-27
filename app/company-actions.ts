@@ -8,6 +8,7 @@ import { processQueriesWithEngines } from "@/lib/actions/generate-questions";
 import { SupabaseBatchTrackingService } from "@/lib/services/batch-tracking";
 import { createAdminClient } from "@/app/supabase/server";
 import { ResponseAnalysisQueue } from "@/lib/batch-processing/queue";
+import { generateInitialICPs } from "@/lib/actions/generate-initial-icps";
 
 export interface EngineSelection {
   perplexity: boolean;
@@ -46,17 +47,19 @@ export async function generateQuestionsAction(
   systemPromptName: string,
   userPromptName: string,
   model: AIModelType = 'gpt-4-turbo-preview',
-  personaId?: number
+  accountId: string,
+  personaId?: string
 ) {
   try {
     if (personaId) {
       return await generateQuestions(
         companyName,
         engines,
-        personaId,
+        parseInt(personaId),
         systemPromptName,
         userPromptName,
-        model
+        model,
+        accountId
       );
     } else {
       await generateQuestionsForAllPersonas(
@@ -64,7 +67,8 @@ export async function generateQuestionsAction(
         engines,
         systemPromptName,
         userPromptName,
-        model
+        model,
+        accountId
       );
     }
   } catch (error) {
@@ -80,14 +84,16 @@ export async function generateICPsAction(
   questionSystemPrompt: string,
   questionUserPrompt: string,
   engines: EngineSelection,
-  modelSelection: ModelSelection
+  modelSelection: ModelSelection,
+  accountId: string
 ) {
   try {
     const icps = await generateICPs(
       companyName, 
       icpSystemPrompt, 
       icpUserPrompt,
-      modelSelection.icpModel
+      modelSelection.icpModel,
+      accountId
     );
     
     await generateQuestionsForAllPersonas(
@@ -95,7 +101,8 @@ export async function generateICPsAction(
       engines,
       questionSystemPrompt,
       questionUserPrompt,
-      modelSelection.questionModel
+      modelSelection.questionModel,
+      accountId
     );
 
     return icps;
@@ -109,14 +116,15 @@ export async function generateResponsesAction(
   companyId: number,
   personaIds: number[],
   engines: EngineSelection,
-  model: AIModelType = 'gpt-4-turbo-preview'
+  model: AIModelType = 'gpt-4-turbo-preview',
+  accountId: string
 ) {
   try {
-    const adminClient = createAdminClient();
-    const batchTracker = new SupabaseBatchTrackingService();
+    const adminClient = await createAdminClient();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
 
     // Create a new response batch
-    const responseBatchId = await batchTracker.createBatch('response', companyId, {
+    const responseBatchId = await batchTracker.createBatch('response', companyId, accountId, {
       model,
       engines: Object.keys(engines).filter(k => engines[k as keyof typeof engines])
     });
@@ -137,7 +145,8 @@ export async function generateResponsesAction(
     await processQueriesWithEngines(
       existingQueries,
       engines,
-      responseBatchId
+      responseBatchId,
+      accountId
     );
 
     // Initialize queue processing for the new responses
@@ -151,7 +160,12 @@ export async function generateResponsesAction(
     if (responseRange?.length) {
       const startId = responseRange[0].id;
       const endId = responseRange[responseRange.length - 1].id;
-      await queue.processQueue(startId, endId, companyId);
+      await queue.processQueue(
+        startId, 
+        endId, 
+        companyId,
+        accountId
+      );
     }
 
     return {
@@ -160,6 +174,23 @@ export async function generateResponsesAction(
     };
   } catch (error) {
     console.error('Error in generateResponsesAction:', error);
+    throw error;
+  }
+}
+
+export async function generateInitialICPsAction(
+  companyName: string,
+  accountId: string
+) {
+  try {
+    const icps = await generateInitialICPs(
+      companyName,
+      accountId
+    );
+
+    return icps;
+  } catch (error) {
+    console.error('Error in generateInitialICPsAction:', error);
     throw error;
   }
 }

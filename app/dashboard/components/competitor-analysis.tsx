@@ -44,8 +44,7 @@ const ENGINE_NAMES: { [key: string]: string } = {
   perplexity: 'Perplexity',
   gemini: 'Gemini',
   claude: 'Claude',
-  openai: 'OpenAI',
-  google_search: 'Google Search'
+  openai: 'OpenAI'
 }
 
 interface EngineData {
@@ -73,7 +72,8 @@ interface CompetitorData {
 }
 
 interface CompetitorAnalysisProps {
-  companyId?: number | null
+  companyId: number;
+  accountId: string;
 }
 
 interface MetricInfo {
@@ -400,7 +400,10 @@ const ENGINE_COLORS = {
   rest: COMPETITOR_COLORS.rest
 }
 
-export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
+export function CompetitorAnalysis({ 
+  companyId, 
+  accountId
+}: CompetitorAnalysisProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeEngine, setActiveEngine] = useState<string>('perplexity')
@@ -435,7 +438,8 @@ export function CompetitorAnalysis({ companyId }: CompetitorAnalysisProps) {
             company_name,
             response_text
           `)
-          .eq('company_id', effectiveCompanyId);
+          .eq('company_id', effectiveCompanyId)
+          .not('answer_engine', 'in', '("google_search","google-search")');
 
         if (analysisError) throw analysisError;
         if (!analysisData?.length) {

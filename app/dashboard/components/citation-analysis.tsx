@@ -87,7 +87,8 @@ const PURPLE_PALETTE = {
 }
 
 interface CitationAnalysisProps {
-  companyId: number
+  companyId: number;
+  accountId: string;
 }
 
 interface CompetitorData {
@@ -1462,7 +1463,18 @@ function ChartLoadingState() {
   )
 }
 
-export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
+// Feature flag to control legacy citation analysis visibility
+const SHOW_LEGACY_CITATIONS = false
+
+export function CitationAnalysis({ 
+  companyId, 
+  accountId
+}: CitationAnalysisProps) {
+  // Return null if feature flag is disabled
+  if (!SHOW_LEGACY_CITATIONS) {
+    return null
+  }
+
   const [currentCompanyName, setCurrentCompanyName] = useState<string | null>(null)
   const [selectedMentionCompetitor, setSelectedMentionCompetitor] = useState<string | null>(null)
   const [selectedRankingCompetitor, setSelectedRankingCompetitor] = useState<string | null>(null)
@@ -1493,6 +1505,7 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
           .from('companies')
           .select('name')
           .eq('id', companyId)
+          .eq('account_id', accountId)
           .single()
 
         if (companyError) throw companyError
@@ -1503,6 +1516,7 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
           .from('response_analysis')
           .select('*')
           .eq('company_id', companyId)
+          .eq('account_id', accountId)
           .in('buying_journey_stage', MENTION_STAGES)
           .not('mentioned_companies', 'is', null)
           .order('created_at', { ascending: false })
@@ -1514,6 +1528,7 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
           .from('response_analysis')
           .select('*')
           .eq('company_id', companyId)
+          .eq('account_id', accountId)
           .in('buying_journey_stage', RANKING_STAGES)
           .not('rank_list', 'is', null)
           .order('created_at', { ascending: false })
@@ -1603,7 +1618,7 @@ export function CitationAnalysis({ companyId }: CitationAnalysisProps) {
     }
 
     fetchData()
-  }, [companyId])
+  }, [companyId, accountId])
 
   if (!companyId) {
     return (

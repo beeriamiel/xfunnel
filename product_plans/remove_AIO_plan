@@ -1,0 +1,81 @@
+I'll help investigate the changes needed to exclude AI Overviews (google_search) metrics from the frontend while maintaining system stability. Let me analyze the components and data flow.
+
+First, let's understand the key components and their relationships:
+
+1. **Data Source and Processing**
+From the tables schema, I see that metrics primarily come from the `response_analysis` table, where:
+- `answer_engine` field indicates the source (google_search for AI Overviews)
+- Data includes metrics like sentiment_score, ranking_position, company_mentioned, etc.
+
+Let me examine the components to understand the data flow:
+
+Read file: app/dashboard/components/source-analysis/overall-citations.tsx
+
+
+Let me check the engine metrics chart component to understand how it processes AI Overview data:
+
+Read file: app/dashboard/components/engine-metrics-chart.tsx
+
+
+Let me check the ICP analysis component as well:
+
+Read file: app/dashboard/components/new-icp-analysis/index.tsx
+
+
+Based on my analysis, here are the key areas that need to be modified to exclude AI Overview metrics:
+
+1. **Engine Metrics Chart (`engine-metrics-chart.tsx`)**:
+- The component uses `DB_ENGINE_MAP` to map database engine names to display names
+- Currently maps 'google_search' and 'google-search' to 'aio'
+- Metrics are processed in `processGroup` function which uses this mapping
+- The chart displays data for all engines including AIO
+- Key changes needed:
+  - Remove 'google_search'/'google-search' from `DB_ENGINE_MAP`
+  - Filter out AIO data in data processing functions
+  - Update UI elements that reference AIO (colors, names, etc.)
+
+2. **Source Analysis (`source-analysis/overall-citations.tsx`)**:
+- Uses `ANSWER_ENGINES` constant that includes Google Search (AIO)
+- Has filtering capabilities for different engines
+- Processes citations and metrics by engine type
+- Key changes needed:
+  - Remove Google Search from `ANSWER_ENGINES`
+  - Update filter logic to exclude AIO data
+  - Modify chart colors and legends
+
+3. **ICP Analysis (`new-icp-analysis/index.tsx`)**:
+- Component structure suggests it processes data across different stages
+- Likely needs changes in subcomponents that handle metrics
+- Key changes needed:
+  - Review and update data fetching in each stage component
+  - Ensure metrics calculations exclude AIO data
+  - Update any UI elements referencing AIO
+
+4. **Database Considerations**:
+- Data comes from `response_analysis` table
+- `answer_engine` field identifies the source
+- Need to ensure queries filter out 'google_search' entries
+
+5. **Potential Impact Areas**:
+- Metrics calculations and aggregations
+- Chart visualizations and legends
+- Filter options and UI elements
+- Data fetching queries
+- Type definitions and interfaces
+
+6. **Implementation Strategy**:
+1. First modify data fetching to exclude AIO:
+   - Update Supabase queries to filter out 'google_search'
+   - Add engine filtering in data processing functions
+2. Update UI components:
+   - Remove AIO from engine lists and mappings
+   - Update charts to exclude AIO data
+   - Modify filters and selectors
+3. Update types and interfaces:
+   - Remove AIO-related types
+   - Update engine type definitions
+4. Test for regressions:
+   - Verify metrics still calculate correctly
+   - Check UI renders properly
+   - Ensure filters work as expected
+

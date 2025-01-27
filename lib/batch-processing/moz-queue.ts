@@ -60,7 +60,7 @@ export class MozEnrichmentQueue {
   }
 
   private async fetchCitationBatch(): Promise<Array<{ id: number; citation_url: string }>> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     const { data: citations, error } = await adminClient
       .from('citations')
@@ -97,45 +97,90 @@ export class MozEnrichmentQueue {
     if (citations.length === 0) return;
 
     const startTime = Date.now();
-    console.log('Starting batch processing:', {
+    console.log('Starting Moz batch processing:', {
       batchId,
       timestamp: new Date().toISOString(),
       citationCount: citations.length,
-      firstCitation: citations[0].citation_url,
-      lastCitation: citations[citations.length - 1].citation_url
+      urls: citations.map(c => c.citation_url)
     });
 
     try {
-      // Ensure all URLs are properly formatted before sending to Moz API
+      // Log pre-Moz API call
+      console.log('Preparing Moz API call:', {
+        batchId,
+        urlCount: citations.length,
+        formattedUrls: citations.map(c => this.ensureValidUrl(c.citation_url))
+      });
+
       const mozResponse = await fetchMozMetrics(citations.map(c => this.ensureValidUrl(c.citation_url))) as MozResponse;
-      const adminClient = createAdminClient();
+      
+      // Log full Moz API response
+      console.log('Moz API Response:', {
+        batchId,
+        hasResponse: !!mozResponse,
+        responseStructure: {
+          hasResult: !!mozResponse?.result,
+          resultCount: mozResponse?.result?.results_by_site?.length || 0,
+          hasErrors: !!mozResponse?.errors_by_site?.length,
+          errorCount: mozResponse?.errors_by_site?.length || 0
+        },
+        firstResult: mozResponse?.result?.results_by_site?.[0] || null,
+        firstError: mozResponse?.errors_by_site?.[0] || null
+      });
+
+      const adminClient = await createAdminClient();
 
       let batchSuccesses = 0;
       let batchFailures = 0;
 
-      // Add null check and proper response structure handling
       if (!mozResponse || !mozResponse.result || !mozResponse.result.results_by_site) {
-        console.error('Invalid Moz API response structure:', mozResponse);
+        console.error('Invalid Moz API response structure:', {
+          batchId,
+          response: mozResponse,
+          error: 'Missing required response structure'
+        });
         throw new Error('Invalid Moz API response structure');
       }
-
-      console.log('Moz API response structure:', {
-        hasResponse: !!mozResponse,
-        hasResult: !!(mozResponse && mozResponse.result),
-        hasResultsBySite: !!(mozResponse && mozResponse.result && mozResponse.result.results_by_site),
-        resultCount: mozResponse?.result?.results_by_site?.length || 0,
-        firstResult: mozResponse?.result?.results_by_site?.[0] || null
-      });
 
       for (const citation of citations) {
         const citationStartTime = Date.now();
         try {
-          // Find matching result in Moz response
+          // Log citation processing start
+          console.log('Processing Moz metrics for citation:', {
+            batchId,
+            citationId: citation.id,
+            url: citation.citation_url,
+            timestamp: new Date().toISOString()
+          });
+
           const result = mozResponse.result.results_by_site.find(
             r => this.normalizeUrl(r.site_query.query) === this.normalizeUrl(citation.citation_url)
           );
 
+          // Log Moz result match
+          console.log('Moz result match:', {
+            batchId,
+            citationId: citation.id,
+            url: citation.citation_url,
+            found: !!result,
+            metrics: result?.site_metrics || null
+          });
+
           if (result?.site_metrics) {
+            // Log pre-update data
+            console.log('Updating citation with Moz metrics:', {
+              batchId,
+              citationId: citation.id,
+              metrics: {
+                domainAuthority: result.site_metrics.domain_authority,
+                pageAuthority: result.site_metrics.page_authority,
+                spamScore: result.site_metrics.spam_score,
+                rootDomains: result.site_metrics.root_domains_to_root_domain,
+                externalLinks: result.site_metrics.external_pages_to_root_domain,
+                lastCrawled: result.site_metrics.last_crawled
+              }
+            });
+
             const { error: updateError } = await adminClient
               .from('citations')
               .update({
@@ -149,8 +194,30 @@ export class MozEnrichmentQueue {
               })
               .eq('id', citation.id);
 
+            // Enhanced database update logging
+            console.log('Moz metrics database update details:', {
+              batchId,
+              citationId: citation.id,
+              url: citation.citation_url,
+              updateAttempt: {
+                timestamp: new Date().toISOString(),
+                success: !updateError,
+                error: updateError
+              },
+              updatedFields: {
+                domainAuthority: result.site_metrics.domain_authority,
+                pageAuthority: result.site_metrics.page_authority,
+                spamScore: result.site_metrics.spam_score,
+                rootDomains: result.site_metrics.root_domains_to_root_domain,
+                externalLinks: result.site_metrics.external_pages_to_root_domain,
+                lastCrawled: result.site_metrics.last_crawled,
+                lastUpdated: new Date().toISOString()
+              }
+            });
+
+            // Log update result
             if (updateError) {
-              console.error('Citation update failed:', {
+              console.error('Moz metrics update failed:', {
                 batchId,
                 citationId: citation.id,
                 url: citation.citation_url,
@@ -161,15 +228,10 @@ export class MozEnrichmentQueue {
               this.stats.failedCitations++;
               batchFailures++;
             } else {
-              console.log('Citation processed successfully:', {
+              console.log('Moz metrics update successful:', {
                 batchId,
                 citationId: citation.id,
                 url: citation.citation_url,
-                metrics: {
-                  domainAuthority: result.site_metrics.domain_authority,
-                  pageAuthority: result.site_metrics.page_authority,
-                  spamScore: result.site_metrics.spam_score
-                },
                 duration: Date.now() - citationStartTime
               });
               this.stats.processedCitations++;
@@ -179,7 +241,7 @@ export class MozEnrichmentQueue {
             const error = mozResponse.errors_by_site?.find(
               e => e.site_query.query === citation.citation_url
             );
-            console.error('No metrics found for citation:', {
+            console.error('No Moz metrics found for citation:', {
               batchId,
               citationId: citation.id,
               url: citation.citation_url,
@@ -191,7 +253,7 @@ export class MozEnrichmentQueue {
             batchFailures++;
           }
         } catch (error) {
-          console.error('Citation processing error:', {
+          console.error('Moz citation processing error:', {
             batchId,
             citationId: citation.id,
             url: citation.citation_url,
@@ -247,10 +309,14 @@ export class MozEnrichmentQueue {
   /**
    * Process a specific list of citations
    */
-  async processBatch(citations: Array<{ id: number; citation_url: string }>, companyId: number): Promise<void> {
+  async processBatch(
+    citations: Array<{ id: number; citation_url: string }>,
+    companyId: number,
+    accountId: string
+  ): Promise<void> {
     if (citations.length === 0) return;
 
-    const batchTracker = new SupabaseBatchTrackingService();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
     const batchId = randomUUID();
 
     try {
@@ -261,13 +327,14 @@ export class MozEnrichmentQueue {
       console.log('Creating batch with:', {
         type: 'citations_moz',
         companyId,
+        accountId,
         metadata: {
           citationCount: citations.length
         }
       });
 
       // Create a batch record with proper batch type and metadata
-      await batchTracker.createBatch('citations_moz', companyId, {
+      await batchTracker.createBatch('citations_moz', companyId, accountId, {
         citationCount: citations.length
       });
 
@@ -280,6 +347,7 @@ export class MozEnrichmentQueue {
       console.error('Error processing citations batch:', {
         batchId,
         companyId,
+        accountId,
         error: error instanceof Error ? {
           name: error.name,
           message: error.message,
@@ -295,20 +363,20 @@ export class MozEnrichmentQueue {
   /**
    * Process all unprocessed citations for a company
    */
-  async processQueue(companyId: number): Promise<void> {
+  async processQueue(companyId: number, accountId: string): Promise<void> {
     if (this.processing) {
       console.log('Queue is already being processed');
       return;
     }
 
-    const batchTracker = new SupabaseBatchTrackingService();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
     const batchId = randomUUID();
 
     try {
       this.processing = true;
       this.stats.inProgress = true;
 
-      await batchTracker.createBatch('citations_moz', companyId, {
+      await batchTracker.createBatch('citations_moz', companyId, accountId, {
         processingType: 'full_queue'
       });
 
@@ -326,7 +394,7 @@ export class MozEnrichmentQueue {
 
       // Handle any failed citations
       if (this.failedCitations.size > 0) {
-        await this.retryFailed();
+        await this.retryFailed(accountId);
       }
 
       await batchTracker.completeBatch(batchId);
@@ -340,7 +408,7 @@ export class MozEnrichmentQueue {
     }
   }
 
-  async retryFailed(): Promise<void> {
+  async retryFailed(accountId: string): Promise<void> {
     if (this.failedCitations.size === 0) {
       console.log('No failed citations to retry');
       return;
@@ -351,7 +419,9 @@ export class MozEnrichmentQueue {
     this.failedCitations.clear();
     this.stats.failedCitations = 0;
 
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
+
     const { data: citations, error } = await adminClient
       .from('citations')
       .select('id, citation_url')
@@ -363,10 +433,9 @@ export class MozEnrichmentQueue {
     }
 
     if (citations && citations.length > 0) {
-      const batchTracker = new SupabaseBatchTrackingService();
       const batchId = randomUUID();
       
-      await batchTracker.createBatch('citations_moz', 0, {
+      await batchTracker.createBatch('citations_moz', 0, accountId, {
         isRetry: true,
         originalIds: failedIds
       });

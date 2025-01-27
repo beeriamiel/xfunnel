@@ -37,10 +37,11 @@ import {
 } from "../../lib/colors"
 
 interface VerticalsProps {
-  companyId: number | null
-  selectedRegion: string
-  onSelectVertical: (vertical: string) => void
-  onBack: () => void
+  companyId: number | null;
+  accountId: string;
+  selectedRegion: string;
+  onSelectVertical: (vertical: string) => void;
+  onBack: () => void;
 }
 
 const METRICS = [
@@ -85,15 +86,16 @@ const VERTICAL_COLORS: Record<string, string> = {
   'Unknown': 'rgb(156, 163, 175)'           // gray-400
 }
 
-export function Verticals({ companyId, selectedRegion, onSelectVertical, onBack }: VerticalsProps) {
+export function Verticals({ companyId, accountId, selectedRegion, onSelectVertical, onBack }: VerticalsProps) {
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
     companyId && selectedRegion ? `vertical-analysis-${companyId}-${selectedRegion}-${timePeriod}` : null,
-    () => companyId && selectedRegion ? getAnalysisByVertical(companyId, selectedRegion, timePeriod) : null
+    () => companyId && selectedRegion ? getAnalysisByVertical(companyId, accountId, selectedRegion, timePeriod, isSuperAdmin) : null
   )
 
   // Prepare data for the timeline chart - moved before conditional returns

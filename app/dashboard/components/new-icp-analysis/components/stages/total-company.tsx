@@ -37,7 +37,8 @@ import {
 type MetricKey = typeof METRICS[number]['key']
 
 interface TotalCompanyProps {
-  companyId: number | null
+  companyId: number | null;
+  accountId: string;
 }
 
 const METRICS = [
@@ -71,16 +72,17 @@ const METRICS = [
   }
 ] as const
 
-export function TotalCompany({ companyId }: TotalCompanyProps) {
+export function TotalCompany({ companyId, accountId }: TotalCompanyProps) {
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const [showGuide, setShowGuide] = React.useState(false)
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
     companyId ? `company-analysis-${companyId}-${timePeriod}` : null,
-    () => companyId ? getAnalysisByCompany(companyId, timePeriod) : null
+    () => companyId ? getAnalysisByCompany(companyId, accountId, timePeriod, isSuperAdmin) : null
   )
 
   React.useEffect(() => {

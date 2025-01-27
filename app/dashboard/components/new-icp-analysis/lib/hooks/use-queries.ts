@@ -7,14 +7,18 @@ import { Database } from "@/types/supabase"
 
 // Add mapping function to transform backend engine names to frontend names
 function transformEngineName(backendName: string): string {
-  const engineMap: Record<string, string> = {
-    'openai': 'searchgpt',
-    'google_search': 'aio',
+  const engineMapping: Record<string, string> = {
     'perplexity': 'perplexity',
     'claude': 'claude',
-    'gemini': 'gemini'
+    'gemini': 'gemini',
+    'openai': 'searchgpt'
   }
-  return engineMap[backendName] || backendName
+  return engineMapping[backendName] || backendName
+}
+
+// Add validation function to check if engine should be included
+function isValidEngine(engine: string): boolean {
+  return ['perplexity', 'claude', 'gemini', 'openai'].includes(engine)
 }
 
 interface QueryPhase {
@@ -42,6 +46,7 @@ type QueryResponse = Pick<
 
 export function useQueries(
   companyId: number | null,
+  accountId: string,
   region: string,
   vertical: string,
   persona: string
@@ -50,6 +55,7 @@ export function useQueries(
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const timePeriod = useDashboardStore(state => state.timePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   useEffect(() => {
     async function fetchQueries() {
@@ -65,17 +71,19 @@ export function useQueries(
 
         console.log('Fetching queries with:', {
           companyId,
+          accountId,
           region,
           vertical,
           persona,
-          timePeriod
+          timePeriod,
+          isSuperAdmin
         })
 
         const supabase = createClient()
         const { start, end } = getDateRangeForPeriod(timePeriod)
 
         // Get all responses for the selected filters
-        const { data: responses, error: fetchError } = await supabase
+        let query = supabase
           .from('response_analysis')
           .select(`
             query_id,
@@ -101,6 +109,13 @@ export function useQueries(
           .lte('created_at', end.toISOString())
           .not('query_id', 'is', null)
           .order('query_id', { ascending: true })
+
+        // Add account filter for non-super admins
+        if (!isSuperAdmin) {
+          query = query.eq('account_id', accountId)
+        }
+
+        const { data: responses, error: fetchError } = await query
 
         console.log('Query response:', { responses, error: fetchError })
 
@@ -129,7 +144,8 @@ export function useQueries(
           const query = queryMap.get(queryKey)!
           const engine = response.answer_engine
 
-          if (engine) {
+          // Only process valid engines
+          if (engine && isValidEngine(engine)) {
             // Transform the engine name from backend to frontend format
             const transformedEngine = transformEngineName(engine)
             
@@ -166,9 +182,11 @@ export function useQueries(
 
         // Calculate mention rates for each query
         queryMap.forEach(query => {
-          const engineCount = Object.keys(query.engineResults).length
-          const mentionCount = Object.values(query.engineResults)
-            .filter(result => result.companyMentioned).length
+          const validEngineResults = Object.entries(query.engineResults)
+            .filter(([engine]) => ['perplexity', 'claude', 'gemini', 'searchgpt'].includes(engine))
+          const engineCount = validEngineResults.length
+          const mentionCount = validEngineResults
+            .filter(([_, result]) => result.companyMentioned).length
           query.companyMentionRate = engineCount > 0 ? (mentionCount / engineCount) * 100 : 0
         })
 
@@ -189,7 +207,7 @@ export function useQueries(
     }
 
     fetchQueries()
-  }, [companyId, region, vertical, persona, timePeriod])
+  }, [companyId, accountId, region, vertical, persona, timePeriod, isSuperAdmin])
 
   return { data, isLoading, error }
 } 

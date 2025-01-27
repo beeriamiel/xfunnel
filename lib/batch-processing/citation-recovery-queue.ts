@@ -23,7 +23,7 @@ function isCitationsParsed(value: unknown): value is CitationsParsed {
 
 export class CitationRecoveryQueue {
   async findMissingCitations(batchId: string): Promise<number[]> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     try {
       // Get all response_analysis_ids from this batch
@@ -56,7 +56,7 @@ export class CitationRecoveryQueue {
   }
 
   async processRecoveryQueue(missingIds: number[]): Promise<void> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     try {
       console.log(`Starting recovery processing for ${missingIds.length} responses`);
@@ -82,10 +82,16 @@ export class CitationRecoveryQueue {
             continue;
           }
 
+          if (!responseAnalysis.account_id) {
+            console.error(`No account_id found for response ${responseId}`);
+            continue;
+          }
+
           // Process citations for this response
           await processCitationsTransaction(
             responseAnalysis,
-            responseAnalysis.citations_parsed  // Pass the object directly, no parsing needed
+            responseAnalysis.citations_parsed,
+            responseAnalysis.account_id
           );
 
           console.log(`Successfully recovered citations for response ${responseId}`);

@@ -51,6 +51,7 @@ interface CompanyICPsTableProps {
   competitors?: { competitor_name: string }[];
   selectedEngines: EngineSelection;
   selectedModel: AIModelType;
+  accountId: string;
   selectedPrompts: {
     systemPromptName: string;
     userPromptName: string;
@@ -72,6 +73,7 @@ export function CompanyICPsTable({
   competitors = [],
   selectedEngines,
   selectedModel,
+  accountId,
   selectedPrompts,
   onGenerateStart,
   onGenerateComplete
@@ -178,7 +180,7 @@ export function CompanyICPsTable({
           selectedPrompts.systemPromptName,
           selectedPrompts.userPromptName,
           selectedModel,
-          personaContext.persona.id
+          personaContext.persona.id.toString()
         );
       }
 
@@ -208,7 +210,7 @@ export function CompanyICPsTable({
       const selectedFromIcp = icp.personas.filter(
         persona => selected[`${icp.id}-${persona.id}`]
       );
-      return selectedFromIcp.map(persona => persona.id);
+      return selectedFromIcp;
     });
 
     if (selectedPersonas.length === 0) {
@@ -226,9 +228,10 @@ export function CompanyICPsTable({
     try {
       const result = await generateResponsesAction(
         companyId,
-        selectedPersonas,
+        selectedPersonas.map(p => p.id),
         selectedEngines,
-        selectedModel
+        selectedModel,
+        accountId
       );
 
       toast({

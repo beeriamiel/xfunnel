@@ -69,19 +69,29 @@ export interface QueryAnalysis {
 
 export async function getAnalysisByCompany(
   companyId: number,
-  timePeriod: TimePeriod
+  accountId: string,
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<CompanyAnalysis> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get the raw analysis data with date range filter
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -129,19 +139,29 @@ export async function getAnalysisByCompany(
 
 export async function getAnalysisByRegion(
   companyId: number,
-  timePeriod: TimePeriod
+  accountId: string,
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<RegionAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get the raw analysis data with date range filter
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -187,21 +207,31 @@ export async function getAnalysisByRegion(
 
 export async function getAnalysisByVertical(
   companyId: number,
+  accountId: string,
   region: string,
-  timePeriod: TimePeriod
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<VerticalAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get the raw analysis data filtered by region and date range
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
     .eq('geographic_region', region)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -288,7 +318,7 @@ function aggregateMetrics(items: AnalysisMetrics[]): AnalysisMetrics {
     }
 
     // Ranking Position: Weight by response count and valid position
-    if (item.rankingPosition > 0) {
+    if (item.rankingPosition !== null && item.rankingPosition !== undefined && item.rankingPosition > 0) {
       const weight = baseWeight;
       weightedSums.position += item.rankingPosition * weight;
       weights.position += weight;
@@ -329,10 +359,12 @@ function aggregateMetrics(items: AnalysisMetrics[]): AnalysisMetrics {
 
 export async function getAnalysisByQueries(
   companyId: number,
+  accountId: string,
   region: string,
   vertical: string,
   persona: string,
   timePeriod: TimePeriod,
+  isSuperAdmin?: boolean,
   filters?: {
     batchId?: string
   }
@@ -350,6 +382,12 @@ export async function getAnalysisByQueries(
     .eq('buyer_persona', persona)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
 
   // Apply optional filters
   if (filters?.batchId) {
@@ -455,15 +493,17 @@ export async function getAnalysisByQueries(
 
 export async function getAnalysisByPersona(
   companyId: number,
+  accountId: string,
   region: string,
   vertical: string,
-  timePeriod: TimePeriod
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<PersonaAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get query analysis for each persona with date range filter
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
@@ -471,7 +511,15 @@ export async function getAnalysisByPersona(
     .eq('icp_vertical', vertical)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -561,13 +609,14 @@ function calculateRankingPosition(
   const filteredData = data.filter(item => 
     item.buying_journey_stage !== null &&
     validStages.includes(item.buying_journey_stage) &&
-    item.ranking_position !== null
+    item.ranking_position !== null &&
+    item.ranking_position > 0  // Filter out 0 values
   );
   
   if (filteredData.length === 0) return 0;
   
   return filteredData.reduce((sum, item) => 
-    sum + (item.ranking_position || 0)
+    sum + item.ranking_position!
   , 0) / filteredData.length;
 }
 

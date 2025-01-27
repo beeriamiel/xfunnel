@@ -123,10 +123,11 @@ export async function generateICPs(
   companyName: string, 
   systemPromptName: string, 
   userPromptName: string,
-  model: AIModelType
+  model: AIModelType,
+  accountId: string
 ) {
-  const adminClient = createAdminClient();
-  const batchTracker = new SupabaseBatchTrackingService();
+  const adminClient = await createAdminClient();
+  const batchTracker = await SupabaseBatchTrackingService.initialize();
   let companyId: number | undefined;
   let batchId: string | undefined;
   
@@ -185,7 +186,7 @@ export async function generateICPs(
     }
 
     // Create a new batch for ICP generation
-    batchId = await batchTracker.createBatch('icp', companyId, {
+    batchId = await batchTracker.createBatch('icp', companyId, accountId, {
       model,
       systemPromptName,
       userPromptName
@@ -193,7 +194,7 @@ export async function generateICPs(
     await batchTracker.updateBatchStatus(batchId, 'in_progress');
 
     // Start progress tracking
-    await updateGenerationProgress(companyId, 'generating_icps', 0);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 0);
 
     // Fetch prompts from Supabase
     const { data: prompts, error: promptError } = await adminClient
@@ -217,7 +218,7 @@ export async function generateICPs(
       throw new Error('Missing required prompts for ICP generation');
     }
 
-    await updateGenerationProgress(companyId, 'generating_icps', 10);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 10);
 
     // Get company data for context
     const { data: companyData } = await adminClient
@@ -255,12 +256,12 @@ export async function generateICPs(
       context
     );
 
-    await updateGenerationProgress(companyId, 'generating_icps', 30);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 30);
 
     // Parse and validate the response
     const parsedResponse = validateICPResponse(response);
 
-    await updateGenerationProgress(companyId, 'generating_icps', 40);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 40);
 
     // Update company with metadata from the response
     const { error: updateError } = await adminClient
@@ -280,7 +281,7 @@ export async function generateICPs(
       // Continue despite metadata update error
     }
 
-    await updateGenerationProgress(companyId, 'generating_icps', 50);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 50);
 
     // Handle competitors - delete existing and insert new
     if (typeof companyId === 'undefined') {
@@ -306,7 +307,7 @@ export async function generateICPs(
       // Continue despite competitor insertion error
     }
 
-    await updateGenerationProgress(companyId, 'generating_icps', 60);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 60);
 
     // Store ICPs and Personas with batch ID
     for (const icp of parsedResponse.ideal_customer_profiles) {
@@ -363,7 +364,7 @@ export async function generateICPs(
       }
     }
 
-    await updateGenerationProgress(companyId, 'generating_icps', 100);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 100);
     await batchTracker.completeBatch(batchId);
 
     // Return the generated ICPs and Personas along with the batch ID
@@ -377,6 +378,7 @@ export async function generateICPs(
     if (typeof companyId !== 'undefined') {
       await updateGenerationProgress(
         companyId,
+        accountId,
         'failed',
         0,
         error instanceof Error ? error.message : 'Unknown error during ICP generation'

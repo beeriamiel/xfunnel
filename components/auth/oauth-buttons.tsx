@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/app/supabase/client'
 import { Provider } from "@supabase/supabase-js"
 import { Icons } from "@/components/ui/icons"
 import { useState } from "react"
@@ -14,9 +14,14 @@ interface OAuthButtonsProps {
 
 export function OAuthButtons({ isLoading, setIsLoading }: OAuthButtonsProps) {
   const [activeProvider, setActiveProvider] = useState<Provider | null>(null)
-  const supabase = createClientComponentClient<Database>()
+  const supabase = createClient()
   
   const handleOAuthSignIn = async (provider: Provider) => {
+    console.log('Starting OAuth flow:', {
+      provider,
+      redirectUrl: `${window.location.origin}/auth/callback`,
+      timestamp: new Date().toISOString()
+    });
     setIsLoading(true)
     setActiveProvider(provider)
     

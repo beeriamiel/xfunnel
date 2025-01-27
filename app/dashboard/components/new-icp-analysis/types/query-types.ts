@@ -3,16 +3,14 @@ export const engineMapping: Record<string, string> = {
   perplexity: 'perplexity',
   claude: 'claude',
   gemini: 'gemini',
-  openai: 'searchgpt',
-  google_search: 'aio'
+  openai: 'searchgpt'
 };
 
 export const engineDisplayNames: Record<string, string> = {
   perplexity: 'Perplexity',
   claude: 'Claude',
   gemini: 'Gemini',
-  searchgpt: 'SearchGPT',
-  aio: 'AIO'
+  searchgpt: 'SearchGPT'
 };
 
 // Phase constants

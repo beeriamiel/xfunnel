@@ -13,6 +13,14 @@ interface QueueStats {
 interface Citation {
   id: number;
   citation_url: string;
+  query_text?: string | null;
+  response_text?: string | null;
+  content_markdown?: string | null;
+  content_scraped_at?: string | null;
+  content_scraping_error?: string | null;
+  is_original?: boolean | null;
+  content_analysis?: string | null;
+  content_analysis_updated_at?: string | null;
 }
 
 export class ContentScrapingQueue {
@@ -20,19 +28,25 @@ export class ContentScrapingQueue {
   private stats: QueueStats;
   private processing: boolean;
   private firecrawlClient: FirecrawlClient;
-  private batchTracker: SupabaseBatchTrackingService;
+  private batchTracker: SupabaseBatchTrackingService | null = null;
 
-  constructor(batchSize = 5) { // Smaller batch size due to content size
+  constructor(batchSize = 5) {
     this.batchSize = batchSize;
     this.processing = false;
     this.firecrawlClient = new FirecrawlClient();
-    this.batchTracker = new SupabaseBatchTrackingService();
     this.stats = {
       totalUrls: 0,
       processedUrls: 0,
       failedUrls: 0,
       inProgress: false
     };
+  }
+
+  private async initializeBatchTracker() {
+    if (!this.batchTracker) {
+      this.batchTracker = await SupabaseBatchTrackingService.initialize();
+    }
+    return this.batchTracker;
   }
 
   async getQueueStats(): Promise<QueueStats> {
@@ -53,7 +67,7 @@ export class ContentScrapingQueue {
       return;
     }
 
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     try {
       console.log('Processing citation content:', {
@@ -111,7 +125,11 @@ export class ContentScrapingQueue {
     }
   }
 
-  async processBatch(citations: Citation[], companyId: number): Promise<void> {
+  async processBatch(
+    citations: Array<{ id: number; citation_url: string }>,
+    companyId: number,
+    accountId: string
+  ): Promise<void> {
     if (this.processing) {
       console.log('Queue is already being processed');
       return;
@@ -121,8 +139,8 @@ export class ContentScrapingQueue {
       this.processing = true;
       this.stats.inProgress = true;
 
-      // Create batch tracking record
-      const batchId = await this.batchTracker.createBatch('citations_content', companyId, {
+      const batchTracker = await this.initializeBatchTracker();
+      const batchId = await batchTracker.createBatch('citations_content', companyId, accountId, {
         totalUrls: citations.length,
         processingType: 'content_scraping'
       });
@@ -156,7 +174,7 @@ export class ContentScrapingQueue {
         }
       }
 
-      await this.batchTracker.completeBatch(batchId);
+      await batchTracker.completeBatch(batchId);
       console.log('Completed content scraping batch:', {
         batchId,
         stats: this.stats

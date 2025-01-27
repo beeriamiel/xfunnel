@@ -11,7 +11,11 @@ import {
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
-export function PersonalSettings() {
+interface PersonalSettingsProps {
+  accountId: string;
+}
+
+export function PersonalSettings({ accountId }: PersonalSettingsProps) {
   return (
     <div className="w-full space-y-6">
       {/* Top Section: Profile and Credits */}

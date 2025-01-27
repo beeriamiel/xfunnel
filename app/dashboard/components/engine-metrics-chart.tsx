@@ -69,7 +69,8 @@ interface EngineMetricsData {
 }
 
 interface EngineMetricsChartProps {
-  companyId?: number | null;
+  companyId: number;
+  accountId: string;
 }
 
 // Updated ExtendedResponseAnalysis interface
@@ -161,8 +162,6 @@ const DB_ENGINE_MAP: { [key: string]: string } = {
   'openai': 'searchgpt',
   'gpt-4': 'searchgpt',
   'gpt-3.5-turbo': 'searchgpt',
-  'google_search': 'aio',
-  'google-search': 'aio',
   'perplexity': 'perplexity',
   'claude': 'claude',
   'claude-2': 'claude',
@@ -175,7 +174,6 @@ const ENGINE_COLORS: { [key: string]: string } = {
   claude: '#2563eb',         // Royal blue
   gemini: '#db2777',         // Deep pink
   searchgpt: '#4f46e5',      // Indigo
-  aio: '#06b6d4',           // Cyan
   default: '#94a3b8'        // Slate gray
 };
 
@@ -183,8 +181,7 @@ const ENGINE_NAMES: { [key: string]: string } = {
   perplexity: 'Perplexity',
   claude: 'Claude',
   gemini: 'Gemini',
-  searchgpt: 'SearchGPT',  // Will display for openai
-  aio: 'AIO'              // Will display for google_search
+  searchgpt: 'SearchGPT'  // Will display for openai
 };
 
 type MetricKey = 'sentiment' | 'position' | 'company_mentioned' | 'feature_score';
@@ -231,7 +228,7 @@ const METRICS: Record<MetricKey, MetricConfig> = {
     },
     allowedPhases: [SOLUTION_COMPARISON_STAGE, FINAL_RESEARCH_STAGE],
     processValue: (record: ExtendedResponseAnalysis) => 
-      typeof record.ranking_position === 'number' ? record.ranking_position : null
+      typeof record.ranking_position === 'number' && record.ranking_position > 0 ? record.ranking_position : null
   },
   feature_score: {
     label: 'Feature Score',
@@ -1061,7 +1058,10 @@ const METRICS_INFO = {
   }
 };
 
-export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
+export function EngineMetricsChart({ 
+  companyId, 
+  accountId
+}: EngineMetricsChartProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeMetric, setActiveMetric] = useState<MetricKey>('company_mentioned');
@@ -1223,6 +1223,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
             buyer_persona
           `)
           .eq('company_id', effectiveCompanyId)
+          .not('answer_engine', 'in', '("google_search","google-search")')
           .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: true });
 
@@ -1274,10 +1275,10 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* Research Coverage Card */}
       <Card className="w-full bg-white shadow-sm">
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           <div className="mb-6">
             <h3 className="text-2xl font-semibold tracking-tight">Research Coverage</h3>
             <p className="text-sm text-muted-foreground mt-1">Analysis scope for your company across AI platforms</p>
@@ -1293,7 +1294,7 @@ export function EngineMetricsChart({ companyId }: EngineMetricsChartProps) {
 
       {/* AI Engine Performance Card */}
       <Card className="w-full bg-white shadow-sm">
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {isLoading ? (
             <ChartPlaceholder />
           ) : error ? (

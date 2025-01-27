@@ -1,5 +1,4 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 import { CompanySelector } from './company-selector'
 import { ClientWrapper } from './client-wrapper'
 import type { Database } from '@/types/supabase'
@@ -13,6 +12,7 @@ interface Company {
 
 interface CompanySelectorWrapperProps {
   selectedCompany: Company | null
+  accountId: string
 }
 
 function CompanySelectorFallback() {
@@ -25,19 +25,34 @@ function CompanySelectorFallback() {
   )
 }
 
-export async function CompanySelectorWrapper({ selectedCompany }: CompanySelectorWrapperProps) {
+export async function CompanySelectorWrapper({ 
+  selectedCompany, 
+  accountId 
+}: CompanySelectorWrapperProps) {
   try {
-    const supabase = createServerComponentClient<Database>({ cookies })
+    const supabase = createServerClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return null // Let middleware handle auth
+          },
+          set(name: string, value: string) {},
+          remove(name: string) {}
+        }
+      }
+    )
     
-    // RLS will automatically handle access control here
+    // Keep RLS and data fetching logic
     const { data: companies, error } = await supabase
       .from('companies')
       .select('id, name, industry')
+      .eq('account_id', accountId)
       .order('name')
 
     if (error) {
       console.error('Error fetching companies:', error)
-      // Return empty state but don't expose error details to client
       return <CompanySelectorFallback />
     }
 

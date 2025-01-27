@@ -33,7 +33,7 @@ const VALID_PHASES = [
 ] as const;
 
 async function processNewResponses() {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   // Get the latest response ID that has been analyzed
   const { data: lastAnalyzed } = await adminClient
@@ -67,37 +67,44 @@ async function processNewResponses() {
   console.log(`Processing responses from ID ${startId} to ${endId}`);
   const queue = new ResponseAnalysisQueue();
   
-  // Get company ID from the first response
+  // Get company ID and account ID from the first response
   const { data: firstResponse } = await adminClient
     .from('responses')
     .select(`
       id,
       query_id,
       queries!inner (
-        company_id
+        company_id,
+        account_id
       )
     `)
     .eq('id', startId)
     .single();
 
-  if (!firstResponse?.queries?.company_id) {
-    throw new Error('Could not find company ID for responses');
+  if (!firstResponse?.queries?.company_id || !firstResponse?.queries?.account_id) {
+    throw new Error('Could not find company ID or account ID for responses');
   }
 
-  await queue.processQueue(startId, endId, firstResponse.queries.company_id);
+  await queue.processQueue(
+    startId, 
+    endId, 
+    firstResponse.queries.company_id,
+    firstResponse.queries.account_id
+  );
 }
 
 export async function generateQuestions(
   companyName: string, 
   engines: EngineSelection,
-  personaId?: number,
-  systemPromptName?: string,
-  userPromptName?: string,
-  model: AIModelType = 'chatgpt-4o-latest'
+  personaId: number,
+  systemPromptName: string,
+  userPromptName: string,
+  model: AIModelType = 'chatgpt-4o-latest',
+  accountId: string
 ): Promise<{ queries: QueryWithId[], batchId: string }> {
   const supabase = await createClient();
-  const adminClient = createAdminClient();
-  const batchTracker = new SupabaseBatchTrackingService();
+  const adminClient = await createAdminClient();
+  const batchTracker = await SupabaseBatchTrackingService.initialize();
   let batchId: string | undefined;
   
   console.log('Starting question generation:', {
@@ -159,7 +166,7 @@ export async function generateQuestions(
     }
 
     // Create a new batch for question generation
-    batchId = await batchTracker.createBatch('query', companyId, {
+    batchId = await batchTracker.createBatch('query', companyId, accountId, {
       model,
       systemPromptName,
       userPromptName,
@@ -356,7 +363,8 @@ export async function generateQuestions(
           persona_id: personaId,
           user_id: user.id,
           query_batch_id: batchId,
-          created_by_batch: true
+          created_by_batch: true,
+          account_id: accountId
         })
         .select('id, query_text, buyer_journey_phase')
         .single();
@@ -407,11 +415,12 @@ type ResponseMapper = (response: {
 export async function processQueriesWithEngines(
   queries: QueryWithId[], 
   engines: EngineSelection,
-  responseBatchId: string
+  responseBatchId: string,
+  accountId: string
 ) {
   console.log(`Processing ${queries.length} queries with selected engines:`, engines);
   
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   const batchSize = 5;
   let totalInserted = 0;
   
@@ -493,7 +502,8 @@ export async function processQueriesWithEngines(
               responses.map((response, index) => ({
                 ...responseObjects[index](response),
                 response_batch_id: responseBatchId,
-                created_by_batch: true
+                created_by_batch: true,
+                account_id: accountId
               }))
             );
             

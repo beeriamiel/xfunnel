@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useDashboardStore } from "@/app/dashboard/store"
 import { Card } from "@/components/ui/card"
 import { Building2, Globe2, Users, Target, Search } from "lucide-react"
@@ -11,6 +11,7 @@ import { Regions } from "./components/stages/regions"
 import { Verticals } from "./components/stages/verticals"
 import { Personas } from "./components/stages/personas"
 import { Queries } from "./components/stages/queries"
+import { useSearchParams } from "next/navigation"
 
 // Types for the analysis stages
 export type AnalysisStage = 
@@ -54,28 +55,28 @@ export const STAGES = [
   }
 ] as const;
 
-interface NewICPAnalysisProps {
-  companyId?: number | null;
+export interface NewICPAnalysisProps {
+  companyId?: number;
+  accountId: string;
 }
 
-export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
-  // Connect to dashboard store for company selection
+export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
+  const searchParams = useSearchParams()
+  const urlCompanyId = searchParams.get('company') ? parseInt(searchParams.get('company')!) : undefined
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
-  const effectiveCompanyId = companyId ?? selectedCompanyId
-
-  // Stage navigation state
+  const companies = useDashboardStore(state => state.companies)
+  
+  // Use URL company ID if available, fallback to prop or store
+  const effectiveCompanyId = urlCompanyId ?? companyId ?? selectedCompanyId
+  
+  // Validate that the company exists in our data
+  const isValidCompany = effectiveCompanyId && companies?.some(c => c.id === effectiveCompanyId)
+  
   const [currentStage, setCurrentStage] = useState<AnalysisStage>('total-company')
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedVertical, setSelectedVertical] = useState<string | null>(null)
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null)
-
-  // Stage accessibility logic
-  const isStageAccessible = (stage: AnalysisStage) => {
-    const currentIndex = STAGES.findIndex(s => s.id === currentStage)
-    const targetIndex = STAGES.findIndex(s => s.id === stage)
-    // Allow moving to any completed stage or the next stage
-    return targetIndex <= currentIndex + 1
-  }
+  const [queryCounts, setQueryCounts] = useState<{ queries: number; responses: number } | null>(null)
 
   // Handle region selection
   const handleRegionSelect = (region: string) => {
@@ -93,6 +94,11 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
   const handlePersonaSelect = (persona: string) => {
     setSelectedPersona(persona)
     setCurrentStage('queries')
+  }
+
+  // Handle query counts update
+  const handleQueriesCount = (queryCount: number, responseCount: number) => {
+    setQueryCounts({ queries: queryCount, responses: responseCount })
   }
 
   // Handle back navigation
@@ -113,66 +119,18 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
     }
   }
 
-  // Stage content renderer
-  const renderStageContent = () => {
-    switch (currentStage) {
-      case 'total-company':
-        return <TotalCompany companyId={effectiveCompanyId} />
-      case 'regions':
-        return (
-          <Regions 
-            companyId={effectiveCompanyId} 
-            onSelectRegion={handleRegionSelect}
-          />
-        )
-      case 'verticals':
-        return selectedRegion ? (
-          <Verticals
-            companyId={effectiveCompanyId}
-            selectedRegion={selectedRegion}
-            onSelectVertical={handleVerticalSelect}
-            onBack={handleBack}
-          />
-        ) : (
-          <div>No region selected</div>
-        )
-      case 'personas':
-        return selectedRegion && selectedVertical ? (
-          <Personas
-            companyId={effectiveCompanyId}
-            selectedRegion={selectedRegion}
-            selectedVertical={selectedVertical}
-            onSelectPersona={handlePersonaSelect}
-            onBack={handleBack}
-          />
-        ) : (
-          <div>No vertical selected</div>
-        )
-      case 'queries':
-        return selectedRegion && selectedVertical && selectedPersona ? (
-          <Queries
-            companyId={effectiveCompanyId}
-            selectedRegion={selectedRegion}
-            selectedVertical={selectedVertical}
-            selectedPersona={selectedPersona}
-            onBack={handleBack}
-          />
-        ) : (
-          <div>No persona selected</div>
-        )
-    }
-  }
-
-  // Handle no company selected
-  if (!effectiveCompanyId) {
+  // Ensure we have a valid company ID that exists in our data
+  if (!effectiveCompanyId || !isValidCompany) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">No Company Selected</h2>
-          <p className="text-muted-foreground mt-2">Please select a company to view the ICP analysis</p>
+      <Card className="w-full bg-white shadow-sm">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold">ICP Analysis</h3>
+          <div className="h-[200px] w-full flex items-center justify-center text-muted-foreground">
+            {!effectiveCompanyId ? 'Please select a company to view ICP analysis' : 'Invalid company selected'}
+          </div>
         </div>
-      </div>
-    )
+      </Card>
+    );
   }
 
   return (
@@ -188,16 +146,29 @@ export function NewICPAnalysis({ companyId }: NewICPAnalysisProps) {
           </p>
         </div>
         
-        <StageProgressCards
+        <StageProgressCards 
           currentStage={currentStage}
+          onStageSelect={setCurrentStage}
           selectedRegion={selectedRegion}
           selectedVertical={selectedVertical}
           selectedPersona={selectedPersona}
-          onStageSelect={setCurrentStage}
+          queryCounts={queryCounts}
         />
         
         <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {renderStageContent()}
+          {currentStage === 'total-company' && <TotalCompany companyId={effectiveCompanyId} accountId={accountId} />}
+          {currentStage === 'regions' && <Regions companyId={effectiveCompanyId} accountId={accountId} onSelectRegion={handleRegionSelect} />}
+          {currentStage === 'verticals' && selectedRegion && <Verticals companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} onSelectVertical={handleVerticalSelect} onBack={handleBack} />}
+          {currentStage === 'personas' && selectedRegion && selectedVertical && <Personas companyId={effectiveCompanyId} accountId={accountId} selectedRegion={selectedRegion} selectedVertical={selectedVertical} onSelectPersona={handlePersonaSelect} onBack={handleBack} />}
+          {currentStage === 'queries' && selectedRegion && selectedVertical && selectedPersona && <Queries 
+            companyId={effectiveCompanyId} 
+            accountId={accountId} 
+            selectedRegion={selectedRegion} 
+            selectedVertical={selectedVertical} 
+            selectedPersona={selectedPersona} 
+            onBack={handleBack}
+            onQueriesCount={handleQueriesCount}
+          />}
         </div>
       </Card>
     </div>

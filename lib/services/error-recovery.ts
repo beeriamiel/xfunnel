@@ -3,6 +3,7 @@ import { updateGenerationProgress } from "./progress-tracking";
 import { generateQuestionsForAllPersonas } from "@/lib/actions/generate-questions-batch";
 import { generateICPsAction } from "@/app/company-actions";
 import { EngineSelection } from "@/app/company-actions";
+import { AIModelType } from "@/lib/services/ai/types";
 
 type GenerationStatus = 'generating_icps' | 'generating_questions' | 'complete' | 'failed';
 
@@ -25,7 +26,7 @@ interface CompanyRow {
 }
 
 export async function getFailedGenerations(): Promise<FailedGeneration[]> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   const { data, error } = await adminClient
     .from('generation_progress')
@@ -60,6 +61,7 @@ export async function getFailedGenerations(): Promise<FailedGeneration[]> {
 export async function recoverFromError(
   companyName: string,
   engines: EngineSelection,
+  accountId: string,
   systemPrompts: {
     icp: string;
     questions: string;
@@ -67,15 +69,17 @@ export async function recoverFromError(
   userPrompts: {
     icp: string;
     questions: string;
-  }
+  },
+  model: AIModelType = 'gpt-4-turbo-preview'
 ): Promise<void> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
   
   // Get the last status from the database
   const { data: lastBatch } = await adminClient
     .from('batch_metadata')
     .select('status')
     .eq('company_name', companyName)
+    .eq('account_id', accountId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
@@ -92,10 +96,8 @@ export async function recoverFromError(
         systemPrompts.questions,
         userPrompts.questions,
         engines,
-        {
-          icpModel: 'gpt-4-turbo-preview',
-          questionModel: 'gpt-4-turbo-preview'
-        }
+        { icpModel: model, questionModel: model },
+        accountId
       );
     } else if (lastStatus === 'generating_questions') {
       // If it failed during question generation, only retry that part
@@ -104,7 +106,9 @@ export async function recoverFromError(
         engines,
         systemPrompts.questions,
         userPrompts.questions,
-        'gpt-4-turbo-preview'
+        model,
+        accountId,
+        undefined
       );
     }
   } catch (error) {

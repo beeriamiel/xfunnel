@@ -1,4 +1,4 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { hasEnvVars } from "@/utils/supabase/check-env-vars"
@@ -6,10 +6,10 @@ import { GenerateICPsButton } from "@/components/generate-icps-button"
 import { Card } from "@/components/ui/card"
 import { AppSidebar } from "@/components/app-sidebar"
 import type { Database } from '@/types/supabase'
+import { createClient } from '../supabase/server'
 
 export default async function ProtectedPage() {
-  const supabase = createServerComponentClient<Database>({ cookies })
-
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

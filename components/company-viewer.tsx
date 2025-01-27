@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/app/supabase/client'
 import type { Database } from '@/types/supabase'
 import { SimpleCompanySelector } from './simple-company-selector';
 import { CompanyDetails, DetailedCompany } from './company-details';
@@ -32,7 +32,11 @@ interface ICP {
   personas: Persona[];
 }
 
-export function CompanyViewer() {
+interface CompanyViewerProps {
+  accountId: string;
+}
+
+export function CompanyViewer({ accountId }: CompanyViewerProps) {
   const [companies, setCompanies] = useState<BasicCompany[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<DetailedCompany | null>(null);
@@ -40,7 +44,7 @@ export function CompanyViewer() {
   const [icps, setIcps] = useState<ICP[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClient();
 
   // Fetch basic company data on mount
   useEffect(() => {
@@ -49,6 +53,7 @@ export function CompanyViewer() {
         const { data, error } = await supabase
           .from('companies')
           .select('id, name, industry')
+          .eq('account_id', accountId)
           .order('name');
 
         if (!error && data) {
@@ -62,7 +67,7 @@ export function CompanyViewer() {
     }
 
     fetchCompanies();
-  }, []);
+  }, [accountId]);
 
   // Fetch detailed company data when selected
   useEffect(() => {
@@ -75,6 +80,7 @@ export function CompanyViewer() {
           .from('companies')
           .select('*')
           .eq('id', companyId)
+          .eq('account_id', accountId)
           .single();
 
         console.log('Fetched company data:', companyData); // Debug
@@ -121,7 +127,7 @@ export function CompanyViewer() {
       setCompetitors([]);
       setIcps([]);
     }
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, accountId]);
 
   console.log('Selected Company:', {
     id: selectedCompany?.id,
@@ -169,6 +175,7 @@ export function CompanyViewer() {
               google_search: true
             }}
             selectedModel="gpt-4-turbo-preview"
+            accountId={accountId}
             selectedPrompts={{
               systemPromptName: "default",
               userPromptName: "default"

@@ -471,3 +471,89 @@ const { data: { account } } = await supabase
 4. Preserve existing user data
 5. Support both auth methods
 6. Maintain current sessions
+
+## Phase 3: Account Integration Implementation
+
+### Overview
+Comprehensive implementation of account associations across auth flows and data pipelines.
+
+### 1. Auth Components Update
+#### A. Callback Route (`app/auth/callback/route.ts`)
+- Standardize account creation for OAuth/email
+- Add account validation checks
+- Enhance error handling
+- Add logging for debugging
+- Ensure account creation precedes redirects
+
+#### B. Middleware (`middleware.ts`)
+- Add account relationship verification
+- Update protected route checks
+- Add account context to headers
+- Handle account-specific redirects
+
+#### C. Auth Forms
+- Update login/signup forms with account context
+- Add account verification states
+- Enhance error messaging
+- Add loading states for account checks
+
+#### D. Header Auth (`components/header-auth.tsx`)
+- Add account display/selection
+- Show account status
+- Add account context provider
+
+### 2. Data Pipeline Integration
+#### A. ICP Generation (`generate-icps.ts`)
+- Add account_id to company creation
+- Update ICP generation with account context
+- Ensure persona creation includes account
+
+#### B. Query Generation (`generate-questions.ts`)
+- Add account_id to queries
+- Update query generation flow
+- Pass account context through pipeline
+
+#### C. Batch Processing (`generate-questions-batch.ts`)
+- Add account_id to batch metadata
+- Update batch processing
+- Ensure response generation includes account
+
+### 3. Analysis & Citation Updates
+#### A. Response Processing (`processor.ts`)
+- Add account context to analysis
+- Update analysis queries
+- Ensure data respects account boundaries
+
+#### B. Citation Processing (`citation-processor.ts`)
+- Add account_id to citations
+- Update citation processing
+- Maintain account context in enrichment
+
+### 4. Database Updates
+- Add NOT NULL constraints for account_id
+- Update existing records
+- Add necessary indexes
+- Verify foreign key relationships
+
+### 5. RLS Policy Updates
+- Update companies access policy
+- Add query access policy
+- Update response access policy
+- Add analysis access policy
+- Update citation access policy
+- Add batch metadata access policy
+
+### Success Metrics
+- All data properly associated with accounts
+- RLS policies effectively filtering by account
+- Successful account creation for all auth methods
+- Proper error handling and user feedback
+- Complete data pipeline account integration
+
+### Implementation Order
+1. Auth components and middleware
+2. Database constraints and indexes
+3. RLS policy updates
+4. Data pipeline integration
+5. Analysis and citation updates
+6. Testing and verification

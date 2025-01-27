@@ -78,11 +78,18 @@ export function AppSidebar({ className }: SidebarProps) {
       title: "Dashboard",
       items: [
         {
-          title: "AI Engine Performance",
+          title: "Search Engine Overview",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'engine',
           icon: <Activity className="h-4 w-4" />,
           view: 'engine',
+        },
+        {
+          title: "AI Overviews",
+          href: getHref("/dashboard"),
+          active: isDashboard && activeView === 'ai-overviews',
+          icon: <LineChart className="h-4 w-4" />,
+          view: 'ai-overviews',
         },
         {
           title: "ICP Analysis",
@@ -149,11 +156,29 @@ export function AppSidebar({ className }: SidebarProps) {
     }
 
     e.preventDefault()
+    console.log('🔵 AppSidebar Navigation:', {
+      item,
+      currentView: activeView,
+      newView: item.view
+    })
+    
     setActiveView(item.view)
     
+    // Use the correct path for Generate Analysis
+    const basePath = item.view === 'response' 
+      ? '/dashboard/generate-analysis'
+      : '/dashboard'
+      
     // Preserve existing search params and navigate
     const params = new URLSearchParams(searchParams.toString())
-    router.push(`/dashboard${params.toString() ? `?${params.toString()}` : ''}`)
+    
+    console.log('🟡 AppSidebar URL Construction:', {
+      basePath,
+      params: params.toString(),
+      finalUrl: `${basePath}${params.toString() ? `?${params.toString()}` : ''}`
+    })
+
+    router.push(`${basePath}${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
   const SidebarContent = () => (

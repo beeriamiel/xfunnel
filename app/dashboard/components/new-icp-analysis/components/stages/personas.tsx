@@ -38,6 +38,7 @@ import {
 
 interface PersonasProps {
   companyId: number | null
+  accountId: string
   selectedRegion: string
   selectedVertical: string
   onSelectPersona: (persona: string) => void
@@ -87,6 +88,7 @@ const PERSONA_COLORS: Record<string, string> = {
 
 export function Personas({ 
   companyId, 
+  accountId, 
   selectedRegion, 
   selectedVertical, 
   onSelectPersona, 
@@ -95,6 +97,7 @@ export function Personas({
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
@@ -102,7 +105,7 @@ export function Personas({
       ? `persona-analysis-${companyId}-${selectedRegion}-${selectedVertical}-${timePeriod}` 
       : null,
     () => companyId && selectedRegion && selectedVertical 
-      ? getAnalysisByPersona(companyId, selectedRegion, selectedVertical, timePeriod) 
+      ? getAnalysisByPersona(companyId, accountId, selectedRegion, selectedVertical, timePeriod, isSuperAdmin) 
       : null
   )
 

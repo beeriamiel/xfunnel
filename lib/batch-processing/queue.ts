@@ -47,7 +47,7 @@ export class ResponseAnalysisQueue {
   }
 
   private async fetchResponseBatch(startId: number, endId: number): Promise<Response[]> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     
     console.log(`Fetching batch from ID ${startId} to ${endId}`);
     
@@ -55,11 +55,12 @@ export class ResponseAnalysisQueue {
       .from('responses')
       .select(`
         *,
-        query:queries (
+        query:queries!inner (
           id,
-          buyer_journey_phase,
           query_text,
-          company:companies (
+          buyer_journey_phase,
+          account_id,
+          company:companies!inner (
             id,
             name,
             industry,
@@ -68,7 +69,7 @@ export class ResponseAnalysisQueue {
               competitor_name
             )
           ),
-          persona:personas (
+          persona:personas!inner (
             id,
             title,
             seniority_level,
@@ -119,8 +120,9 @@ export class ResponseAnalysisQueue {
           web_search_queries: response.websearchqueries || [],
           query: {
             id: 0,
-            company_id: 0,
             query_text: '',
+            company_id: 0,
+            account_id: '',
             prompt_id: null,
             buyer_journey_phase: null,
             persona: undefined,
@@ -140,8 +142,9 @@ export class ResponseAnalysisQueue {
         web_search_queries: response.websearchqueries || [],
         query: {
           id: response.query.id,
-          company_id: response.query.company?.id || 0,
           query_text: response.query.query_text,
+          company_id: response.query.company?.id || 0,
+          account_id: response.query.account_id || '',
           prompt_id: null,
           buyer_journey_phase: response.query.buyer_journey_phase || null,
           persona: response.query.persona && response.query.persona.icp ? {
@@ -169,7 +172,7 @@ export class ResponseAnalysisQueue {
     });
   }
   private async processBatch(responses: Response[], analysisBatchId: string): Promise<void> {
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     const analysisResults: ResponseAnalysisInsert[] = [];
     
     for (const response of responses) {
@@ -190,6 +193,7 @@ export class ResponseAnalysisQueue {
 
         analysisResults.push({
           response_id: response.id,
+          account_id: response.query.account_id,
           citations_parsed: analysis.citations_parsed ?
           JSON.parse(JSON.stringify(analysis.citations_parsed)) : null,
           recommended: analysis.recommended,
@@ -230,80 +234,121 @@ export class ResponseAnalysisQueue {
   
 
     if (analysisResults.length > 0) {
-      console.log(`Upserting ${analysisResults.length} analyses for response IDs: ${analysisResults.map(a => a.response_id).join(', ')}`);
-      
-      // Delete existing analyses first
-      const responseIds = analysisResults.map(a => a.response_id);
-      const { error: deleteError } = await adminClient
-        .from('response_analysis')
-        .delete()
-        .in('response_id', responseIds);
-
-      if (deleteError) {
-        console.error('Error deleting existing analyses:', deleteError);
-        throw deleteError;
-      }
-
-      // Insert new analyses
-      const { error: insertError } = await adminClient
-        .from('response_analysis')
-        .insert(analysisResults);
-
-      if (insertError) {
-        console.error('Error inserting analyses:', insertError);
-        throw insertError;
-      }
-
-      // Add citation processing for each analysis
-      for (const analysisData of analysisResults) {
-        try {
-          const { data: insertedAnalysis } = await adminClient
-            .from('response_analysis')
-            .select('*')
-            .eq('response_id', analysisData.response_id!)
-            .single();
-
-          if (!insertedAnalysis) {
-            console.error(`No analysis found for response ${analysisData.response_id}`);
-            continue;
-          }
-
-          console.log(`Processing citations for response ${analysisData.response_id}:`, {
-            hasAnalysis: !!insertedAnalysis,
-            citationsParsed: analysisData.citations_parsed
+      // Validate and separate valid/invalid records
+      const { validResults, invalidResults } = analysisResults.reduce((acc, result) => {
+        // Check for valid UUID in analysis_batch_id
+        const isValidUUID = result.analysis_batch_id && 
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result.analysis_batch_id);
+        
+        if (isValidUUID) {
+          acc.validResults.push(result);
+        } else {
+          console.error('Invalid UUID detected:', {
+            responseId: result.response_id,
+            batchId: result.analysis_batch_id,
+            timestamp: new Date().toISOString(),
+            invalidField: 'analysis_batch_id',
+            actualValue: result.analysis_batch_id
           });
-
-          await processCitationsTransaction(
-            insertedAnalysis,
-            typeof analysisData.citations_parsed === 'string' 
-              ? JSON.parse(analysisData.citations_parsed)
-              : analysisData.citations_parsed
-          );
-
-          console.log(`Successfully processed citations for response ${analysisData.response_id}`);
-        } catch (citationError) {
-          console.error(`Error processing citations for response ${analysisData.response_id}:`, citationError);
+          acc.invalidResults.push(result);
         }
-      }
+        return acc;
+      }, { validResults: [], invalidResults: [] });
 
-      console.log('Successfully updated analyses');
+      // Log validation results
+      console.log('Batch validation results:', {
+        totalRecords: analysisResults.length,
+        validRecords: validResults.length,
+        invalidRecords: invalidResults.length,
+        skippedResponseIds: invalidResults.map(r => r.response_id)
+      });
+
+      if (validResults.length > 0) {
+        console.log(`Upserting ${validResults.length} valid analyses for response IDs: ${validResults.map(a => a.response_id).join(', ')}`);
+        
+        // Delete existing analyses first
+        const responseIds = validResults.map(a => a.response_id);
+        const { error: deleteError } = await adminClient
+          .from('response_analysis')
+          .delete()
+          .in('response_id', responseIds);
+
+        if (deleteError) {
+          console.error('Error deleting existing analyses:', deleteError);
+          throw deleteError;
+        }
+
+        // Insert new analyses
+        const { error: insertError } = await adminClient
+          .from('response_analysis')
+          .insert(validResults);
+
+        if (insertError) {
+          console.error('Error inserting analyses:', insertError);
+          throw insertError;
+        }
+
+        // Add citation processing for each analysis
+        for (const analysisData of validResults) {
+          try {
+            const { data: insertedAnalysis } = await adminClient
+              .from('response_analysis')
+              .select('*')
+              .eq('response_id', analysisData.response_id!)
+              .single();
+
+            if (!insertedAnalysis) {
+              console.error(`No analysis found for response ${analysisData.response_id}`);
+              continue;
+            }
+
+            console.log(`Processing citations for response ${analysisData.response_id}:`, {
+              hasAnalysis: !!insertedAnalysis,
+              citationsParsed: analysisData.citations_parsed
+            });
+
+            if (!insertedAnalysis.account_id) {
+              throw new Error(`No account_id found for analysis ${analysisData.response_id}`);
+            }
+
+            await processCitationsTransaction(
+              insertedAnalysis,
+              typeof analysisData.citations_parsed === 'string' 
+                ? JSON.parse(analysisData.citations_parsed)
+                : analysisData.citations_parsed,
+              insertedAnalysis.account_id
+            );
+
+            console.log(`Successfully processed citations for response ${analysisData.response_id}`);
+          } catch (citationError) {
+            console.error(`Error processing citations for response ${analysisData.response_id}:`, citationError);
+          }
+        }
+
+        console.log('Successfully updated analyses');
+      }
     }
   }
 
-  async processQueue(startId: number, endId: number, companyId: number): Promise<void> {
+  async processQueue(
+    startId: number, 
+    endId: number, 
+    companyId: number,
+    accountId: string
+  ): Promise<void> {
     if (this.processing) {
       console.log('Queue is already being processed');
       return;
     }
 
-    const adminClient = createAdminClient();
-    const batchTracker = new SupabaseBatchTrackingService();
+    const adminClient = await createAdminClient();
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
 
     try {
       this.processing = true;
       this.stats.inProgress = true;
       
-      const analysisBatchId = await batchTracker.createBatch('response_analysis', companyId, {
+      const analysisBatchId = await batchTracker.createBatch('response_analysis', companyId, accountId, {
         startId,
         endId,
         processingType: 'analysis'
@@ -342,7 +387,7 @@ export class ResponseAnalysisQueue {
     }
   }
 
-  async retryFailed(): Promise<void> {
+  async retryFailed(accountId: string): Promise<void> {
     if (this.failedResponses.size === 0) {
       console.log('No failed responses to retry');
       return;
@@ -353,10 +398,7 @@ export class ResponseAnalysisQueue {
     this.failedResponses.clear();
     this.stats.failedResponses = 0;
 
-    const batchTracker = new SupabaseBatchTrackingService();
-    
-    // Get company ID from the first response
-    const adminClient = createAdminClient();
+    const adminClient = await createAdminClient();
     const { data: firstResponse } = await adminClient
       .from('responses')
       .select('query:queries(company_id)')
@@ -368,10 +410,16 @@ export class ResponseAnalysisQueue {
     }
 
     // Create a new analysis batch for retries
-    const retryBatchId = await batchTracker.createBatch('response_analysis', firstResponse.query.company_id, {
-      isRetry: true,
-      originalIds: failedIds
-    });
+    const batchTracker = await SupabaseBatchTrackingService.initialize();
+    const retryBatchId = await batchTracker.createBatch(
+      'response_analysis', 
+      firstResponse.query.company_id,
+      accountId,
+      {
+        isRetry: true,
+        originalIds: failedIds
+      }
+    );
 
     for (let i = 0; i < failedIds.length; i += this.batchSize) {
       const batchIds = failedIds.slice(i, i + this.batchSize);

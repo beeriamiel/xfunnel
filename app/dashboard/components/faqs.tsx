@@ -8,6 +8,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
+interface FAQsProps {
+  accountId: string;
+}
+
 const faqs = [
   {
     question: "What is xFunnel?",
@@ -23,7 +27,7 @@ const faqs = [
   },
 ]
 
-export function FAQs() {
+export function FAQs({ accountId }: FAQsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-1">
       <Card className="p-6">

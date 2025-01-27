@@ -7,6 +7,18 @@ import { SourceType } from '@/lib/types/batch';
 import { ContentAnalysisService } from '@/lib/services/content-analysis-service';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+interface Citation {
+  id: number;
+  citation_url: string;
+  query_text: string | null;
+  response_text: string | null;
+  content_markdown: string | null;
+  content_scraped_at: string | null;
+  content_scraping_error: string | null;
+  is_original: boolean | null;
+  content_analysis: string | null;
+  content_analysis_updated_at: string | null;
+}
 
 type CitationInsert = Database['public']['Tables']['citations']['Insert'] & {
   mentioned_companies_count?: string[] | null;
@@ -45,6 +57,8 @@ interface CitationMetadata {
   spam_score?: number | null;
   root_domains_to_root_domain?: number | null;
   external_links_to_root_domain?: number | null;
+  account_id: string;
+  answer_engine?: string | null;
 }
 
 export interface ParsedCitation {
@@ -58,7 +72,8 @@ export interface ParsedCitation {
  */
 export async function processCitations(
   responseAnalysis: ResponseAnalysis,
-  citationsParsed: ParsedCitation | null
+  citationsParsed: ParsedCitation | null,
+  accountId: string
 ): Promise<CitationMetadata[]> {
   if (!citationsParsed || !citationsParsed.urls || citationsParsed.urls.length === 0) {
     console.log('No citations to process for response analysis:', responseAnalysis.id);
@@ -69,6 +84,10 @@ export async function processCitations(
     responseAnalysisId: responseAnalysis.id,
     citationCount: citationsParsed.urls.length
   });
+
+  if (!responseAnalysis.account_id || !accountId) {
+    throw new Error('account_id is required for response analysis');
+  }
 
   return citationsParsed.urls.map((url, index) => {
     const metadata: CitationMetadata = {
@@ -87,6 +106,8 @@ export async function processCitations(
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
       query_text: responseAnalysis.query_text ?? '',
+      account_id: accountId,
+      answer_engine: responseAnalysis.answer_engine
     };
 
     console.log('Created citation metadata:', {
@@ -108,7 +129,7 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
     return [];
   }
 
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   try {
     // Add detailed logging of the exact data being inserted
@@ -154,7 +175,9 @@ export async function insertCitationBatch(citations: CitationMetadata[]): Promis
         page_authority: citation.page_authority,
         spam_score: citation.spam_score,
         root_domains_to_root_domain: citation.root_domains_to_root_domain,
-        external_links_to_root_domain: citation.external_links_to_root_domain
+        external_links_to_root_domain: citation.external_links_to_root_domain,
+        account_id: citation.account_id,
+        answer_engine: citation.answer_engine
       })))
       .select('id');
 
@@ -247,9 +270,15 @@ export function extractCitationMetadata(
  */
 export async function processCitationsTransaction(
   responseAnalysis: ResponseAnalysis,
-  citationsParsed: ParsedCitation | null
+  citationsParsed: ParsedCitation | null,
+  accountId: string
 ): Promise<void> {
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
+
+  // Add type guard for both account_id values
+  if (!responseAnalysis.account_id || !accountId) {
+    throw new Error('account_id is required');
+  }
 
   try {
     // Extract URLs first
@@ -283,7 +312,9 @@ export async function processCitationsTransaction(
       response_text: responseAnalysis.response_text ?? '',
       region: responseAnalysis.geographic_region ?? '',
       ranking_position: responseAnalysis.ranking_position,
-      query_text: responseAnalysis.query_text ?? ''
+      query_text: responseAnalysis.query_text ?? '',
+      account_id: accountId,
+      answer_engine: responseAnalysis.answer_engine
     }));
 
     // Type-safe handling of reusable citations
@@ -328,12 +359,8 @@ export async function processCitationsTransaction(
         response_text: responseAnalysis.response_text ?? '',
         region: responseAnalysis.geographic_region ?? '',
         ranking_position: responseAnalysis.ranking_position,
-        query_text: responseAnalysis.query_text ?? ''
-      };
-
-      // Return combined citation with existing data
-      return {
-        ...baseCitation,
+        query_text: responseAnalysis.query_text ?? '',
+        account_id: accountId,
         is_original: false,
         origin_citation_id: existing.id,
         content_markdown: existing.content_markdown,
@@ -346,8 +373,12 @@ export async function processCitationsTransaction(
         page_authority: existing.page_authority,
         spam_score: existing.spam_score,
         root_domains_to_root_domain: existing.root_domains_to_root_domain,
-        external_links_to_root_domain: existing.external_links_to_root_domain
+        external_links_to_root_domain: existing.external_links_to_root_domain,
+        answer_engine: responseAnalysis.answer_engine
       };
+
+      // Return combined citation with existing data
+      return baseCitation;
     });
 
     // Combine all citations and proceed with insertion
@@ -397,7 +428,7 @@ export async function processCitationsTransaction(
       // Get only new citations for content scraping
       const { data: citationsToProcess, error } = await adminClient
         .from('citations')
-        .select('id, citation_url, query_text, response_text, content_markdown')
+        .select('*')
         .in('id', citationIds)
         .eq('is_original', true);
 
@@ -418,8 +449,8 @@ export async function processCitationsTransaction(
           });
 
           await Promise.all([
-            mozQueue.processBatch(citationsToProcess, responseAnalysis.company_id),
-            contentQueue.processBatch(citationsToProcess, responseAnalysis.company_id)
+            mozQueue.processBatch(citationsToProcess, responseAnalysis.company_id, accountId),
+            contentQueue.processBatch(citationsToProcess, responseAnalysis.company_id, accountId)
           ]);
         } catch (enrichmentError) {
           console.error('Enrichment error:', {
@@ -442,12 +473,120 @@ export async function processCitationsTransaction(
       if (citationsToProcess && citationsToProcess.length > 0) {
         for (const citation of citationsToProcess) {
           try {
+            // Add logging for markdown content
+            console.log('Citation content analysis preparation:', {
+              citationId: citation.id,
+              contentState: {
+                hasMarkdown: !!citation.content_markdown,
+                markdownLength: citation.content_markdown?.length || 0,
+                markdownPreview: citation.content_markdown?.substring(0, 100) + '...',
+                contentScrapedAt: citation.content_scraped_at,
+                scrapingError: citation.content_scraping_error
+              },
+              queryState: {
+                hasQuery: !!citation.query_text,
+                queryLength: citation.query_text?.length || 0,
+                queryPreview: citation.query_text?.substring(0, 100) + '...'
+              },
+              responseState: {
+                hasResponse: !!citation.response_text,
+                responseLength: citation.response_text?.length || 0,
+                responsePreview: citation.response_text?.substring(0, 100) + '...'
+              },
+              timestamp: new Date().toISOString()
+            });
+
+            // Add logging for database fetch
+            const { data: freshCitation, error: fetchError } = await adminClient
+              .from('citations')
+              .select('*')
+              .eq('id', citation.id)
+              .single();
+
+            if (fetchError) {
+              console.error('Error fetching fresh citation data:', {
+                citationId: citation.id,
+                error: fetchError,
+                timestamp: new Date().toISOString()
+              });
+              continue;
+            }
+
+            if (!freshCitation) {
+              console.error('No fresh citation data found:', {
+                citationId: citation.id,
+                timestamp: new Date().toISOString()
+              });
+              continue;
+            }
+
+            // Add detailed markdown inspection
+            console.log('Pre-analysis markdown inspection:', {
+              citationId: citation.id,
+              markdownState: {
+                fromFreshCitation: {
+                  exists: !!freshCitation.content_markdown,
+                  length: freshCitation.content_markdown?.length || 0,
+                  preview: freshCitation.content_markdown?.substring(0, 150),
+                  type: typeof freshCitation.content_markdown
+                },
+                fromCitation: {
+                  exists: !!citation.content_markdown,
+                  length: citation.content_markdown?.length || 0,
+                  preview: citation.content_markdown?.substring(0, 150),
+                  type: typeof citation.content_markdown
+                }
+              },
+              timestamp: new Date().toISOString()
+            });
+
             const contentAnalysisService = new ContentAnalysisService();
+            
+            // Log the input data being sent for analysis
+            console.log('Content analysis service input:', {
+              citationId: freshCitation.id,
+              inputValidation: {
+                queryText: {
+                  present: !!freshCitation.query_text,
+                  length: freshCitation.query_text?.length || 0,
+                  preview: freshCitation.query_text?.substring(0, 100) + '...'
+                },
+                responseText: {
+                  present: !!freshCitation.response_text,
+                  length: freshCitation.response_text?.length || 0,
+                  preview: freshCitation.response_text?.substring(0, 100) + '...'
+                },
+                contentMarkdown: {
+                  present: !!freshCitation.content_markdown,
+                  length: freshCitation.content_markdown?.length || 0,
+                  preview: freshCitation.content_markdown?.substring(0, 100) + '...'
+                }
+              },
+              timestamp: new Date().toISOString()
+            });
+
             const analysis = await contentAnalysisService.analyzeContent(
-              citation.query_text || '',
-              citation.response_text || '',
-              citation.content_markdown || ''
+              freshCitation.query_text || '',
+              freshCitation.response_text || '',
+              freshCitation.content_markdown || '',
+              accountId
             );
+
+            // Enhanced pre-update logging
+            console.log('Content analysis database update preparation:', {
+              citationId: citation.id,
+              timestamp: new Date().toISOString(),
+              analysisStatus: {
+                hasAnalysis: !!analysis,
+                analysisSize: analysis ? JSON.stringify(analysis).length : 0,
+                analysisKeys: Object.keys(analysis || {})
+              },
+              inputData: {
+                hasQueryText: !!freshCitation.query_text,
+                hasResponseText: !!freshCitation.response_text,
+                hasContentMarkdown: !!freshCitation.content_markdown
+              }
+            });
 
             const { error: updateError } = await adminClient
               .from('citations')
@@ -457,13 +596,46 @@ export async function processCitationsTransaction(
               })
               .eq('id', citation.id);
 
+            // Enhanced post-update logging
+            console.log('Content analysis database update completed:', {
+              citationId: citation.id,
+              timestamp: new Date().toISOString(),
+              updateStatus: {
+                success: !updateError,
+                error: updateError,
+                updatedFields: {
+                  contentAnalysis: true,
+                  contentAnalysisUpdatedAt: true
+                }
+              },
+              analysisMetrics: {
+                analysisSize: analysis ? JSON.stringify(analysis).length : 0,
+                hasValidAnalysis: !!analysis
+              }
+            });
+
+            // Log the update result
             if (updateError) {
-              throw updateError;
+              console.error('Content analysis update failed:', {
+                citationId: citation.id,
+                error: updateError,
+                timestamp: new Date().toISOString()
+              });
+            } else {
+              console.log('Content analysis update successful:', {
+                citationId: citation.id,
+                timestamp: new Date().toISOString(),
+                analysisSize: JSON.stringify(analysis).length
+              });
             }
           } catch (analysisError) {
             console.error('Content analysis failed for citation:', {
               citationId: citation.id,
-              error: analysisError,
+              error: analysisError instanceof Error ? {
+                name: analysisError.name,
+                message: analysisError.message,
+                stack: analysisError.stack
+              } : analysisError,
               timestamp: new Date().toISOString()
             });
           }
@@ -472,6 +644,23 @@ export async function processCitationsTransaction(
 
       // Process company mentions for all citations with content
       await processCompanyMentions(citationIds, responseAnalysis, adminClient);
+
+      // Enhanced transaction completion logging
+      console.log('Citation processing transaction completed:', {
+        responseAnalysisId: responseAnalysis.id,
+        timestamp: new Date().toISOString(),
+        processingStats: {
+          totalCitations: allCitations.length,
+          newCitations: newCitations.length,
+          reusedCitations: reusableCitationsData.length,
+          citationIds
+        },
+        contentProcessing: {
+          citationsProcessed: citationsToProcess?.length || 0,
+          hasContentAnalysis: citationsToProcess?.some(c => c.content_markdown) || false
+        },
+        status: 'completed'
+      });
 
     } catch (error) {
       console.error('Processing error:', {
@@ -633,45 +822,60 @@ async function waitForContentScraping(
   citationIds: number[],
   adminClient: SupabaseClient<Database>,
   responseAnalysis: ResponseAnalysis,
-  maxAttempts = 30,
-  pollInterval = 1000
+  maxWaitTime: number = 30000 // 30 seconds
 ): Promise<void> {
   console.log('Waiting for content scraping to complete:', {
     citationCount: citationIds.length,
-    maxWaitTime: maxAttempts * (pollInterval / 1000) + ' seconds'
+    maxWaitTime: '30 seconds'
   });
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  const startTime = Date.now();
+  let processed = 0;
+  let withContent = 0;
+  let withErrors = 0;
+
+  while (Date.now() - startTime < maxWaitTime) {
+    // Query current status
     const { data: citations, error } = await adminClient
       .from('citations')
-      .select('id, content_scraped_at, content_scraping_error, content_markdown')
+      .select('id, content_markdown, content_scraping_error, content_scraped_at')
       .in('id', citationIds);
 
     if (error) {
-      console.error('Error checking citation status:', error);
+      console.error('Error checking content scraping status:', error);
       throw error;
     }
 
-    const processed = citations?.filter(c => 
-      c.content_scraped_at !== null || c.content_scraping_error !== null
-    );
+    // Count citations with content or errors
+    processed = citations.filter(c => c.content_scraped_at).length;
+    withContent = citations.filter(c => c.content_markdown).length;
+    withErrors = citations.filter(c => c.content_scraping_error).length;
 
     console.log('Content scraping progress:', {
-      attempt: attempt + 1,
-      processed: processed?.length ?? 0,
+      attempt: Math.floor((Date.now() - startTime) / 1000),
+      processed,
       total: citationIds.length,
-      withContent: citations?.filter(c => c.content_markdown !== null).length ?? 0,
-      withErrors: citations?.filter(c => c.content_scraping_error !== null).length ?? 0
+      withContent,
+      withErrors
     });
 
-    if (processed && processed.length === citationIds.length) {
+    // If all citations are processed (have content or errors), we're done
+    if (processed === citationIds.length) {
       console.log('Content scraping completed for all citations');
       return;
     }
 
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    // Wait a bit before checking again
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-  throw new Error(`Timeout waiting for content scraping after ${maxAttempts} attempts`);
+  // If we get here, we've timed out
+  console.warn('Content scraping wait time exceeded:', {
+    processed,
+    total: citationIds.length,
+    withContent,
+    withErrors,
+    timeElapsed: Date.now() - startTime
+  });
 }
 
