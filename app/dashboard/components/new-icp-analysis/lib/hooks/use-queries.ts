@@ -7,14 +7,18 @@ import { Database } from "@/types/supabase"
 
 // Add mapping function to transform backend engine names to frontend names
 function transformEngineName(backendName: string): string {
-  const engineMap: Record<string, string> = {
-    'openai': 'searchgpt',
-    'google_search': 'aio',
+  const engineMapping: Record<string, string> = {
     'perplexity': 'perplexity',
     'claude': 'claude',
-    'gemini': 'gemini'
+    'gemini': 'gemini',
+    'openai': 'searchgpt'
   }
-  return engineMap[backendName] || backendName
+  return engineMapping[backendName] || backendName
+}
+
+// Add validation function to check if engine should be included
+function isValidEngine(engine: string): boolean {
+  return ['perplexity', 'claude', 'gemini', 'openai'].includes(engine)
 }
 
 interface QueryPhase {
@@ -140,7 +144,8 @@ export function useQueries(
           const query = queryMap.get(queryKey)!
           const engine = response.answer_engine
 
-          if (engine) {
+          // Only process valid engines
+          if (engine && isValidEngine(engine)) {
             // Transform the engine name from backend to frontend format
             const transformedEngine = transformEngineName(engine)
             
@@ -177,9 +182,11 @@ export function useQueries(
 
         // Calculate mention rates for each query
         queryMap.forEach(query => {
-          const engineCount = Object.keys(query.engineResults).length
-          const mentionCount = Object.values(query.engineResults)
-            .filter(result => result.companyMentioned).length
+          const validEngineResults = Object.entries(query.engineResults)
+            .filter(([engine]) => ['perplexity', 'claude', 'gemini', 'searchgpt'].includes(engine))
+          const engineCount = validEngineResults.length
+          const mentionCount = validEngineResults
+            .filter(([_, result]) => result.companyMentioned).length
           query.companyMentionRate = engineCount > 0 ? (mentionCount / engineCount) * 100 : 0
         })
 

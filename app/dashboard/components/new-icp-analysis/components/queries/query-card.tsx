@@ -26,7 +26,7 @@ export function QueryCard({ query, showCompanyMention }: QueryCardProps) {
   const isEvaluationPhase = query.buyerJourneyPhase === 'solution_evaluation'
 
   // Always show all engines in the same order
-  const orderedEngines = ['perplexity', 'claude', 'gemini', 'searchgpt', 'aio']
+  const orderedEngines = ['perplexity', 'claude', 'gemini', 'searchgpt']
 
   // Transform the query text for display
   const displayText = transformQueryText(query.text)
@@ -90,7 +90,7 @@ export function QueryCard({ query, showCompanyMention }: QueryCardProps) {
           >
             <div className="p-4 border-t">
               <div className="overflow-x-auto">
-                <div className="grid grid-cols-5 gap-4 min-w-[1000px]">
+                <div className="grid grid-cols-4 gap-4 min-w-[800px]">
                   {orderedEngines.map((engineKey) => {
                     const engineResult = query.engineResults[engineKey]
                     const hasData = engineResult && Object.keys(engineResult).length > 0

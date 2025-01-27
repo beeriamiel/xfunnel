@@ -11,6 +11,7 @@ export interface PlatformRankings {
   perplexity: number
   claude: number
   gemini: number
+  searchgpt: number
 }
 
 // Mock data types

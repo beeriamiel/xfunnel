@@ -83,6 +83,7 @@ export async function getAnalysisByCompany(
     .eq('company_id', companyId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
 
   // Add account filter for non-super admins
@@ -152,6 +153,7 @@ export async function getAnalysisByRegion(
     .eq('company_id', companyId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
 
   // Add account filter for non-super admins
@@ -221,6 +223,7 @@ export async function getAnalysisByVertical(
     .eq('geographic_region', region)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
 
   // Add account filter for non-super admins
@@ -379,6 +382,7 @@ export async function getAnalysisByQueries(
     .eq('buyer_persona', persona)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
 
   // Add account filter for non-super admins
   if (!isSuperAdmin) {
@@ -507,6 +511,7 @@ export async function getAnalysisByPersona(
     .eq('icp_vertical', vertical)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+    .not('answer_engine', 'in', '("google_search","google-search")')
     .order('created_at', { ascending: true })
 
   // Add account filter for non-super admins
@@ -605,7 +610,7 @@ function calculateRankingPosition(
     item.buying_journey_stage !== null &&
     validStages.includes(item.buying_journey_stage) &&
     item.ranking_position !== null &&
-    item.ranking_position > 0  // Only include rankings greater than 0
+    item.ranking_position > 0  // Filter out 0 values
   );
   
   if (filteredData.length === 0) return 0;

@@ -22,8 +22,9 @@ export function PhaseMetrics({ phase, queries }: PhaseMetricsProps) {
   // Helper to calculate average ranking
   const calculateAverageRanking = () => {
     const validRankings = queries.flatMap(query => 
-      Object.values(query.engineResults)
-        .map(result => result.rank)
+      Object.entries(query.engineResults)
+        .filter(([_, result]) => typeof result.rank === 'number' && result.rank > 0)
+        .map(([_, result]) => result.rank)
         .filter((rank): rank is number => typeof rank === 'number' && rank > 0)
     );
 

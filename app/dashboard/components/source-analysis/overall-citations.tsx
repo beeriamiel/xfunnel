@@ -63,7 +63,6 @@ const SOURCE_TYPES = [
 ] as const
 
 const ANSWER_ENGINES = [
-  { value: 'google', label: 'Google Search (AIO)' },
   { value: 'openai', label: 'SearchGPT (OpenAI)' },
   { value: 'anthropic', label: 'Claude (Anthropic)' },
   { value: 'perplexity', label: 'Perplexity' },
@@ -152,11 +151,10 @@ const CHART_COLORS = {
   final_research: '#06b6d4',      // Cyan
   
   // Answer Engines
-  google: '#06b6d4',      // Cyan (AIO)
   openai: '#4f46e5',           // Indigo (SearchGPT)
-  anthropic: '#2563eb',            // Royal blue
-  perplexity: '#9333ea',        // Bright purple
-  gemini: '#db2777',            // Deep pink
+  anthropic: '#2563eb',        // Royal blue
+  perplexity: '#9333ea',       // Bright purple
+  gemini: '#db2777',           // Deep pink
 } as const
 
 // Safe color getter with type checking
@@ -185,7 +183,6 @@ const journeyPhaseConfig = {
 
 const answerEngineConfig = {
   value: { label: 'Citations' },
-  google: { label: 'Google Search (AIO)', color: CHART_COLORS.google },
   openai: { label: 'SearchGPT (OpenAI)', color: CHART_COLORS.openai },
   anthropic: { label: 'Claude (Anthropic)', color: CHART_COLORS.anthropic },
   perplexity: { label: 'Perplexity', color: CHART_COLORS.perplexity },
@@ -341,7 +338,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
             page_authority,
             created_at,
             answer_engine
-          `) as any
+          `)
+          .not('answer_engine', 'in', '("google_search","google-search")') as any
 
         // Apply filters
         if (filters.buyingJourneyPhase) {

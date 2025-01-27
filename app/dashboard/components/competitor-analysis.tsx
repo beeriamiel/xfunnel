@@ -44,8 +44,7 @@ const ENGINE_NAMES: { [key: string]: string } = {
   perplexity: 'Perplexity',
   gemini: 'Gemini',
   claude: 'Claude',
-  openai: 'OpenAI',
-  google_search: 'Google Search'
+  openai: 'OpenAI'
 }
 
 interface EngineData {
@@ -439,7 +438,8 @@ export function CompetitorAnalysis({
             company_name,
             response_text
           `)
-          .eq('company_id', effectiveCompanyId);
+          .eq('company_id', effectiveCompanyId)
+          .not('answer_engine', 'in', '("google_search","google-search")');
 
         if (analysisError) throw analysisError;
         if (!analysisData?.length) {

@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react'
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card } from '@/components/ui/card'
-import { EngineMetricsChart } from './engine-metrics-chart'
+import { EngineMetricsChart as SearchEngineOverview } from './engine-metrics-chart'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CompetitorAnalysis } from './competitor-analysis'
 import { CitationAnalysis } from './citation-analysis'
@@ -110,7 +110,7 @@ function DashboardView({
             />
           ) : (
             <>
-              <EngineMetricsChart 
+              <SearchEngineOverview 
                 companyId={selectedCompany.id}
                 accountId={accountId}
               />

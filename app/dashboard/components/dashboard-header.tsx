@@ -16,13 +16,15 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { createClient } from '@/app/supabase/client'
 import { useEffect } from 'react'
 import { CompanySelector } from "./company-selector"
+import type { Company } from '../generate-analysis/types/company'
 
 interface DashboardHeaderProps {
   title?: string
 }
 
 export function DashboardHeader({ title }: DashboardHeaderProps) {
-  const { activeView, isSuperAdmin, companies, selectedCompany } = useDashboardStore()
+  const { activeView, isSuperAdmin, companies, selectedCompanyId } = useDashboardStore()
+  const selectedCompany = companies.find(c => c.id === selectedCompanyId) || null
   const supabase = createClient()
   
   // Add logging
@@ -80,6 +82,16 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
         <Separator orientation="vertical" className="mr-2 h-4" />
         <Breadcrumb>
           <BreadcrumbList>
+            {selectedCompany && (
+              <>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbPage className="text-muted-foreground font-medium">
+                    {selectedCompany.name}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+              </>
+            )}
             {showSectionLink && (
               <>
                 <BreadcrumbItem className="hidden md:block">

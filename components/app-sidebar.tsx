@@ -78,7 +78,7 @@ export function AppSidebar({ className }: SidebarProps) {
       title: "Dashboard",
       items: [
         {
-          title: "AI Engine Performance",
+          title: "Search Engine Overview",
           href: getHref("/dashboard"),
           active: isDashboard && activeView === 'engine',
           icon: <Activity className="h-4 w-4" />,
