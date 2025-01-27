@@ -67,7 +67,7 @@ interface DashboardStore {
   activeView: DashboardView
   setActiveView: (view: DashboardView) => void
   selectedCompanyId: number | null
-  setSelectedCompanyId: (id: number) => void
+  setSelectedCompanyId: (id: number | null) => void
   companyProfile: CompanyProfile | null
   setCompanyProfile: (profile: CompanyProfile | null) => void
   timePeriod: TimePeriod
@@ -88,6 +88,8 @@ interface DashboardStore {
   setStepData: (data: Partial<OnboardingState['stepData']>) => void
   startOnboarding: () => void
   completeOnboarding: () => void
+  isSuperAdmin: boolean
+  setIsSuperAdmin: (isSuperAdmin: boolean) => void
 }
 
 export const useDashboardStore = create(
@@ -170,7 +172,9 @@ export const useDashboardStore = create(
           ...state.onboarding,
           isOnboarding: false
         }
-      }))
+      })),
+      isSuperAdmin: false,
+      setIsSuperAdmin: (isSuperAdmin) => set({ isSuperAdmin })
     }),
     {
       name: 'dashboard-store',

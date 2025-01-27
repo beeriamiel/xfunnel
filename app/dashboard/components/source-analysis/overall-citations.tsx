@@ -44,6 +44,8 @@ import { FilterButton } from './filter-sidebar/filter-button'
 import { FilterSidebar } from './filter-sidebar/filter-sidebar'
 import { FilterSection } from './filter-sidebar/filter-section'
 import { FilterBadgeGroup } from './filter-sidebar/filter-badge-group'
+import { useDashboardStore } from '@/app/dashboard/store'
+import { useSearchParams } from 'next/navigation'
 
 const JOURNEY_PHASES = [
   { value: 'problem_exploration', label: 'Problem Exploration' },
@@ -191,6 +193,16 @@ const answerEngineConfig = {
 } as const
 
 export function OverallCitations({ companyId, accountId }: Props) {
+  const searchParams = useSearchParams()
+  const urlCompanyId = searchParams.get('company') ? parseInt(searchParams.get('company')!) : undefined
+  const companies = useDashboardStore(state => state.companies)
+  
+  // Use URL company ID if available, fallback to prop
+  const effectiveCompanyId = urlCompanyId ?? companyId
+  
+  // Validate that the company exists in our data
+  const isValidCompany = effectiveCompanyId && companies?.some(c => c.id === effectiveCompanyId)
+  
   const [filters, setFilters] = useState<LocalFilterOptions>({
     buyingJourneyPhase: null,
     sourceType: null,
@@ -204,6 +216,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
   const [selectedSource, setSelectedSource] = useState<OverallSourceData | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [buyerPersonas, setBuyerPersonas] = useState<string[]>([])
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Add new state for filter UI
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -276,13 +289,30 @@ export function OverallCitations({ companyId, accountId }: Props) {
 
   useEffect(() => {
     async function fetchData() {
-      if (!companyId) return
+      if (!effectiveCompanyId) return
 
       try {
         setIsLoading(true)
         setError(null)
 
         const supabase = createClient()
+        
+        // First verify company access
+        let companyQuery = supabase
+          .from('companies')
+          .select('id')
+          .eq('id', effectiveCompanyId)
+        
+        // Add account filter for non-super admins
+        if (!isSuperAdmin) {
+          companyQuery = companyQuery.eq('account_id', accountId)
+        }
+
+        const { data: companyData, error: companyError } = await companyQuery.single()
+
+        if (companyError || !companyData) {
+          throw new Error('Company not found or access denied')
+        }
         
         let query = supabase
           .from('citations')
@@ -327,7 +357,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
           query = query.in('buyer_persona', filters.buyerPersona)
         }
 
-        query = query.eq('company_id', companyId)
+        query = query.eq('company_id', effectiveCompanyId)
 
         const { data, error: fetchError } = await query
 
@@ -483,7 +513,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
     }
 
     fetchData()
-  }, [companyId, accountId, filters])
+  }, [effectiveCompanyId, accountId, filters, isSuperAdmin])
 
   const handleSourceClick = (source: OverallSourceData) => {
     setSelectedSource(source)
@@ -522,6 +552,20 @@ export function OverallCitations({ companyId, accountId }: Props) {
       return updated as LocalFilterOptions
     })
   }, [])
+
+  // Return early if company is invalid
+  if (!effectiveCompanyId || !isValidCompany) {
+    return (
+      <Card className="w-full bg-white shadow-sm">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold">Source Analysis</h3>
+          <div className="h-[200px] w-full flex items-center justify-center text-muted-foreground">
+            {!effectiveCompanyId ? 'Please select a company to view source analysis' : 'Invalid company selected'}
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div>

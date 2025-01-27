@@ -70,20 +70,27 @@ export interface QueryAnalysis {
 export async function getAnalysisByCompany(
   companyId: number,
   accountId: string,
-  timePeriod: TimePeriod
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<CompanyAnalysis> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get the raw analysis data with date range filter
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
-    .eq('account_id', accountId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -132,20 +139,27 @@ export async function getAnalysisByCompany(
 export async function getAnalysisByRegion(
   companyId: number,
   accountId: string,
-  timePeriod: TimePeriod
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<RegionAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get the raw analysis data with date range filter
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
-    .eq('account_id', accountId)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -193,21 +207,28 @@ export async function getAnalysisByVertical(
   companyId: number,
   accountId: string,
   region: string,
-  timePeriod: TimePeriod
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<VerticalAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get the raw analysis data filtered by region and date range
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
-    .eq('account_id', accountId)
     .eq('geographic_region', region)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {
@@ -340,6 +361,7 @@ export async function getAnalysisByQueries(
   vertical: string,
   persona: string,
   timePeriod: TimePeriod,
+  isSuperAdmin?: boolean,
   filters?: {
     batchId?: string
   }
@@ -352,12 +374,16 @@ export async function getAnalysisByQueries(
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
-    .eq('account_id', accountId)
     .eq('geographic_region', region)
     .eq('icp_vertical', vertical)
     .eq('buyer_persona', persona)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
 
   // Apply optional filters
   if (filters?.batchId) {
@@ -466,22 +492,29 @@ export async function getAnalysisByPersona(
   accountId: string,
   region: string,
   vertical: string,
-  timePeriod: TimePeriod
+  timePeriod: TimePeriod,
+  isSuperAdmin?: boolean
 ): Promise<PersonaAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
 
   // Get query analysis for each persona with date range filter
-  const { data: analysisData, error } = await supabase
+  let query = supabase
     .from('response_analysis')
     .select('*')
     .eq('company_id', companyId)
-    .eq('account_id', accountId)
     .eq('geographic_region', region)
     .eq('icp_vertical', vertical)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: true })
+
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: analysisData, error } = await query
 
   if (error) throw new Error(`Failed to fetch analysis data: ${error.message}`)
   if (!analysisData?.length) {

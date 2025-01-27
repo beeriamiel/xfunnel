@@ -15,13 +15,14 @@ import AuthButton from "@/components/header-auth"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { createClient } from '@/app/supabase/client'
 import { useEffect } from 'react'
+import { CompanySelector } from "./company-selector"
 
 interface DashboardHeaderProps {
   title?: string
 }
 
 export function DashboardHeader({ title }: DashboardHeaderProps) {
-  const { activeView } = useDashboardStore()
+  const { activeView, isSuperAdmin, companies, selectedCompany } = useDashboardStore()
   const supabase = createClient()
   
   // Add logging
@@ -93,7 +94,10 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div>
+      <div className="flex items-center gap-4">
+        {isSuperAdmin && (
+          <CompanySelector selectedCompany={selectedCompany} companies={companies} />
+        )}
         <AuthButton />
       </div>
     </header>

@@ -18,6 +18,8 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { createClient } from '@/app/supabase/client'
 import { OverallCitations } from './source-analysis/overall-citations'
 import { AIOverviews } from './ai-overviews'
+import { useSession } from '@/app/providers/session-provider'
+import { useSearchParams } from 'next/navigation'
 
 interface Company {
   id: number
@@ -138,17 +140,61 @@ export function DashboardError() {
 }
 
 export function DashboardContent({ accountId }: { accountId: string }) {
-  const { activeView, selectedCompanyId, companies } = useDashboardStore()
+  const { activeView, selectedCompanyId, companies, setIsSuperAdmin } = useDashboardStore()
+  const { isSuperAdmin } = useSession()
   const selectedCompany = companies.find(c => c.id === selectedCompanyId)
+  const supabase = createClient()
+  const searchParams = useSearchParams()
+  const urlCompanyId = searchParams.get('company')
+
+  // Set super admin status first
+  useEffect(() => {
+    setIsSuperAdmin(isSuperAdmin)
+  }, [isSuperAdmin, setIsSuperAdmin])
+
+  // Then fetch companies after super admin status is set
+  useEffect(() => {
+    async function fetchCompanies() {
+      let query = supabase.from('companies').select('*')
+      
+      // If not super admin, filter by account_id
+      if (!isSuperAdmin) {
+        query = query.eq('account_id', accountId)
+      }
+
+      const { data: companiesData, error } = await query
+      
+      if (error) {
+        console.error('Error fetching companies:', error)
+        return
+      }
+
+      if (companiesData) {
+        // Preserve the selected company ID from URL when updating companies
+        const currentUrlCompanyId = urlCompanyId ? parseInt(urlCompanyId) : null
+        const companyExists = companiesData.some(c => c.id === currentUrlCompanyId)
+        
+        useDashboardStore.getState().setCompanies(companiesData)
+        
+        // Only update selectedCompanyId if URL company exists in the fetched data
+        if (currentUrlCompanyId && companyExists) {
+          useDashboardStore.getState().setSelectedCompanyId(currentUrlCompanyId)
+        }
+      }
+    }
+
+    fetchCompanies()
+  }, [accountId, isSuperAdmin, supabase, urlCompanyId])
 
   useEffect(() => {
     console.log('DashboardContent state:', {
       selectedCompanyId,
       companiesCount: companies.length,
       hasSelectedCompany: !!selectedCompany,
-      activeView
+      activeView,
+      isSuperAdmin
     })
-  }, [selectedCompanyId, companies, selectedCompany, activeView])
+  }, [selectedCompanyId, companies, selectedCompany, activeView, isSuperAdmin])
 
   if (!selectedCompany) {
     return <NoCompanySelected />

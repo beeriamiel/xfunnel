@@ -97,6 +97,7 @@ export function Personas({
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
@@ -104,7 +105,7 @@ export function Personas({
       ? `persona-analysis-${companyId}-${selectedRegion}-${selectedVertical}-${timePeriod}` 
       : null,
     () => companyId && selectedRegion && selectedVertical 
-      ? getAnalysisByPersona(companyId, accountId, selectedRegion, selectedVertical, timePeriod) 
+      ? getAnalysisByPersona(companyId, accountId, selectedRegion, selectedVertical, timePeriod, isSuperAdmin) 
       : null
   )
 

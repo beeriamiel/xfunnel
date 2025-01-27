@@ -12,9 +12,10 @@ import type { AIOverviewResult } from "@/lib/services/ai-overview-analysis/types
 interface AIOAnalysisProps {
   companyId: number
   accountId: string
+  isSuperAdmin: boolean
 }
 
-export function AIOAnalysis({ companyId, accountId }: AIOAnalysisProps) {
+export function AIOAnalysis({ companyId, accountId, isSuperAdmin }: AIOAnalysisProps) {
   const [selectedTerms, setSelectedTerms] = useState<number[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -37,7 +38,8 @@ export function AIOAnalysis({ companyId, accountId }: AIOAnalysisProps) {
         (progress) => {
           setProgress(progress.completed)
           setResults(progress.results)
-        }
+        },
+        isSuperAdmin
       )
 
       toast.success('Analysis completed successfully')
@@ -77,6 +79,7 @@ export function AIOAnalysis({ companyId, accountId }: AIOAnalysisProps) {
         <AnalysisTable
           companyId={companyId}
           accountId={accountId}
+          isSuperAdmin={isSuperAdmin}
           selectedTerms={selectedTerms}
           onSelectionChange={setSelectedTerms}
           results={results}

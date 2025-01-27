@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useDashboardStore } from "@/app/dashboard/store"
 import { Card } from "@/components/ui/card"
 import { Building2, Globe2, Users, Target, Search } from "lucide-react"
@@ -11,6 +11,7 @@ import { Regions } from "./components/stages/regions"
 import { Verticals } from "./components/stages/verticals"
 import { Personas } from "./components/stages/personas"
 import { Queries } from "./components/stages/queries"
+import { useSearchParams } from "next/navigation"
 
 // Types for the analysis stages
 export type AnalysisStage = 
@@ -60,8 +61,16 @@ export interface NewICPAnalysisProps {
 }
 
 export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
+  const searchParams = useSearchParams()
+  const urlCompanyId = searchParams.get('company') ? parseInt(searchParams.get('company')!) : undefined
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
-  const effectiveCompanyId = companyId ?? selectedCompanyId
+  const companies = useDashboardStore(state => state.companies)
+  
+  // Use URL company ID if available, fallback to prop or store
+  const effectiveCompanyId = urlCompanyId ?? companyId ?? selectedCompanyId
+  
+  // Validate that the company exists in our data
+  const isValidCompany = effectiveCompanyId && companies?.some(c => c.id === effectiveCompanyId)
   
   const [currentStage, setCurrentStage] = useState<AnalysisStage>('total-company')
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
@@ -110,14 +119,14 @@ export function NewICPAnalysis({ companyId, accountId }: NewICPAnalysisProps) {
     }
   }
 
-  // Ensure we have a valid company ID
-  if (!effectiveCompanyId) {
+  // Ensure we have a valid company ID that exists in our data
+  if (!effectiveCompanyId || !isValidCompany) {
     return (
       <Card className="w-full bg-white shadow-sm">
         <div className="p-6">
           <h3 className="text-lg font-semibold">ICP Analysis</h3>
           <div className="h-[200px] w-full flex items-center justify-center text-muted-foreground">
-            Please select a company to view ICP analysis
+            {!effectiveCompanyId ? 'Please select a company to view ICP analysis' : 'Invalid company selected'}
           </div>
         </div>
       </Card>

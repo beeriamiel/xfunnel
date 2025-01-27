@@ -1,3 +1,5 @@
+'use server'
+
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -22,8 +24,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const companyId = searchParams.get('companyId')
   const accountId = searchParams.get('accountId')
+  const isSuperAdmin = searchParams.get('isSuperAdmin') === 'true'
 
-  console.log('GET /api/ai-overview-terms - Request params:', { companyId, accountId })
+  console.log('GET /api/ai-overview-terms - Request params:', { companyId, accountId, isSuperAdmin })
 
   if (!companyId || !accountId) {
     return new NextResponse('Missing required parameters', { status: 400 })
@@ -73,12 +76,19 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    const { data, error } = await supabase
+    // Build query with company_id filter
+    let query = supabase
       .from('ai_overview_terms_test')
       .select('*')
       .eq('company_id', companyId)
-      .eq('account_id', accountId)
       .order('created_at', { ascending: false })
+
+    // Add account filter for non-super admins
+    if (!isSuperAdmin) {
+      query = query.eq('account_id', accountId)
+    }
+
+    const { data, error } = await query
 
     console.log('Supabase query result:', { data, error })
 

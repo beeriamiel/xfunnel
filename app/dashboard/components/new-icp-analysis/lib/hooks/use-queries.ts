@@ -51,6 +51,7 @@ export function useQueries(
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const timePeriod = useDashboardStore(state => state.timePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   useEffect(() => {
     async function fetchQueries() {
@@ -70,14 +71,15 @@ export function useQueries(
           region,
           vertical,
           persona,
-          timePeriod
+          timePeriod,
+          isSuperAdmin
         })
 
         const supabase = createClient()
         const { start, end } = getDateRangeForPeriod(timePeriod)
 
         // Get all responses for the selected filters
-        const { data: responses, error: fetchError } = await supabase
+        let query = supabase
           .from('response_analysis')
           .select(`
             query_id,
@@ -96,7 +98,6 @@ export function useQueries(
             company_name
           `)
           .eq('company_id', companyId)
-          .eq('account_id', accountId)
           .eq('geographic_region', region)
           .eq('icp_vertical', vertical)
           .eq('buyer_persona', persona)
@@ -104,6 +105,13 @@ export function useQueries(
           .lte('created_at', end.toISOString())
           .not('query_id', 'is', null)
           .order('query_id', { ascending: true })
+
+        // Add account filter for non-super admins
+        if (!isSuperAdmin) {
+          query = query.eq('account_id', accountId)
+        }
+
+        const { data: responses, error: fetchError } = await query
 
         console.log('Query response:', { responses, error: fetchError })
 
@@ -192,7 +200,7 @@ export function useQueries(
     }
 
     fetchQueries()
-  }, [companyId, accountId, region, vertical, persona, timePeriod])
+  }, [companyId, accountId, region, vertical, persona, timePeriod, isSuperAdmin])
 
   return { data, isLoading, error }
 } 

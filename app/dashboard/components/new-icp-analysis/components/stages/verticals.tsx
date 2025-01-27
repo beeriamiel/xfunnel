@@ -90,11 +90,12 @@ export function Verticals({ companyId, accountId, selectedRegion, onSelectVertic
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
     companyId && selectedRegion ? `vertical-analysis-${companyId}-${selectedRegion}-${timePeriod}` : null,
-    () => companyId && selectedRegion ? getAnalysisByVertical(companyId, accountId, selectedRegion, timePeriod) : null
+    () => companyId && selectedRegion ? getAnalysisByVertical(companyId, accountId, selectedRegion, timePeriod, isSuperAdmin) : null
   )
 
   // Prepare data for the timeline chart - moved before conditional returns

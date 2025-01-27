@@ -29,12 +29,13 @@ interface Term {
     competitor_mentions: string[]
     content_snapshot: string | null
     checked_at: string | null
-  } | null
+  }[] | null
 }
 
 interface AnalysisTableProps {
   companyId: number
   accountId: string
+  isSuperAdmin: boolean
   selectedTerms: number[]
   onSelectionChange: (termIds: number[]) => void
   results: AIOverviewResult[]
@@ -50,19 +51,27 @@ function ExpandableContent({ content }: { content: string }) {
 
 export function AnalysisTable({ 
   companyId, 
-  accountId, 
+  accountId,
+  isSuperAdmin,
   selectedTerms, 
   onSelectionChange,
   results
 }: AnalysisTableProps) {
   const [terms, setTerms] = useState<Term[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [expandedRows, setExpandedRows] = useState<number[]>([])
+  const [expandedTerms, setExpandedTerms] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    async function loadTerms() {
+    loadTerms()
+  }, [companyId, accountId, isSuperAdmin])
+
+  async function loadTerms() {
+    try {
+      setIsLoading(true)
       const supabase = createClient()
-      const { data, error } = await supabase
+      
+      // Build query with company_id filter
+      let query = supabase
         .from('ai_overview_terms_test')
         .select(`
           *,
@@ -75,24 +84,32 @@ export function AnalysisTable({
           )
         `)
         .eq('company_id', companyId)
-        .eq('account_id', accountId)
         .eq('status', 'ACTIVE')
         .order('created_at', { ascending: false })
 
-      if (!error && data) {
-        // Transform the data to handle the nested array from the join
-        const transformedData = data.map(term => ({
-          ...term,
-          // Get the most recent analysis result
-          ai_overview_tracking_test: term.ai_overview_tracking_test?.[0] || null
-        })) as Term[]
-        setTerms(transformedData)
+      // Add account filter for non-super admins
+      if (!isSuperAdmin) {
+        query = query.eq('account_id', accountId)
       }
+
+      const { data, error } = await query
+
+      if (error) throw error
+      
+      // Transform the data to handle the nested array from the join
+      const transformedData = (data || []).map(term => ({
+        ...term,
+        // Get the most recent analysis result
+        ai_overview_tracking_test: term.ai_overview_tracking_test?.[0] || null
+      })) as Term[]
+      
+      setTerms(transformedData)
+    } catch (error) {
+      console.error('Error loading terms:', error)
+    } finally {
       setIsLoading(false)
     }
-
-    loadTerms()
-  }, [companyId, accountId])
+  }
 
   const toggleTerm = (termId: number) => {
     if (selectedTerms.includes(termId)) {
@@ -111,11 +128,12 @@ export function AnalysisTable({
   }
 
   const toggleExpand = (termId: number) => {
-    setExpandedRows(prev => 
-      prev.includes(termId) 
-        ? prev.filter(id => id !== termId)
-        : [...prev, termId]
-    )
+    if (expandedTerms.has(termId)) {
+      expandedTerms.delete(termId)
+    } else {
+      expandedTerms.add(termId)
+    }
+    setExpandedTerms(new Set(expandedTerms))
   }
 
   const getResultForTerm = (termId: number) => {
@@ -164,7 +182,7 @@ export function AnalysisTable({
       <TableBody>
         {terms.map((term) => {
           const result = getResultForTerm(term.id)
-          const isExpanded = expandedRows.includes(term.id)
+          const isExpanded = expandedTerms.has(term.id)
           const hasAIOverview = result?.hasAIOverview && result?.contentSnapshot
           
           return (

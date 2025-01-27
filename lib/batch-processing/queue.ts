@@ -234,68 +234,99 @@ export class ResponseAnalysisQueue {
   
 
     if (analysisResults.length > 0) {
-      console.log(`Upserting ${analysisResults.length} analyses for response IDs: ${analysisResults.map(a => a.response_id).join(', ')}`);
-      
-      // Delete existing analyses first
-      const responseIds = analysisResults.map(a => a.response_id);
-      const { error: deleteError } = await adminClient
-        .from('response_analysis')
-        .delete()
-        .in('response_id', responseIds);
-
-      if (deleteError) {
-        console.error('Error deleting existing analyses:', deleteError);
-        throw deleteError;
-      }
-
-      // Insert new analyses
-      const { error: insertError } = await adminClient
-        .from('response_analysis')
-        .insert(analysisResults);
-
-      if (insertError) {
-        console.error('Error inserting analyses:', insertError);
-        throw insertError;
-      }
-
-      // Add citation processing for each analysis
-      for (const analysisData of analysisResults) {
-        try {
-          const { data: insertedAnalysis } = await adminClient
-            .from('response_analysis')
-            .select('*')
-            .eq('response_id', analysisData.response_id!)
-            .single();
-
-          if (!insertedAnalysis) {
-            console.error(`No analysis found for response ${analysisData.response_id}`);
-            continue;
-          }
-
-          console.log(`Processing citations for response ${analysisData.response_id}:`, {
-            hasAnalysis: !!insertedAnalysis,
-            citationsParsed: analysisData.citations_parsed
+      // Validate and separate valid/invalid records
+      const { validResults, invalidResults } = analysisResults.reduce((acc, result) => {
+        // Check for valid UUID in analysis_batch_id
+        const isValidUUID = result.analysis_batch_id && 
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result.analysis_batch_id);
+        
+        if (isValidUUID) {
+          acc.validResults.push(result);
+        } else {
+          console.error('Invalid UUID detected:', {
+            responseId: result.response_id,
+            batchId: result.analysis_batch_id,
+            timestamp: new Date().toISOString(),
+            invalidField: 'analysis_batch_id',
+            actualValue: result.analysis_batch_id
           });
-
-          if (!insertedAnalysis.account_id) {
-            throw new Error(`No account_id found for analysis ${analysisData.response_id}`);
-          }
-
-          await processCitationsTransaction(
-            insertedAnalysis,
-            typeof analysisData.citations_parsed === 'string' 
-              ? JSON.parse(analysisData.citations_parsed)
-              : analysisData.citations_parsed,
-            insertedAnalysis.account_id
-          );
-
-          console.log(`Successfully processed citations for response ${analysisData.response_id}`);
-        } catch (citationError) {
-          console.error(`Error processing citations for response ${analysisData.response_id}:`, citationError);
+          acc.invalidResults.push(result);
         }
-      }
+        return acc;
+      }, { validResults: [], invalidResults: [] });
 
-      console.log('Successfully updated analyses');
+      // Log validation results
+      console.log('Batch validation results:', {
+        totalRecords: analysisResults.length,
+        validRecords: validResults.length,
+        invalidRecords: invalidResults.length,
+        skippedResponseIds: invalidResults.map(r => r.response_id)
+      });
+
+      if (validResults.length > 0) {
+        console.log(`Upserting ${validResults.length} valid analyses for response IDs: ${validResults.map(a => a.response_id).join(', ')}`);
+        
+        // Delete existing analyses first
+        const responseIds = validResults.map(a => a.response_id);
+        const { error: deleteError } = await adminClient
+          .from('response_analysis')
+          .delete()
+          .in('response_id', responseIds);
+
+        if (deleteError) {
+          console.error('Error deleting existing analyses:', deleteError);
+          throw deleteError;
+        }
+
+        // Insert new analyses
+        const { error: insertError } = await adminClient
+          .from('response_analysis')
+          .insert(validResults);
+
+        if (insertError) {
+          console.error('Error inserting analyses:', insertError);
+          throw insertError;
+        }
+
+        // Add citation processing for each analysis
+        for (const analysisData of validResults) {
+          try {
+            const { data: insertedAnalysis } = await adminClient
+              .from('response_analysis')
+              .select('*')
+              .eq('response_id', analysisData.response_id!)
+              .single();
+
+            if (!insertedAnalysis) {
+              console.error(`No analysis found for response ${analysisData.response_id}`);
+              continue;
+            }
+
+            console.log(`Processing citations for response ${analysisData.response_id}:`, {
+              hasAnalysis: !!insertedAnalysis,
+              citationsParsed: analysisData.citations_parsed
+            });
+
+            if (!insertedAnalysis.account_id) {
+              throw new Error(`No account_id found for analysis ${analysisData.response_id}`);
+            }
+
+            await processCitationsTransaction(
+              insertedAnalysis,
+              typeof analysisData.citations_parsed === 'string' 
+                ? JSON.parse(analysisData.citations_parsed)
+                : analysisData.citations_parsed,
+              insertedAnalysis.account_id
+            );
+
+            console.log(`Successfully processed citations for response ${analysisData.response_id}`);
+          } catch (citationError) {
+            console.error(`Error processing citations for response ${analysisData.response_id}:`, citationError);
+          }
+        }
+
+        console.log('Successfully updated analyses');
+      }
     }
   }
 

@@ -3,6 +3,24 @@ export interface AIOverviewsProps {
   accountId: string
 }
 
+export interface KeywordManagementProps {
+  companyId: number
+  accountId: string
+  isSuperAdmin: boolean
+}
+
+export interface AIOAnalysisProps {
+  companyId: number
+  accountId: string
+  isSuperAdmin: boolean
+}
+
+export interface HistoricalTrackingProps {
+  companyId: number
+  accountId: string
+  isSuperAdmin: boolean
+}
+
 export interface Keyword {
   id: string
   term: string
@@ -78,4 +96,51 @@ export interface AIMetrics {
   id: string
   name: string
   value: number
+}
+
+export interface Term {
+  id: number
+  term: string
+  source: string
+  status: string
+  created_at: string
+  updated_at: string
+  company_id: number
+  account_id: string
+}
+
+export interface TermAnalysis {
+  termId: number
+  term: string
+  hasAIOverview: boolean
+  companyMentioned: boolean
+  competitorMentions: string[]
+  url?: string
+  contentSnapshot?: string | null
+}
+
+export interface HistoricalData {
+  term_id: number
+  term: string
+  has_ai_overview: boolean
+  company_mentioned: boolean
+  competitor_mentions: string[]
+  url: string | null
+  content_snapshot: string | null
+  checked_at: string
+}
+
+export interface TermsResponse {
+  data: Term[]
+  error: Error | null
+}
+
+export interface AnalysisResponse {
+  data: TermAnalysis | null
+  error: Error | null
+}
+
+export interface HistoricalResponse {
+  data: HistoricalData[]
+  error: Error | null
 } 

@@ -7,9 +7,11 @@ import { type AIOverviewsProps } from "./types"
 import { KeywordManagement } from "./components/keyword-management"
 import { AIOAnalysis } from "./components/aio-analysis"
 import { HistoricalTracking } from "./components/historical-tracking"
+import { useDashboardStore } from "@/app/dashboard/store"
 
 export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
   const [activeTab, setActiveTab] = useState<string>('keywords')
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   return (
     <div className="space-y-4">
@@ -29,6 +31,7 @@ export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
             <KeywordManagement 
               companyId={companyId}
               accountId={accountId}
+              isSuperAdmin={isSuperAdmin}
             />
           </TabsContent>
 
@@ -36,6 +39,7 @@ export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
             <AIOAnalysis
               companyId={companyId}
               accountId={accountId}
+              isSuperAdmin={isSuperAdmin}
             />
           </TabsContent>
 
@@ -43,6 +47,7 @@ export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
             <HistoricalTracking
               companyId={companyId}
               accountId={accountId}
+              isSuperAdmin={isSuperAdmin}
             />
           </TabsContent>
         </Tabs>

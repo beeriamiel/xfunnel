@@ -15,6 +15,7 @@ interface AccountContext {
   accountRole: string
   hasCompanies: boolean
   companies: any[]
+  isSuperAdmin: boolean
 }
 
 type SearchParams = { [key: string]: string | string[] | undefined }
@@ -51,6 +52,10 @@ async function getAccountContext(): Promise<AccountContext> {
     redirect('/login')
   }
 
+  // Check if user is super admin
+  const isSuperAdmin = user.user_metadata?.is_super_admin === true
+  console.log('4.1 Super admin check:', { isSuperAdmin })
+
   // Get account relationship
   const { data: accountUser, error: accountError } = await supabase
     .from('account_users')
@@ -68,23 +73,27 @@ async function getAccountContext(): Promise<AccountContext> {
     throw new Error('Account access required')
   }
 
-  // Get all companies for the account
-  const { data: companies, error: companiesError } = await supabase
-    .from('companies')
-    .select('*')
-    .eq('account_id', accountUser.account_id)
+  // Get all companies - for super admin get all, for regular users filter by account
+  let companiesQuery = supabase.from('companies').select('*')
+  if (!isSuperAdmin) {
+    companiesQuery = companiesQuery.eq('account_id', accountUser.account_id)
+  }
+  
+  const { data: companies, error: companiesError } = await companiesQuery
   
   console.log('7. Companies lookup:', {
     count: companies?.length,
-    error: companiesError?.message
+    error: companiesError?.message,
+    isSuperAdmin
   })
 
-  // Check for any companies
-  const { data: hasCompaniesCheck, error: checkError } = await supabase
-    .from('companies')
-    .select('id')
-    .eq('account_id', accountUser.account_id)
-    .limit(1)
+  // Check for any companies - same logic as above
+  let hasCompaniesQuery = supabase.from('companies').select('id').limit(1)
+  if (!isSuperAdmin) {
+    hasCompaniesQuery = hasCompaniesQuery.eq('account_id', accountUser.account_id)
+  }
+  
+  const { data: hasCompaniesCheck, error: checkError } = await hasCompaniesQuery
   
   console.log('8. Has companies check:', {
     hasCompanies: Boolean(hasCompaniesCheck?.length),
@@ -96,7 +105,8 @@ async function getAccountContext(): Promise<AccountContext> {
     accountId: accountUser.account_id,
     accountRole: accountUser.role ?? 'user',
     hasCompanies: Boolean(hasCompaniesCheck?.length),
-    companies: companies || []
+    companies: companies || [],
+    isSuperAdmin
   }
 }
 
@@ -111,7 +121,12 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accoun
 
     const supabase = await createClient()
     
-    const { data: company, error } = await supabase
+    // Get user to check super admin status
+    const { data: { user } } = await supabase.auth.getUser()
+    const isSuperAdmin = user?.user_metadata?.is_super_admin === true
+    
+    // Build query - only filter by account_id for non-super-admins
+    let query = supabase
       .from('companies')
       .select(`
         id, 
@@ -125,8 +140,12 @@ async function getCompanyData(searchParamsPromise: Promise<SearchParams>, accoun
         markets_operating_in
       `)
       .eq('id', companyId)
-      .eq('account_id', accountId)
-      .single()
+    
+    if (!isSuperAdmin) {
+      query = query.eq('account_id', accountId)
+    }
+    
+    const { data: company, error } = await query.single()
 
     if (error) {
       console.error('Error fetching company:', error)
@@ -169,6 +188,7 @@ export default async function Page({ params, searchParams }: Props) {
           accountId={accountContext.accountId}
           initialCompanies={accountContext.companies}
           isOnboarding={false}
+          isSuperAdmin={accountContext.isSuperAdmin}
           children={null}
         />
       </ClientWrapper>

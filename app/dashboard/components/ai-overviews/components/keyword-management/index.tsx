@@ -37,9 +37,10 @@ import type { Keyword } from "../../types"
 interface KeywordManagementProps {
   companyId: number
   accountId: string
+  isSuperAdmin: boolean
 }
 
-export function KeywordManagement({ companyId, accountId }: KeywordManagementProps) {
+export function KeywordManagement({ companyId, accountId, isSuperAdmin }: KeywordManagementProps) {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [sourceFilter, setSourceFilter] = useState<string>("all")
@@ -52,13 +53,13 @@ export function KeywordManagement({ companyId, accountId }: KeywordManagementPro
   // Fetch terms on component mount
   useEffect(() => {
     fetchTerms()
-  }, [companyId, accountId])
+  }, [companyId, accountId, isSuperAdmin])
 
   const fetchTerms = async () => {
     try {
       setIsLoading(true)
-      console.log('Fetching terms with params:', { companyId, accountId })
-      const response = await fetch(`/api/ai-overview-terms?companyId=${companyId}&accountId=${accountId}`)
+      console.log('Fetching terms with params:', { companyId, accountId, isSuperAdmin })
+      const response = await fetch(`/api/ai-overview-terms?companyId=${companyId}&accountId=${accountId}&isSuperAdmin=${isSuperAdmin}`)
       console.log('Response status:', response.status)
       if (!response.ok) throw new Error('Failed to fetch terms')
       const data = await response.json()
@@ -82,7 +83,8 @@ export function KeywordManagement({ companyId, accountId }: KeywordManagementPro
         body: JSON.stringify({
           term: newTerm.trim(),
           companyId,
-          accountId
+          accountId,
+          isSuperAdmin
         })
       })
 

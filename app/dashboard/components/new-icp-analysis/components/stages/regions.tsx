@@ -88,11 +88,12 @@ export function Regions({ companyId, accountId, onSelectRegion }: RegionsProps) 
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('companyMentioned')
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
+  const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
     companyId ? `region-analysis-${companyId}-${timePeriod}` : null,
-    () => companyId ? getAnalysisByRegion(companyId, accountId, timePeriod) : null
+    () => companyId ? getAnalysisByRegion(companyId, accountId, timePeriod, isSuperAdmin) : null
   )
 
   // Prepare data for the timeline chart - moved before conditional returns

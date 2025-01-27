@@ -8,11 +8,13 @@ import type { Database } from '@/types/supabase'
 interface SessionContextType {
   user: User | null
   isLoading: boolean
+  isSuperAdmin: boolean
 }
 
 const SessionContext = createContext<SessionContextType>({
   user: null,
-  isLoading: true
+  isLoading: true,
+  isSuperAdmin: false
 })
 
 export function useSession() {
@@ -31,6 +33,7 @@ export function SessionProvider({ initialSession, children }: SessionProviderPro
   console.log('SessionProvider init:', { initialSession })
   const [user, setUser] = useState<User | null>(initialSession?.user ?? null)
   const [isLoading, setIsLoading] = useState(!initialSession)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export function SessionProvider({ initialSession, children }: SessionProviderPro
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('SessionProvider getSession result:', { session })
       setUser(session?.user ?? null)
+      setIsSuperAdmin(session?.user?.user_metadata?.is_super_admin === true)
       setIsLoading(false)
     })
 
@@ -48,6 +52,7 @@ export function SessionProvider({ initialSession, children }: SessionProviderPro
     } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log('SessionProvider onAuthStateChange:', { session })
       setUser(session?.user ?? null)
+      setIsSuperAdmin(session?.user?.user_metadata?.is_super_admin === true)
       setIsLoading(false)
     })
 
@@ -55,7 +60,7 @@ export function SessionProvider({ initialSession, children }: SessionProviderPro
   }, [supabase.auth])
 
   return (
-    <SessionContext.Provider value={{ user, isLoading }}>
+    <SessionContext.Provider value={{ user, isLoading, isSuperAdmin }}>
       {children}
     </SessionContext.Provider>
   )

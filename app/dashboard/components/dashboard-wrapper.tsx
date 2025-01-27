@@ -23,6 +23,7 @@ interface DashboardWrapperProps {
   initialCompanies: Company[];
   isOnboarding: boolean;
   currentStep?: Step;
+  isSuperAdmin?: boolean;
 }
 
 function LoadingSkeleton() {
@@ -51,7 +52,9 @@ export function DashboardWrapper({
   accountId,
   initialCompanies,
   isOnboarding,
-  children
+  currentStep,
+  children,
+  isSuperAdmin
 }: DashboardWrapperProps) {
   console.log('🔵 DashboardWrapper Render:', {
     selectedCompany,
@@ -65,7 +68,7 @@ export function DashboardWrapper({
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setSelectedCompanyId, setCompanies, setWizardStep } = useDashboardStore()
+  const { setSelectedCompanyId, setCompanies, setWizardStep, setIsSuperAdmin } = useDashboardStore()
   const hasRedirected = useRef(false)
 
   useEffect(() => {
@@ -75,6 +78,7 @@ export function DashboardWrapper({
       pathname: window?.location?.pathname
     })
     setCompanies(initialCompanies)
+    setIsSuperAdmin(isSuperAdmin ?? false)
     
     // Only check onboarding for single company
     if (initialCompanies.length === 1 && !hasRedirected.current) {
@@ -107,7 +111,7 @@ export function DashboardWrapper({
         }
       })
     }
-  }, [initialCompanies, setCompanies, setSelectedCompanyId, router, searchParams, setWizardStep])
+  }, [initialCompanies, setCompanies, setSelectedCompanyId, router, searchParams, setWizardStep, isSuperAdmin, setIsSuperAdmin])
 
   let mainContent
   if (isOnboarding || searchParams.get('step')) {

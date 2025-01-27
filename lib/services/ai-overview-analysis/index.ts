@@ -17,7 +17,8 @@ async function analyzeTerm(
   termId: number,
   term: string,
   companyId: number,
-  accountId: string
+  accountId: string,
+  isSuperAdmin: boolean
 ): Promise<AIOverviewResult> {
   const response = await fetch('/api/ai-overview-analysis', {
     method: 'POST',
@@ -28,7 +29,8 @@ async function analyzeTerm(
       termId,
       term,
       companyId,
-      accountId
+      accountId,
+      isSuperAdmin
     })
   })
 
@@ -43,41 +45,56 @@ export async function analyzeTerms(
   termIds: number[],
   companyId: number,
   accountId: string,
-  onProgress?: (progress: AnalysisProgress) => void
+  onProgress?: (progress: AnalysisProgress) => void,
+  isSuperAdmin: boolean = false
 ): Promise<AIOverviewResult[]> {
   // Get terms data
   const supabase = createClient()
-  const { data: terms } = await supabase
+  
+  // Build query with company_id filter
+  let query = supabase
     .from('ai_overview_terms_test')
     .select('id, term')
     .in('id', termIds)
+    .eq('company_id', companyId)
 
-  if (!terms) return []
+  // Add account filter for non-super admins
+  if (!isSuperAdmin) {
+    query = query.eq('account_id', accountId)
+  }
+
+  const { data: terms } = await query
+
+  if (!terms?.length) {
+    throw new Error('No terms found')
+  }
 
   const results: AIOverviewResult[] = []
-  
-  // Process in batches
+  let completed = 0
+
+  // Process terms in batches
   for (let i = 0; i < terms.length; i += BATCH_SIZE) {
     const batch = terms.slice(i, i + BATCH_SIZE)
-    
-    // Process batch in parallel
-    const batchResults = await Promise.all(
-      batch.map(term => analyzeTerm(term.id, term.term, companyId, accountId))
+    const batchPromises = batch.map(term => 
+      analyzeTerm(term.id, term.term, companyId, accountId, isSuperAdmin)
     )
-    
-    // Update progress
+
+    const batchResults = await Promise.all(batchPromises)
     results.push(...batchResults)
-    onProgress?.({
-      completed: results.length,
-      total: terms.length,
-      results
-    })
-    
-    // Delay before next batch
+    completed += batch.length
+
+    if (onProgress) {
+      onProgress({
+        completed,
+        total: terms.length,
+        results
+      })
+    }
+
     if (i + BATCH_SIZE < terms.length) {
       await delay(DELAY_BETWEEN_BATCHES)
     }
   }
-  
+
   return results
 } 

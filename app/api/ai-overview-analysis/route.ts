@@ -1,3 +1,5 @@
+'use server'
+
 import { searchWithSerpApi } from "@/lib/clients/serpapi"
 import { createClient } from "@/app/supabase/server"
 import { NextResponse } from "next/server"
@@ -7,12 +9,13 @@ interface AnalyzeTermRequest {
   term: string
   companyId: number
   accountId: string
+  isSuperAdmin: boolean
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json() as AnalyzeTermRequest
-    const { termId, term, companyId, accountId } = body
+    const { termId, term, companyId, accountId, isSuperAdmin } = body
 
     // Get company context
     const supabase = await createClient()
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
       .insert({
         term_id: termId,
         company_id: companyId,
-        account_id: accountId,
+        account_id: accountId,  // Always include account_id
         has_ai_overview: hasAIOverview,
         company_mentioned: companyMentioned,
         competitor_mentions: competitorMentions,
@@ -101,9 +104,6 @@ export async function POST(request: Request) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error analyzing term:', error)
-    return NextResponse.json(
-      { error: 'Failed to analyze term' },
-      { status: 500 }
-    )
+    return new NextResponse('Error analyzing term', { status: 500 })
   }
 } 
