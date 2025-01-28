@@ -180,6 +180,7 @@ export function CompanyICPsTable({
           selectedPrompts.systemPromptName,
           selectedPrompts.userPromptName,
           selectedModel,
+          accountId,
           personaContext.persona.id.toString()
         );
       }
