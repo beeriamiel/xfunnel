@@ -1,24 +1,28 @@
 export interface AIOverviewsProps {
   companyId: number
   accountId: string
+  isSuperAdmin: boolean
 }
 
 export interface KeywordManagementProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
 }
 
 export interface AIOAnalysisProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
 }
 
 export interface HistoricalTrackingProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
 }
 
 export interface Keyword {
@@ -107,6 +111,7 @@ export interface Term {
   updated_at: string
   company_id: number
   account_id: string
+  product_id: number | null
 }
 
 export interface TermAnalysis {
@@ -117,6 +122,7 @@ export interface TermAnalysis {
   competitorMentions: string[]
   url?: string
   contentSnapshot?: string | null
+  product_id: number | null
 }
 
 export interface HistoricalData {
@@ -128,6 +134,7 @@ export interface HistoricalData {
   url: string | null
   content_snapshot: string | null
   checked_at: string
+  product_id: number | null
 }
 
 export interface TermsResponse {

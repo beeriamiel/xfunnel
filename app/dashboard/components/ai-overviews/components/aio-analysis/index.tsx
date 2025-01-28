@@ -13,9 +13,10 @@ interface AIOAnalysisProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
 }
 
-export function AIOAnalysis({ companyId, accountId, isSuperAdmin }: AIOAnalysisProps) {
+export function AIOAnalysis({ companyId, accountId, isSuperAdmin, selectedProductId }: AIOAnalysisProps) {
   const [selectedTerms, setSelectedTerms] = useState<number[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -39,7 +40,8 @@ export function AIOAnalysis({ companyId, accountId, isSuperAdmin }: AIOAnalysisP
           setProgress(progress.completed)
           setResults(progress.results)
         },
-        isSuperAdmin
+        isSuperAdmin,
+        selectedProductId
       )
 
       toast.success('Analysis completed successfully')
@@ -80,6 +82,7 @@ export function AIOAnalysis({ companyId, accountId, isSuperAdmin }: AIOAnalysisP
           companyId={companyId}
           accountId={accountId}
           isSuperAdmin={isSuperAdmin}
+          selectedProductId={selectedProductId}
           selectedTerms={selectedTerms}
           onSelectionChange={setSelectedTerms}
           results={results}

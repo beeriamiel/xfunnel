@@ -23,19 +23,21 @@ interface Term {
   source: 'MOZ' | 'AI' | 'USER'
   status: 'ACTIVE' | 'ARCHIVED'
   created_at: string | null
+  product_id: number | null
   ai_overview_tracking_test?: {
     has_ai_overview: boolean
     company_mentioned: boolean
     competitor_mentions: string[]
     content_snapshot: string | null
     checked_at: string | null
-  }[] | null
+  } | null
 }
 
 interface AnalysisTableProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
   selectedTerms: number[]
   onSelectionChange: (termIds: number[]) => void
   results: AIOverviewResult[]
@@ -53,6 +55,7 @@ export function AnalysisTable({
   companyId, 
   accountId,
   isSuperAdmin,
+  selectedProductId,
   selectedTerms, 
   onSelectionChange,
   results
@@ -90,6 +93,11 @@ export function AnalysisTable({
       // Add account filter for non-super admins
       if (!isSuperAdmin) {
         query = query.eq('account_id', accountId)
+      }
+
+      // Add product filter if selected
+      if (selectedProductId) {
+        query = query.eq('product_id', selectedProductId)
       }
 
       const { data, error } = await query

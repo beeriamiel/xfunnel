@@ -46,7 +46,8 @@ export async function analyzeTerms(
   companyId: number,
   accountId: string,
   onProgress?: (progress: AnalysisProgress) => void,
-  isSuperAdmin: boolean = false
+  isSuperAdmin: boolean = false,
+  productId: number | null = null
 ): Promise<AIOverviewResult[]> {
   // Get terms data
   const supabase = createClient()
@@ -61,6 +62,11 @@ export async function analyzeTerms(
   // Add account filter for non-super admins
   if (!isSuperAdmin) {
     query = query.eq('account_id', accountId)
+  }
+
+  // Add product filter if selected
+  if (productId) {
+    query = query.eq('product_id', productId)
   }
 
   const { data: terms } = await query
