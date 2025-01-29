@@ -606,3 +606,54 @@ generation_progress_status_check CHECK ((status = ANY (ARRAY['generating_icps'::
   WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) | (EXISTS ( SELECT 1
    FROM auth.users
   WHERE (((users.email)::text = CURRENT_USER) AND (((users.raw_user_meta_data ->> 'is_super_admin'::text))::boolean = true)))) |
+
+-- Add product_id column to ideal_customer_profiles
+ALTER TABLE public.ideal_customer_profiles
+ADD COLUMN product_id bigint;
+
+-- Add foreign key constraint
+ALTER TABLE public.ideal_customer_profiles
+ADD CONSTRAINT fk_icp_product
+FOREIGN KEY (product_id)
+REFERENCES public.products(id)
+ON DELETE SET NULL;
+
+-- Add index for product_id
+CREATE INDEX idx_icp_product_id ON public.ideal_customer_profiles(product_id);
+
+-- Update RLS policies to include product filtering
+ALTER POLICY "Users can create ICPs in their accounts" ON public.ideal_customer_profiles
+USING (
+  EXISTS (
+    SELECT 1
+    FROM account_users
+    WHERE account_users.account_id = ideal_customer_profiles.account_id
+    AND account_users.user_id = auth.uid()
+  )
+  AND (
+    product_id IS NULL OR EXISTS (
+      SELECT 1
+      FROM products
+      WHERE products.id = ideal_customer_profiles.product_id
+      AND products.account_id = ideal_customer_profiles.account_id
+    )
+  )
+);
+
+ALTER POLICY "Users can view their account's ICPs" ON public.ideal_customer_profiles
+USING (
+  EXISTS (
+    SELECT 1
+    FROM account_users
+    WHERE account_users.account_id = ideal_customer_profiles.account_id
+    AND account_users.user_id = auth.uid()
+  )
+  AND (
+    product_id IS NULL OR EXISTS (
+      SELECT 1
+      FROM products
+      WHERE products.id = ideal_customer_profiles.product_id
+      AND products.account_id = ideal_customer_profiles.account_id
+    )
+  )
+);

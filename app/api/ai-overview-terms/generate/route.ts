@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Get request body
     const body = await request.json()
-    const { companyId, accountId } = body
+    const { companyId, accountId, productId } = body
 
     if (!companyId || !accountId) {
       return new NextResponse('Missing required fields', { status: 400 })
@@ -57,17 +57,26 @@ export async function POST(request: NextRequest) {
     console.log('Generating terms for company:', companyId)
     const terms = await generateTerms(companyId, accountId, {
       limit: 20, // Generate up to 20 terms
-      minConfidence: 0.7 // Only keep terms with confidence > 0.7
+      minConfidence: 0.7, // Only keep terms with confidence > 0.7
+      productId // Pass through the productId
     })
 
     // Save generated terms
     console.log(`Saving ${terms.length} generated terms`)
     await saveGeneratedTerms(terms, companyId, accountId)
 
-    return NextResponse.json({ success: true, count: terms.length })
+    return NextResponse.json({ 
+      success: true, 
+      count: terms.length,
+      message: `Successfully generated ${terms.length} terms`
+    })
 
   } catch (error) {
     console.error('Error generating terms:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return NextResponse.json({ 
+      success: false,
+      message: error instanceof Error ? error.message : 'Internal Server Error',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    }, { status: 500 })
   }
 } 

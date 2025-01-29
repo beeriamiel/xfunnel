@@ -89,11 +89,12 @@ export function Regions({ companyId, accountId, onSelectRegion }: RegionsProps) 
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
   const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
-    companyId ? `region-analysis-${companyId}-${timePeriod}` : null,
-    () => companyId ? getAnalysisByRegion(companyId, accountId, timePeriod, isSuperAdmin) : null
+    companyId ? `region-analysis-${companyId}-${timePeriod}-${selectedProductId}` : null,
+    () => companyId ? getAnalysisByRegion(companyId, accountId, timePeriod, isSuperAdmin, selectedProductId) : null
   )
 
   // Prepare data for the timeline chart - moved before conditional returns

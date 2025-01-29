@@ -405,6 +405,7 @@ export function CompetitorAnalysis({
   accountId
 }: CompetitorAnalysisProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeEngine, setActiveEngine] = useState<string>('perplexity')
   const [view, setView] = useState<'mentions' | 'rankings'>('mentions')
@@ -426,7 +427,7 @@ export function CompetitorAnalysis({
         console.log('Fetching data for company ID:', effectiveCompanyId);
 
         // Get competitor analysis data with company name
-        const { data: analysisData, error: analysisError } = await createClient()
+        let query = createClient()
           .from('response_analysis')
           .select(`
             answer_engine,
@@ -440,6 +441,13 @@ export function CompetitorAnalysis({
           `)
           .eq('company_id', effectiveCompanyId)
           .not('answer_engine', 'in', '("google_search","google-search")');
+
+        // Add product filter if a product is selected
+        if (selectedProductId) {
+          query = query.eq('product_id', parseInt(selectedProductId));
+        }
+
+        const { data: analysisData, error: analysisError } = await query;
 
         if (analysisError) throw analysisError;
         if (!analysisData?.length) {
@@ -591,7 +599,7 @@ export function CompetitorAnalysis({
     }
 
     fetchData();
-  }, [effectiveCompanyId]);
+  }, [effectiveCompanyId, selectedProductId]);
 
   if (!effectiveCompanyId) {
     return (

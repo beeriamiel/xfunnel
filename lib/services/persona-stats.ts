@@ -30,14 +30,14 @@ export interface StatsMap {
   [key: string]: PersonaStats;
 }
 
-export async function fetchPersonaStats(companyId: number): Promise<StatsMap> {
+export async function fetchPersonaStats(companyId: number, productId?: number): Promise<StatsMap> {
   if (!companyId || isNaN(companyId)) {
     console.error('Invalid company ID provided:', companyId);
     return {};
   }
 
   const supabase = createClient();
-  console.log('Fetching stats for company:', companyId);
+  console.log('Fetching stats for company:', companyId, 'product:', productId);
 
   // First get ICPs for this company
   const { data: icpData, error: icpError } = await supabase
@@ -58,8 +58,8 @@ export async function fetchPersonaStats(companyId: number): Promise<StatsMap> {
   const icpIds = icpData.map(icp => icp.id);
   console.log('Found ICP IDs:', icpIds);
 
-  // Then get personas with their queries and responses
-  const { data, error } = await supabase
+  // Build the query
+  let query = supabase
     .from('personas')
     .select(`
       id,
@@ -73,6 +73,13 @@ export async function fetchPersonaStats(companyId: number): Promise<StatsMap> {
       )
     `)
     .in('icp_id', icpIds);
+
+  // If productId is provided, filter queries by product
+  if (productId) {
+    query = query.eq('queries.product_id', productId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching persona stats:', error);

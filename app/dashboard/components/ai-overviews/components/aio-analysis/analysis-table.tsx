@@ -23,28 +23,48 @@ interface Term {
   source: 'MOZ' | 'AI' | 'USER'
   status: 'ACTIVE' | 'ARCHIVED'
   created_at: string | null
+  product_id: number | null
   ai_overview_tracking_test?: {
     has_ai_overview: boolean
     company_mentioned: boolean
     competitor_mentions: string[]
     content_snapshot: string | null
     checked_at: string | null
-  }[] | null
+  } | null
 }
 
 interface AnalysisTableProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
   selectedTerms: number[]
   onSelectionChange: (termIds: number[]) => void
   results: AIOverviewResult[]
 }
 
 function ExpandableContent({ content }: { content: string }) {
+  console.log('Content received in ExpandableContent:', {
+    type: typeof content,
+    value: content,
+    length: content?.length
+  });
+  
+  // Try to parse if it's a stringified JSON
+  let displayContent = content;
+  try {
+    if (typeof content === 'string' && (content.startsWith('{') || content.startsWith('['))) {
+      const parsed = JSON.parse(content);
+      console.log('Parsed content:', parsed);
+      displayContent = JSON.stringify(parsed, null, 2);
+    }
+  } catch (e) {
+    console.log('Not a JSON string');
+  }
+
   return (
     <div className="px-4 py-3 bg-muted/50 rounded-md my-2 mx-4">
-      <p className="text-sm whitespace-pre-wrap">{content}</p>
+      <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
     </div>
   )
 }
@@ -53,6 +73,7 @@ export function AnalysisTable({
   companyId, 
   accountId,
   isSuperAdmin,
+  selectedProductId,
   selectedTerms, 
   onSelectionChange,
   results
@@ -90,6 +111,11 @@ export function AnalysisTable({
       // Add account filter for non-super admins
       if (!isSuperAdmin) {
         query = query.eq('account_id', accountId)
+      }
+
+      // Add product filter if selected
+      if (selectedProductId) {
+        query = query.eq('product_id', selectedProductId)
       }
 
       const { data, error } = await query

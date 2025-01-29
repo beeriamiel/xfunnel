@@ -47,7 +47,8 @@ export const badgeVariants = {
   buyerPersona: "bg-gradient-to-r from-purple-50/50 to-violet-50/50 text-purple-700 border-purple-200/50 hover:bg-purple-100/50",
   company: "bg-gradient-to-r from-slate-50/50 to-gray-50/50 text-slate-700 border-slate-200/50 hover:bg-slate-100/50",
   metric: "bg-gradient-to-r from-muted/50 to-muted/30 text-muted-foreground border-muted/50",
-  more: "bg-gradient-to-r from-primary/5 to-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+  more: "bg-gradient-to-r from-primary/5 to-primary/10 text-primary border-primary/20 hover:bg-primary/20",
+  product: "bg-gradient-to-r from-pink-50/50 to-rose-50/50 text-pink-700 border-pink-200/50 hover:bg-pink-100/50"
 } as const
 
 export function OverallSourceCard({ source, onClick }: OverallSourceCardProps) {

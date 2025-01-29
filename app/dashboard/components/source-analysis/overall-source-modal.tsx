@@ -41,7 +41,8 @@ const badgeVariants = {
   answerEngine: "bg-gradient-to-r from-orange-50/50 to-amber-50/50 text-orange-700 border-orange-200/50 hover:bg-amber-100/50",
   buyerPersona: "bg-gradient-to-r from-purple-50/50 to-violet-50/50 text-purple-700 border-purple-200/50 hover:bg-purple-100/50",
   company: "bg-gradient-to-r from-slate-50/50 to-gray-50/50 text-slate-700 border-slate-200/50 hover:bg-slate-100/50",
-  metric: "bg-gradient-to-r from-muted/50 to-muted/30 text-muted-foreground border-muted/50"
+  metric: "bg-gradient-to-r from-muted/50 to-muted/30 text-muted-foreground border-muted/50",
+  product: "bg-gradient-to-r from-pink-50/50 to-rose-50/50 text-pink-700 border-pink-200/50 hover:bg-pink-100/50"
 } as const
 
 // Add journey phase mapping
@@ -392,6 +393,21 @@ export function OverallSourceModal({ source, isOpen, onClose }: Props) {
                       <span className="text-sm text-muted-foreground">
                         (from {source.citation_count} citations)
                       </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Product:</span>
+                    <div className="flex gap-1.5">
+                      {source.product_id ? (
+                        <Badge 
+                          variant="outline"
+                          className={badgeVariants.product}
+                        >
+                          {source.product_name || `Product ${source.product_id}`}
+                        </Badge>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not specified</span>
+                      )}
                     </div>
                   </div>
                 </div>

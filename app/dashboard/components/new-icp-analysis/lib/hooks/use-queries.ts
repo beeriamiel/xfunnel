@@ -56,6 +56,7 @@ export function useQueries(
   const [error, setError] = useState<string | null>(null)
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
 
   useEffect(() => {
     async function fetchQueries() {
@@ -76,7 +77,8 @@ export function useQueries(
           vertical,
           persona,
           timePeriod,
-          isSuperAdmin
+          isSuperAdmin,
+          selectedProductId
         })
 
         const supabase = createClient()
@@ -107,12 +109,16 @@ export function useQueries(
           .eq('buyer_persona', persona)
           .gte('created_at', start.toISOString())
           .lte('created_at', end.toISOString())
-          .not('query_id', 'is', null)
-          .order('query_id', { ascending: true })
+          .not('answer_engine', 'in', '("google_search","google-search")')
 
         // Add account filter for non-super admins
         if (!isSuperAdmin) {
           query = query.eq('account_id', accountId)
+        }
+
+        // Add product filter if productId is provided
+        if (selectedProductId) {
+          query = query.eq('product_id', parseInt(selectedProductId))
         }
 
         const { data: responses, error: fetchError } = await query
@@ -207,7 +213,7 @@ export function useQueries(
     }
 
     fetchQueries()
-  }, [companyId, accountId, region, vertical, persona, timePeriod, isSuperAdmin])
+  }, [companyId, accountId, region, vertical, persona, timePeriod, isSuperAdmin, selectedProductId])
 
   return { data, isLoading, error }
 } 

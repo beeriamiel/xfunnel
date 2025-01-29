@@ -38,9 +38,10 @@ interface KeywordManagementProps {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  selectedProductId: number | null
 }
 
-export function KeywordManagement({ companyId, accountId, isSuperAdmin }: KeywordManagementProps) {
+export function KeywordManagement({ companyId, accountId, isSuperAdmin, selectedProductId }: KeywordManagementProps) {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [sourceFilter, setSourceFilter] = useState<string>("all")
@@ -53,13 +54,13 @@ export function KeywordManagement({ companyId, accountId, isSuperAdmin }: Keywor
   // Fetch terms on component mount
   useEffect(() => {
     fetchTerms()
-  }, [companyId, accountId, isSuperAdmin])
+  }, [companyId, accountId, isSuperAdmin, selectedProductId])
 
   const fetchTerms = async () => {
     try {
       setIsLoading(true)
-      console.log('Fetching terms with params:', { companyId, accountId, isSuperAdmin })
-      const response = await fetch(`/api/ai-overview-terms?companyId=${companyId}&accountId=${accountId}&isSuperAdmin=${isSuperAdmin}`)
+      console.log('Fetching terms with params:', { companyId, accountId, isSuperAdmin, selectedProductId })
+      const response = await fetch(`/api/ai-overview-terms?companyId=${companyId}&accountId=${accountId}&isSuperAdmin=${isSuperAdmin}${selectedProductId ? `&productId=${selectedProductId}` : ''}`)
       console.log('Response status:', response.status)
       if (!response.ok) throw new Error('Failed to fetch terms')
       const data = await response.json()
@@ -84,7 +85,8 @@ export function KeywordManagement({ companyId, accountId, isSuperAdmin }: Keywor
           term: newTerm.trim(),
           companyId,
           accountId,
-          isSuperAdmin
+          isSuperAdmin,
+          productId: selectedProductId
         })
       })
 
@@ -132,12 +134,19 @@ export function KeywordManagement({ companyId, accountId, isSuperAdmin }: Keywor
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId,
-          accountId
+          accountId,
+          productId: selectedProductId
         })
       })
 
-      if (!response.ok) throw new Error('Failed to generate terms')
+      const data = await response.json()
       
+      if (!response.ok) {
+        console.error('Error response:', data)
+        throw new Error(data.message || 'Failed to generate terms')
+      }
+      
+      console.log('Terms generated:', data)
       await fetchTerms() // Refresh the terms list after generation
     } catch (error) {
       console.error('Error generating terms:', error)

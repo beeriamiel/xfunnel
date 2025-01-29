@@ -109,9 +109,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { term, companyId, accountId } = body
+    const { term, companyId, accountId, productId } = body
 
-    console.log('POST /api/ai-overview-terms - Request body:', { term, companyId, accountId })
+    console.log('POST /api/ai-overview-terms - Request body:', { term, companyId, accountId, productId })
 
     if (!term || !companyId || !accountId) {
       return new NextResponse('Missing required fields', { status: 400 })
@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
           company_id: companyId,
           account_id: accountId,
           source: 'USER',
-          status: 'ACTIVE'  // Insert as ACTIVE which will be transformed to 'approved'
+          status: 'ACTIVE',  // Insert as ACTIVE which will be transformed to 'approved'
+          product_id: productId || null // Add product_id, defaulting to null if not provided
         }
       ])
       .select()

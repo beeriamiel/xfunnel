@@ -66,23 +66,29 @@ export async function createAdminClient() {
   console.log('Creating admin client with:', {
     hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0
+    serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
+    urlValue: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    timestamp: new Date().toISOString()
   });
-  
-  return createServerClient<Database>(
+
+  const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          const cookies = cookieStore.getAll()
+          console.log('Admin client cookies:', cookies)
+          return cookies
         },
         setAll(cookiesToSet) {
           try {
+            console.log('Setting admin client cookies:', cookiesToSet)
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             )
-          } catch {
+          } catch (error) {
+            console.error('Error setting admin client cookies:', error)
             // Ignore setAll in Server Components
           }
         },
@@ -93,6 +99,9 @@ export async function createAdminClient() {
       }
     }
   )
+
+  console.log('Admin client created successfully')
+  return client
 }
 
 export async function createAccount(userId: string) {

@@ -12,6 +12,12 @@ interface BasicCompany {
   id: number;
   name: string;
   industry: string | null;
+  product_category: string | null;
+  annual_revenue: string | null;
+  markets_operating_in: string[];
+  number_of_employees: number | null;
+  main_products: string[];
+  created_at: string;
 }
 
 interface SimpleCompanySelectorProps {

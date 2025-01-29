@@ -27,11 +27,26 @@ import { ModelSelection } from "@/app/company-actions";
 import { ICPDetailsEditor } from './icp-details-editor';
 import { CompetitorDetailsEditor } from './competitor-details-editor';
 import { Pencil, Eye } from "lucide-react";
+import { useSearchParams } from 'next/navigation';
+import { Label } from "@/components/ui/label";
+import { CompanyCombobox } from '@/components/company-combobox';
+import { toast } from "sonner";
+import { Database } from "@/types/supabase";
+import { AIModelType } from "@/lib/services/ai/types";
+
+type DatabaseICP = Database['public']['Tables']['ideal_customer_profiles']['Row']
+type DatabasePersona = Database['public']['Tables']['personas']['Row']
 
 interface BasicCompany {
   id: number;
   name: string;
   industry: string | null;
+  product_category: string | null;
+  annual_revenue: string | null;
+  markets_operating_in: string[];
+  number_of_employees: number | null;
+  main_products: string[];
+  created_at: string;
 }
 
 interface Company {
@@ -50,17 +65,19 @@ interface Competitor {
   competitor_name: string;
 }
 
+interface Persona {
+  id: number
+  title: string
+  seniority_level: string
+  department: string
+}
+
 interface ICP {
-  id: number;
-  vertical: string;
-  company_size: string;
-  region: string;
-  personas: {
-    id: number;
-    title: string;
-    seniority_level: string;
-    department: string;
-  }[];
+  id: number
+  vertical: string
+  company_size: string
+  region: string
+  personas: Persona[]
 }
 
 interface Prompt {
@@ -83,14 +100,16 @@ export function GenerateICPsButton() {
   // Input mode state
   const [inputMode, setInputMode] = useState<'select' | 'new'>('select');
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<BasicCompany | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: number; name: string } | null>(null);
+  const [products, setProducts] = useState<{ id: number; name: string }[]>([]);
   const [newCompanyName, setNewCompanyName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   
   // Company data states
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
-  const [icps, setIcps] = useState<ICP[]>([]);
+  const [icps, setICPs] = useState<ICP[]>([]);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
@@ -118,6 +137,11 @@ export function GenerateICPsButton() {
   const supabase = createClient();
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const searchParams = useSearchParams();
+  const selectedProductId = searchParams.get('product');
+  const [accountId, setAccountId] = useState<string | null>(null);
+
+  const [selectedPersonas, setSelectedPersonas] = useState<Record<number, boolean>>({});
 
   // Fetch company details
   async function fetchCompanyData(companyId: number) {
@@ -148,7 +172,7 @@ export function GenerateICPsButton() {
         .eq('company_id', companyId);
 
       if (competitorsData) setCompetitors(competitorsData);
-      if (icpsData) setIcps(icpsData);
+      if (icpsData) setICPs(icpsData);
 
     } catch (error) {
       console.error('Error fetching company data:', error);
@@ -164,25 +188,70 @@ export function GenerateICPsButton() {
 
   // Handle company selection
   const handleCompanySelect = async (company: BasicCompany | null) => {
+    setSelectedCompany(company);
+    setSelectedProduct(null);
+    setICPs([]);
+    
     if (company) {
-      // Fetch full company details
-      const { data: fullCompany } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', company.id)
-        .single();
+      // Fetch products for the selected company
+      const { data: companyProducts, error: productsError } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('company_id', company.id)
+        .order('name');
 
-      if (fullCompany) {
-        setSelectedCompany({
-          ...fullCompany,
-          markets_operating_in: fullCompany.markets_operating_in || [],
-          main_products: fullCompany.main_products || [],
-          created_at: fullCompany.created_at || new Date().toISOString()
-        });
-        setInputMode('select');
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+        toast.error('Failed to load products');
+        return;
       }
+      
+      setProducts(companyProducts || []);
     } else {
-      setSelectedCompany(null);
+      setProducts([]);
+    }
+  };
+
+  // Add after handleCompanySelect
+  const handleProductSelect = async (product: { id: number; name: string } | null) => {
+    setSelectedProduct(product);
+    setICPs([]);
+    setSelectedPersonas({});
+    
+    if (selectedCompany) {
+      const { data: icpsData, error } = await supabase
+        .from('ideal_customer_profiles')
+        .select(`
+          *,
+          personas (*)
+        `)
+        .eq('company_id', selectedCompany.id)
+      
+      if (error) {
+        console.error('Error fetching ICPs:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load ICPs"
+        });
+        return;
+      }
+      
+      if (icpsData) {
+        const typedICPs = (icpsData as Array<DatabaseICP & { personas: DatabasePersona[] }>).map(icp => ({
+          id: icp.id,
+          vertical: icp.vertical,
+          company_size: icp.company_size,
+          region: icp.region,
+          personas: icp.personas.map(p => ({
+            id: p.id,
+            title: p.title,
+            seniority_level: p.seniority_level,
+            department: p.department
+          }))
+        }));
+        setICPs(typedICPs);
+      }
     }
   };
 
@@ -193,7 +262,17 @@ export function GenerateICPsButton() {
         // Fetch companies
         const { data: companiesData, error: companiesError } = await supabase
           .from('companies')
-          .select('*')
+          .select(`
+            id,
+            name,
+            industry,
+            product_category,
+            annual_revenue,
+            markets_operating_in,
+            number_of_employees,
+            main_products,
+            created_at
+          `)
           .order('name');
 
         if (companiesError) throw companiesError;
@@ -253,7 +332,6 @@ export function GenerateICPsButton() {
             setSelectedQuestionUserPrompt(questionUserPrompt.name);
           }
         }
-
       } catch (error) {
         console.error('Error fetching initial data:', error);
         toast({
@@ -275,9 +353,78 @@ export function GenerateICPsButton() {
       fetchCompanyData(selectedCompany.id);
     } else {
       setCompetitors([]);
-      setIcps([]);
+      setICPs([]);
     }
   }, [selectedCompany]);
+
+  // Add effect to fetch account ID
+  useEffect(() => {
+    async function fetchAccountId() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: accountUser } = await supabase
+          .from('account_users')
+          .select('account_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (accountUser) {
+          setAccountId(accountUser.account_id);
+        }
+      }
+    }
+
+    fetchAccountId();
+  }, []);
+
+  // Add effect to fetch product details when selected
+  useEffect(() => {
+    async function fetchProductDetails() {
+      if (!selectedProductId || selectedProductId === 'all') {
+        return;
+      }
+
+      try {
+        const { data: product } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', parseInt(selectedProductId))
+          .single();
+
+        if (product) {
+          // If product is selected, automatically select its company
+          const { data: company } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('id', product.company_id)
+            .single();
+
+          if (company) {
+            handleCompanySelect({
+              id: company.id,
+              name: company.name,
+              industry: company.industry,
+              product_category: company.product_category,
+              annual_revenue: company.annual_revenue,
+              markets_operating_in: company.markets_operating_in || [],
+              number_of_employees: company.number_of_employees,
+              main_products: company.main_products || [],
+              created_at: company.created_at || new Date().toISOString()
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching product details:', error);
+        toast({
+          title: "Error loading product",
+          description: "Failed to load product details",
+          variant: "destructive"
+        });
+      }
+    }
+
+    fetchProductDetails();
+  }, [selectedProductId]);
 
   async function handleGenerate() {
     const companyName = inputMode === 'select' ? selectedCompany?.name : newCompanyName;
@@ -333,8 +480,8 @@ export function GenerateICPsButton() {
       
       setProgress(30);
       toast({
-        title: "ICPs Generated",
-        description: `Generated ${icps.ideal_customer_profiles.length} ICPs with personas`
+        title: "Success",
+        description: `Generated ${icps.ideal_customer_profiles.length} ICPs successfully`
       });
 
       setProgress(50);
@@ -351,12 +498,12 @@ export function GenerateICPsButton() {
       }
 
     } catch (error) {
-      console.error('Generation failed:', error);
+      console.error('Failed to generate ICPs:', error)
       toast({
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to generate ICPs',
         variant: "destructive"
-      });
+      })
     } finally {
       setIsGenerating(false);
       setProgress(100);
@@ -554,20 +701,52 @@ export function GenerateICPsButton() {
                 company={selectedCompany}
                 competitors={competitors}
               />
-              <CompanyICPsTable 
-                icps={icps} 
-                companyId={selectedCompany.id}
-                companyName={selectedCompany.name}
-                companyIndustry={selectedCompany.industry}
-                companyProductCategory={selectedCompany.product_category}
-                competitors={competitors}
-                selectedEngines={engines}
-                selectedModel={modelSelection.questionModel}
-                selectedPrompts={{
-                  systemPromptName: selectedQuestionSystemPrompt || '',
-                  userPromptName: selectedQuestionUserPrompt || ''
-                }}
-              />
+              {products.length > 0 && (
+                <div className="space-y-4">
+                  <Label>Select Product</Label>
+                  <Select
+                    value={selectedProduct?.id.toString()}
+                    onValueChange={(value) => {
+                      const product = products.find(p => p.id.toString() === value);
+                      handleProductSelect(product || null);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id.toString()}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {selectedProduct && icps.length > 0 && (
+                <CompanyICPsTable
+                  icps={icps}
+                  companyId={selectedCompany.id}
+                  companyName={selectedCompany.name}
+                  companyIndustry={selectedCompany.industry}
+                  companyProductCategory={selectedCompany.product_category}
+                  competitors={competitors}
+                  selectedEngines={engines}
+                  selectedModel={modelSelection.questionModel}
+                  accountId={accountId || ''}
+                  selectedPrompts={{
+                    systemPromptName: selectedQuestionSystemPrompt || '',
+                    userPromptName: selectedQuestionUserPrompt || ''
+                  }}
+                  productId={selectedProduct.id}
+                />
+              )}
+              {selectedProduct && icps.length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  No ICPs found for this company and product combination.
+                </div>
+              )}
             </>
           )}
         </div>

@@ -73,6 +73,7 @@ export interface ICP {
   icp_batch_id?: string | null
   created_by_batch?: boolean | null
   company_id?: number | null
+  product_id?: number | null
   personas: Persona[]
 }
 

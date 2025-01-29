@@ -12,6 +12,7 @@ import { useDashboardStore } from "@/app/dashboard/store"
 export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
   const [activeTab, setActiveTab] = useState<string>('keywords')
   const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
 
   return (
     <div className="space-y-4">
@@ -32,6 +33,7 @@ export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
               companyId={companyId}
               accountId={accountId}
               isSuperAdmin={isSuperAdmin}
+              selectedProductId={selectedProductId}
             />
           </TabsContent>
 
@@ -40,6 +42,7 @@ export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
               companyId={companyId}
               accountId={accountId}
               isSuperAdmin={isSuperAdmin}
+              selectedProductId={selectedProductId}
             />
           </TabsContent>
 
@@ -48,6 +51,7 @@ export function AIOverviews({ companyId, accountId }: AIOverviewsProps) {
               companyId={companyId}
               accountId={accountId}
               isSuperAdmin={isSuperAdmin}
+              selectedProductId={selectedProductId}
             />
           </TabsContent>
         </Tabs>

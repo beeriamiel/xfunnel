@@ -83,12 +83,12 @@ export async function getCompanyProfile(companyId: number | null, accountId: str
   try {
     const supabase = await createClient()
     
-    // Use explicit join instead of foreign key reference
+    // Use explicit join for products through company_id
     const { data, error } = await supabase
       .from('companies')
       .select(`
         *,
-        ideal_customer_profiles!inner (
+        ideal_customer_profiles (
           id,
           region,
           vertical,
@@ -109,6 +109,13 @@ export async function getCompanyProfile(companyId: number | null, accountId: str
         competitors (
           id,
           competitor_name
+        ),
+        products!products_company_id_fkey (
+          id,
+          name,
+          company_id,
+          account_id,
+          created_at
         )
       `)
       .eq('id', companyId)

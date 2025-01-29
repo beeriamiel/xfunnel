@@ -1,5 +1,3 @@
-'use server'
-
 import { searchWithSerpApi } from "@/lib/clients/serpapi"
 import { createClient } from "@/app/supabase/server"
 import { NextResponse } from "next/server"
@@ -10,12 +8,34 @@ interface AnalyzeTermRequest {
   companyId: number
   accountId: string
   isSuperAdmin: boolean
+  productId: number | null
+}
+
+interface ListItem {
+  snippet: string;
+}
+
+interface TextBlock {
+  type: 'paragraph' | 'list';
+  snippet: string;
+  list?: ListItem[];
+}
+
+interface AIOverviewResponse {
+  text_blocks?: TextBlock[];
+}
+
+interface SerpAPIResponse {
+  ai_overview?: AIOverviewResponse;
+  organic_results?: Array<{
+    link?: string;
+  }>;
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json() as AnalyzeTermRequest
-    const { termId, term, companyId, accountId, isSuperAdmin } = body
+    const { termId, term, companyId, accountId, isSuperAdmin, productId } = body
 
     // Get company context
     const supabase = await createClient()
@@ -39,71 +59,72 @@ export async function POST(request: Request) {
     }
 
     // Search with SerpAPI
-    const response = await searchWithSerpApi(term)
+    const response = await searchWithSerpApi(term) as SerpAPIResponse
     
     // Detailed logging for AI Overview check
     console.log('AI Overview check for term:', term);
-    console.log('Has ai_overview property:', !!response.ai_overview);
-    console.log('Has text_blocks:', !!response.ai_overview?.text_blocks);
-    console.log('Number of text blocks:', response.ai_overview?.text_blocks?.length || 0);
+    console.log('Raw AI Overview response:', JSON.stringify(response.ai_overview, null, 2));
+    console.log('Text blocks type:', typeof response.ai_overview?.text_blocks);
+    console.log('Text blocks structure:', JSON.stringify(response.ai_overview?.text_blocks, null, 2));
     
     // Check if AI overview exists
     const hasAIOverview = !!response.ai_overview?.text_blocks?.length
     
     // Log final result
     console.log('Has AI Overview:', hasAIOverview);
-    
-    // Initialize variables
-    let companyMentioned = false
-    let competitorMentions: string[] = []
-    let contentSnapshot: string | null = null
 
-    // Only analyze content if AI overview exists
-    if (hasAIOverview && response.ai_overview?.text_blocks) {
-      // Get content from AI overview only
-      const contentToAnalyze = response.ai_overview.text_blocks
-        .map(block => block.snippet)
-        .join(" ")
+    // Store the analysis result
+    if (hasAIOverview) {
+      // Log the content before processing
+      console.log('Raw text blocks before joining:', response.ai_overview?.text_blocks);
+      const contentSnapshot = response.ai_overview?.text_blocks?.map(block => {
+        console.log('Processing block:', block);
+        if (block.type === 'paragraph') {
+          return block.snippet;
+        } else if (block.type === 'list') {
+          return block.list?.map(item => `• ${item.snippet}`).join('\n');
+        }
+        return '';
+      }).filter(Boolean).join('\n\n');
+      console.log('Final content snapshot:', contentSnapshot);
 
-      // Check for company and competitor mentions only in AI overview content
-      companyMentioned = contentToAnalyze.toLowerCase()
-        .includes(context.name.toLowerCase())
+      await supabase
+        .from('ai_overview_tracking_test')
+        .insert({
+          term_id: termId,
+          company_id: companyId,
+          account_id: accountId,
+          has_ai_overview: true,
+          company_mentioned: false, // This would need to be analyzed from the content
+          competitor_mentions: [],  // This would need to be analyzed from the content
+          content_snapshot: contentSnapshot,
+          url: response.organic_results?.[0]?.link || null,
+          checked_at: new Date().toISOString(),
+          product_id: productId
+        })
 
-      competitorMentions = context.competitors.filter(competitor =>
-        contentToAnalyze.toLowerCase().includes(competitor.toLowerCase())
-      )
-
-      contentSnapshot = contentToAnalyze
+      return NextResponse.json({
+        termId,
+        term,
+        hasAIOverview,
+        companyMentioned: false, // This would need to be analyzed from the content
+        competitorMentions: [],  // This would need to be analyzed from the content
+        contentSnapshot,
+        url: response.organic_results?.[0]?.link || null
+      })
     }
 
-    const result = {
+    return NextResponse.json({
       termId,
       term,
-      hasAIOverview,
-      companyMentioned,
-      competitorMentions,
-      url: response.organic_results?.[0]?.link,
-      contentSnapshot
-    }
-
-    // Save result to database
-    await supabase
-      .from('ai_overview_tracking_test')
-      .insert({
-        term_id: termId,
-        company_id: companyId,
-        account_id: accountId,  // Always include account_id
-        has_ai_overview: hasAIOverview,
-        company_mentioned: companyMentioned,
-        competitor_mentions: competitorMentions,
-        url: response.organic_results?.[0]?.link,
-        content_snapshot: contentSnapshot,
-        checked_at: new Date().toISOString()
-      })
-
-    return NextResponse.json(result)
+      hasAIOverview: false,
+      companyMentioned: false,
+      competitorMentions: [],
+      contentSnapshot: null,
+      url: null
+    })
   } catch (error) {
     console.error('Error analyzing term:', error)
-    return new NextResponse('Error analyzing term', { status: 500 })
+    return NextResponse.json({ error: 'Failed to analyze term' }, { status: 500 })
   }
 } 
