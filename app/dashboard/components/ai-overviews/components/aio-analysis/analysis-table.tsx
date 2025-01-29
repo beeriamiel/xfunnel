@@ -14,6 +14,8 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { createClient } from "@/app/supabase/client"
 import type { AIOverviewResult } from "@/lib/services/ai-overview-analysis/types"
+import { RelevantLinks } from "./relevant-links"
+import { SourcesOverview } from "./sources-overview"
 
 interface Term {
   id: number
@@ -30,7 +32,40 @@ interface Term {
     competitor_mentions: string[]
     content_snapshot: string | null
     checked_at: string | null
+    relevant_links?: Array<{
+      url: string
+      title?: string
+      snippet?: string
+      source?: string
+    }>
   } | null
+}
+
+interface TrackingResult {
+  id: number
+  has_ai_overview: boolean
+  company_mentioned: boolean
+  competitor_mentions: string[]
+  content_snapshot: string | null
+  checked_at: string | null
+  relevant_links?: Array<{
+    url: string
+    title?: string
+    snippet?: string
+    source?: string
+  }>
+}
+
+interface QueryResult {
+  id: number
+  company_id: number
+  account_id: string
+  term: string
+  source: 'MOZ' | 'AI' | 'USER'
+  status: 'ACTIVE' | 'ARCHIVED'
+  created_at: string | null
+  product_id: number | null
+  ai_overview_tracking_test: TrackingResult[] | null
 }
 
 interface AnalysisTableProps {
@@ -43,7 +78,15 @@ interface AnalysisTableProps {
   results: AIOverviewResult[]
 }
 
-function ExpandableContent({ content }: { content: string }) {
+function ExpandableContent({ 
+  content, 
+  links,
+  companyName 
+}: { 
+  content: string; 
+  links?: Array<{ url: string; title?: string; snippet?: string; source?: string }>;
+  companyName?: string;
+}) {
   console.log('Content received in ExpandableContent:', {
     type: typeof content,
     value: content,
@@ -63,8 +106,22 @@ function ExpandableContent({ content }: { content: string }) {
   }
 
   return (
-    <div className="px-4 py-3 bg-muted/50 rounded-md my-2 mx-4">
-      <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
+    <div className="px-4 py-3 space-y-4">
+      {/* AI Overview Content Card */}
+      <div className="bg-card text-card-foreground rounded-lg border shadow-sm">
+        <div className="px-6 py-4">
+          <h4 className="text-sm font-medium mb-2">AI Overview</h4>
+          <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+            {displayContent}
+          </div>
+        </div>
+      </div>
+
+      {/* Sources and Links Section */}
+      <div className="bg-muted/50 rounded-lg px-6 py-4">
+        <SourcesOverview links={links} companyName={companyName} />
+        <RelevantLinks links={links} />
+      </div>
     </div>
   )
 }
@@ -81,27 +138,52 @@ export function AnalysisTable({
   const [terms, setTerms] = useState<Term[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [expandedTerms, setExpandedTerms] = useState<Set<number>>(new Set())
+  const [companyName, setCompanyName] = useState<string>()
 
   useEffect(() => {
     loadTerms()
-  }, [companyId, accountId, isSuperAdmin])
+    loadCompanyName()
+  }, [companyId, accountId, isSuperAdmin, selectedProductId])
+
+  async function loadCompanyName() {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .single()
+      
+      setCompanyName(data?.name)
+    } catch (error) {
+      console.error('Error loading company name:', error)
+    }
+  }
 
   async function loadTerms() {
     try {
       setIsLoading(true)
       const supabase = createClient()
       
-      // Build query with company_id filter
       let query = supabase
         .from('ai_overview_terms_test')
         .select(`
-          *,
+          id,
+          company_id,
+          account_id,
+          term,
+          source,
+          status,
+          created_at,
+          product_id,
           ai_overview_tracking_test (
+            id,
             has_ai_overview,
             company_mentioned,
             competitor_mentions,
             content_snapshot,
-            checked_at
+            checked_at,
+            relevant_links
           )
         `)
         .eq('company_id', companyId)
@@ -123,10 +205,13 @@ export function AnalysisTable({
       if (error) throw error
       
       // Transform the data to handle the nested array from the join
-      const transformedData = (data || []).map(term => ({
+      const transformedData = ((data || []) as unknown as QueryResult[]).map(term => ({
         ...term,
-        // Get the most recent analysis result
-        ai_overview_tracking_test: term.ai_overview_tracking_test?.[0] || null
+        // Get the most recent analysis result by sorting by checked_at
+        ai_overview_tracking_test: term.ai_overview_tracking_test
+          ?.sort((a: TrackingResult, b: TrackingResult) => 
+            new Date(b.checked_at || 0).getTime() - new Date(a.checked_at || 0).getTime()
+          )?.[0] || null
       })) as Term[]
       
       setTerms(transformedData)
@@ -176,7 +261,8 @@ export function AnalysisTable({
         hasAIOverview: term.ai_overview_tracking_test.has_ai_overview,
         companyMentioned: term.ai_overview_tracking_test.company_mentioned,
         competitorMentions: term.ai_overview_tracking_test.competitor_mentions,
-        contentSnapshot: term.ai_overview_tracking_test.content_snapshot
+        contentSnapshot: term.ai_overview_tracking_test.content_snapshot,
+        relevantLinks: term.ai_overview_tracking_test.relevant_links
       }
     }
 
@@ -272,7 +358,11 @@ export function AnalysisTable({
               {hasAIOverview && isExpanded && (
                 <TableRow>
                   <TableCell colSpan={7} className="p-0">
-                    <ExpandableContent content={result.contentSnapshot!} />
+                    <ExpandableContent 
+                      content={result.contentSnapshot!} 
+                      links={result.relevantLinks}
+                      companyName={companyName}
+                    />
                   </TableCell>
                 </TableRow>
               )}

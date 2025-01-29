@@ -23,13 +23,38 @@ interface TextBlock {
 
 interface AIOverviewResponse {
   text_blocks?: TextBlock[];
+  hasAIOverview?: boolean;
+  companyMentioned?: boolean;
+  competitorMentions?: string[];
+  contentSnapshot?: string;
+  relevantLinks?: Array<{
+    url: string;
+    title?: string;
+    snippet?: string;
+    source?: string;
+  }>;
 }
 
 interface SerpAPIResponse {
   ai_overview?: AIOverviewResponse;
   organic_results?: Array<{
     link?: string;
+    title?: string;
+    snippet?: string;
+    source?: string;
   }>;
+}
+
+function extractDomain(url: string): string {
+  try {
+    const domain = new URL(url).hostname.replace('www.', '')
+    // Capitalize first letter of each word
+    return domain.split('.')[0].split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+  } catch {
+    return 'Unknown Source'
+  }
 }
 
 export async function POST(request: Request) {
@@ -75,10 +100,8 @@ export async function POST(request: Request) {
 
     // Store the analysis result
     if (hasAIOverview) {
-      // Log the content before processing
-      console.log('Raw text blocks before joining:', response.ai_overview?.text_blocks);
+      // Process content snapshot from text blocks
       const contentSnapshot = response.ai_overview?.text_blocks?.map(block => {
-        console.log('Processing block:', block);
         if (block.type === 'paragraph') {
           return block.snippet;
         } else if (block.type === 'list') {
@@ -86,8 +109,19 @@ export async function POST(request: Request) {
         }
         return '';
       }).filter(Boolean).join('\n\n');
-      console.log('Final content snapshot:', contentSnapshot);
 
+      // Extract relevant links from organic results
+      const relevantLinks = response.organic_results
+        ?.slice(0, 5)  // Take first 5 results
+        ?.filter(result => result.link && result.title)
+        ?.map(result => ({
+          url: result.link || '',
+          title: result.title,
+          snippet: result.snippet,
+          source: extractDomain(result.link || '')
+        })) || [];
+
+      // Store in database
       await supabase
         .from('ai_overview_tracking_test')
         .insert({
@@ -95,22 +129,24 @@ export async function POST(request: Request) {
           company_id: companyId,
           account_id: accountId,
           has_ai_overview: true,
-          company_mentioned: false, // This would need to be analyzed from the content
-          competitor_mentions: [],  // This would need to be analyzed from the content
+          company_mentioned: false,
+          competitor_mentions: [],
           content_snapshot: contentSnapshot,
           url: response.organic_results?.[0]?.link || null,
           checked_at: new Date().toISOString(),
-          product_id: productId
+          product_id: productId,
+          relevant_links: relevantLinks
         })
 
       return NextResponse.json({
         termId,
         term,
         hasAIOverview,
-        companyMentioned: false, // This would need to be analyzed from the content
-        competitorMentions: [],  // This would need to be analyzed from the content
+        companyMentioned: false,
+        competitorMentions: [],
         contentSnapshot,
-        url: response.organic_results?.[0]?.link || null
+        url: response.organic_results?.[0]?.link || null,
+        relevantLinks
       })
     }
 
@@ -121,7 +157,8 @@ export async function POST(request: Request) {
       companyMentioned: false,
       competitorMentions: [],
       contentSnapshot: null,
-      url: null
+      url: null,
+      relevantLinks: []
     })
   } catch (error) {
     console.error('Error analyzing term:', error)
