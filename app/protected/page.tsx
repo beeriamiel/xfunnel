@@ -34,10 +34,12 @@ export default async function ProtectedPage() {
               <section>
                 <h3 className="text-lg font-medium mb-4">Generate ICPs and Questions</h3>
                 <Card className="p-6">
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Recommended: Generate Ideal Customer Profiles (ICPs) first, then automatically create targeted questions for each persona.
-                  </p>
-                  <GenerateICPsButton />
+                  <div className="space-y-6">
+                    <p className="text-sm text-muted-foreground">
+                      Recommended: Generate Ideal Customer Profiles (ICPs) first, then automatically create targeted questions for each persona.
+                    </p>
+                    <GenerateICPsButton />
+                  </div>
                 </Card>
               </section>
             </div>

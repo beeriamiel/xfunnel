@@ -17,6 +17,7 @@ export type GeneratedTerm = {
 export interface GenerateTermsOptions {
   limit?: number;  // Max number of terms to return
   minConfidence?: number;  // Minimum confidence score (0-1)
+  productId?: number | null;
 }
 
 export async function generateTerms(
@@ -25,8 +26,9 @@ export async function generateTerms(
   options: GenerateTermsOptions = {}
 ): Promise<GeneratedTerm[]> {
   const {
-    limit = 10,
-    minConfidence = 0.6
+    limit = 20,
+    minConfidence = 0.7,
+    productId
   } = options;
 
   try {
@@ -43,10 +45,15 @@ export async function generateTerms(
     const aiTerms = await processTermsWithAI(companyData, mozSuggestions);
 
     // Step 4: Filter and sort only AI-generated terms
-    return aiTerms
+    const filteredTerms = aiTerms
       .filter(term => term.confidence >= minConfidence)
       .sort((a, b) => b.confidence - a.confidence)
       .slice(0, limit);
+
+    // Save the generated terms
+    await saveGeneratedTerms(filteredTerms, companyId, accountId, productId);
+
+    return filteredTerms;
 
   } catch (error) {
     console.error('Error generating terms:', error);
@@ -57,7 +64,8 @@ export async function generateTerms(
 export async function saveGeneratedTerms(
   terms: GeneratedTerm[],
   companyId: number,
-  accountId: string
+  accountId: string,
+  productId?: number | null
 ): Promise<void> {
   const supabase = await createClient();
 
@@ -70,7 +78,8 @@ export async function saveGeneratedTerms(
     status: 'ACTIVE',
     estimated_volume: term.estimatedVolume,
     estimated_relevance: term.estimatedRelevance,
-    estimated_difficulty: term.estimatedDifficulty
+    estimated_difficulty: term.estimatedDifficulty,
+    product_id: productId || null
   }));
 
   // Insert terms

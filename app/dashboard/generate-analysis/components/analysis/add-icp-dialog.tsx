@@ -29,11 +29,13 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Input } from "@/components/ui/input"
+import { useDashboardStore } from '@/app/dashboard/store'
 
 const formSchema = z.object({
   region: z.enum(['north_america', 'europe', 'asia_pacific', 'latin_america']),
   vertical: z.string().min(1, "Vertical is required"),
   company_size: z.enum(['smb_under_500', 'mid_market_500_1000', 'enterprise_1000_plus']),
+  product_id: z.string().min(1, "Product is required"),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -45,12 +47,17 @@ interface AddICPDialogProps {
 }
 
 export function AddICPDialog({ open, onOpenChange, onSubmit }: AddICPDialogProps) {
+  // Get company profile and selected product from store
+  const { companyProfile, selectedProductId } = useDashboardStore()
+  const products = companyProfile?.products || []
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       region: 'north_america',
       vertical: 'Technology',
       company_size: 'smb_under_500',
+      product_id: selectedProductId || '',
     },
   })
 
@@ -75,6 +82,30 @@ export function AddICPDialog({ open, onOpenChange, onSubmit }: AddICPDialogProps
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="product_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id.toString()}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="region"

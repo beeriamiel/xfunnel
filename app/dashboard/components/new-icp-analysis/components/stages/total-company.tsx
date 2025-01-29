@@ -78,11 +78,12 @@ export function TotalCompany({ companyId, accountId }: TotalCompanyProps) {
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
   const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
-    companyId ? `company-analysis-${companyId}-${timePeriod}` : null,
-    () => companyId ? getAnalysisByCompany(companyId, accountId, timePeriod, isSuperAdmin) : null
+    companyId ? `company-analysis-${companyId}-${timePeriod}-${selectedProductId}` : null,
+    () => companyId ? getAnalysisByCompany(companyId, accountId, timePeriod, isSuperAdmin, selectedProductId) : null
   )
 
   React.useEffect(() => {

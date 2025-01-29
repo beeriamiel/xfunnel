@@ -57,8 +57,22 @@ export async function generateQuestionsForAllPersonas(
   accountId: string,
   icpBatchId?: string
 ) {
+  console.log('Starting generateQuestionsForAllPersonas with params:', {
+    companyName,
+    engines: Object.keys(engines),
+    systemPromptName,
+    userPromptName,
+    model,
+    accountId,
+    icpBatchId
+  });
+
   const adminClient = await createAdminClient();
+  console.log('Admin client created');
+
   const batchTracker = await SupabaseBatchTrackingService.initialize();
+  console.log('Batch tracker initialized');
+
   const batchSize = 3;
   const delayBetweenBatches = 5000;
   let responseBatchId: string | undefined;
@@ -68,14 +82,54 @@ export async function generateQuestionsForAllPersonas(
 
   try {
     // Get company ID first for progress tracking
-    const { data: company } = await adminClient
+    console.log('Fetching company with query params:', {
+      companyName: companyName,
+      accountId: accountId,
+      companyNameLength: companyName.length,
+      companyNameEncoded: JSON.stringify(companyName)
+    });
+
+    const companyQuery = adminClient
       .from('companies')
       .select('id')
       .eq('name', companyName)
       .eq('account_id', accountId)
       .single();
 
-    if (!company) throw new Error('Company not found');
+    console.log('Company query built:', companyQuery.toString());
+
+    const { data: company, error: companyError } = await companyQuery;
+
+    console.log('Company query result:', {
+      company,
+      error: companyError,
+      hasData: !!company,
+      queryDetails: {
+        table: 'companies',
+        filters: {
+          name: companyName,
+          account_id: accountId
+        }
+      }
+    });
+
+    if (companyError) {
+      console.error('Error fetching company:', {
+        error: companyError,
+        errorCode: companyError.code,
+        errorMessage: companyError.message,
+        errorDetails: companyError.details
+      });
+    }
+
+    if (!company) {
+      console.error('Company not found with params:', {
+        companyName,
+        accountId,
+        timestamp: new Date().toISOString()
+      });
+      throw new Error('Company not found');
+    }
 
     // Create a new batch for responses with accountId
     responseBatchId = await batchTracker.createBatch(

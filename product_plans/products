@@ -1,0 +1,160 @@
+Company
+├── ICPs (many)
+├── Products (many)
+│   └── Product + ICP Combination
+│       └── Queries (many)
+│           └── Responses (many)
+│               └── Response Analysis (one)
+│                   └── Citations (many)
+
+
+You're absolutely right - the current implementation has the product selection in the wrong place in the user flow. Let me investigate the current structure:
+
+1. Current Flow:
+```
+- Product Dropdown
+- Company Selection (SimpleCompanySelector) OR New Company Input
+- ICP Generation Settings
+- Company Details & ICPs Table (when company is selected)
+```
+
+2. Desired Flow should be:
+```
+- Company Selection (SimpleCompanySelector) OR New Company Input
+- Company Details
+- Product Selection (for the selected company)
+- ICPs Table filtered by selected product
+```
+
+Ah, now I understand better! Let me analyze the current state and what's needed:
+
+Current Flow:
+```
+Dashboard -> Company Filter -> Response Analysis & Citations
+```
+
+Desired Flow:
+```
+Dashboard -> Company Filter -> Product Filter -> Response Analysis & Citations
+```
+
+Looking at the tables:
+1. `response_analysis` already has:
+   - company_id
+   - product_id
+   - query_id
+   - response_id
+
+2. `citations` is connected through:
+   - response_analysis_id
+
+So technically, we already have all the data relationships we need because:
+- Response Analysis already tracks which product it belongs to
+- Citations are linked to Response Analysis
+- The chain of relationships is complete: Citation -> Response Analysis -> Product -> Company
+
+No schema changes are needed! We just need to:
+1. Add the product filter to the protected dashboard
+2. Modify the queries to filter response_analysis by both company_id AND product_id
+3. The citations will automatically filter because they're linked to the filtered response_analysis
+
+The data model already supports this hierarchy:
+```
+Company (Filter 1)
+└── Product (Filter 2)
+    └── Response Analysis (filtered by both)
+        └── Citations (automatically filtered through response_analysis)
+```
+I'll help analyze where and how to implement product filtering across these dashboard components. Let me break this down systematically:
+
+1. **Overall Architecture Analysis**:
+- We need a product filter that affects all dashboard components
+- The filter should be consistent across all views
+- Changes should trickle down from a central location
+
+2. **Current State**:
+- Components are currently filtered by company only
+- Each component handles company filtering differently
+- We have complex data visualizations that need to respect both company and product filters
+
+3. **Component-by-Component Impact Analysis**:
+
+a) **Engine Metrics Chart** (`engine-metrics-chart.tsx`):
+- Primary metrics display
+- Currently uses company filtering
+- Would need to add product dimension to metrics aggregation
+- Impact: Medium (requires data query modification)
+
+b) **AI Overviews** (`ai-overviews`):
+- Overview statistics and summaries
+- Impact: Low (likely just needs to add product filter to queries)
+
+c) **ICP Analysis** (`new-icp-analysis`):
+- Customer profile analysis
+- Impact: High (needs to consider product-specific ICPs)
+- Most complex to modify due to ICP relationships
+
+d) **Citation Analysis** (`source-analysis`, `citation-analysis.tsx`):
+- Source tracking and competitor analysis
+- Impact: Medium (needs product context in citations)
+
+4. **Recommended Implementation Approach**:
+
+```plaintext
+Dashboard Layout:
+┌─────────────────────────────────────┐
+│ Global Filters (New Component)      │
+├─────────────────────────────────────┤
+│ ┌─────────┐ ┌─────────┐            │
+│ │Company  │ │Product  │            │
+│ │Filter   │ │Filter   │            │
+│ └─────────┘ └─────────┘            │
+├─────────────────────────────────────┤
+│ Dashboard Content                   │
+│ (Filtered Components)               │
+└─────────────────────────────────────┘
+```
+
+5. **Implementation Steps**:
+
+1. Create a Global Filter Component:
+   - Place at the top of the dashboard
+   - Include both company and product filters
+   - Use Zustand store for state management
+
+2. Modify Database Queries:
+   - Add product filtering to all relevant queries
+   - Update types to include product information
+
+3. Update Components in Order:
+   - Start with Engine Metrics (most visible impact)
+   - Then AI Overviews (simplest to modify)
+   - Then Citation Analysis
+   - Finally ICP Analysis (most complex)
+
+6. **Technical Considerations**:
+
+- Store Updates:
+```typescript
+interface DashboardState {
+  selectedCompanyId: number | null;
+  selectedProductId: number | null; // New
+  // ... existing state
+}
+```
+
+- Query Modifications:
+```typescript
+// Example query structure
+.eq('company_id', companyId)
+.eq('product_id', productId) // New filter
+```
+
+7. **UI/UX Recommendations**:
+
+- Use a consistent filter component across all views
+- Allow clearing product filter independently
+- Show active filters clearly
+- Consider saving user preferences
+
+Would you like me to focus on any particular aspect of this plan or proceed with implementing a specific part?

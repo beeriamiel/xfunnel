@@ -42,13 +42,17 @@ interface ICP {
   personas: Persona[];
 }
 
+interface Competitor {
+  competitor_name: string;
+}
+
 interface CompanyICPsTableProps {
   icps: ICP[];
   companyId: number;
   companyName: string;
   companyIndustry: string | null;
   companyProductCategory: string | null;
-  competitors?: { competitor_name: string }[];
+  competitors: Competitor[];
   selectedEngines: EngineSelection;
   selectedModel: AIModelType;
   accountId: string;
@@ -56,6 +60,7 @@ interface CompanyICPsTableProps {
     systemPromptName: string;
     userPromptName: string;
   };
+  productId?: number;
   onGenerateStart?: () => void;
   onGenerateComplete?: () => void;
 }
@@ -75,6 +80,7 @@ export function CompanyICPsTable({
   selectedModel,
   accountId,
   selectedPrompts,
+  productId,
   onGenerateStart,
   onGenerateComplete
 }: CompanyICPsTableProps) {
@@ -94,7 +100,7 @@ export function CompanyICPsTable({
     }
     async function loadStats() {
       try {
-        const data = await fetchPersonaStats(companyId);
+        const data = await fetchPersonaStats(companyId, productId);
         setStats(data);
       } catch (error) {
         console.error('Error loading stats:', error);
@@ -104,7 +110,7 @@ export function CompanyICPsTable({
     }
 
     loadStats();
-  }, [companyId]);
+  }, [companyId, productId]);
 
   const allSelected = icps.flatMap(icp => 
     icp.personas.map(p => `${icp.id}-${p.id}`)
@@ -131,38 +137,29 @@ export function CompanyICPsTable({
   };
 
   const handleGenerateQuestions = async () => {
-    const selectedPersonas = icps.flatMap(icp => {
-      const selectedFromIcp = icp.personas.filter(
-        persona => selected[`${icp.id}-${persona.id}`]
-      );
-      
-      // Map each selected persona to include its ICP context
-      return selectedFromIcp.map(persona => ({
-        persona: {
-          id: persona.id,
-          title: persona.title,
-          department: persona.department,
-          seniority_level: persona.seniority_level
-        },
-        icp: {
-          vertical: icp.vertical,
-          company_size: icp.company_size,
-          region: icp.region
-        },
-        company: {
-          id: companyId,
-          name: companyName,
-          industry: companyIndustry,
-          product_category: companyProductCategory,
-          competitors: competitors || []
-        }
-      }));
-    });
+    if (!selectedPrompts.systemPromptName || !selectedPrompts.userPromptName) {
+      toast({
+        title: "Missing prompts",
+        description: "Please select both system and user prompts",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const selectedPersonas = Object.entries(selected)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([key]) => {
+        const [icpId, personaId] = key.split('-');
+        return {
+          icpId: parseInt(icpId),
+          personaId: parseInt(personaId)
+        };
+      });
 
     if (selectedPersonas.length === 0) {
       toast({
         title: "No personas selected",
-        description: "Please select at least one persona to generate questions",
+        description: "Please select at least one persona",
         variant: "destructive"
       });
       return;
@@ -181,28 +178,24 @@ export function CompanyICPsTable({
           selectedPrompts.userPromptName,
           selectedModel,
           accountId,
-          personaContext.persona.id.toString()
+          personaContext.personaId.toString()
         );
       }
 
       toast({
-        title: "Generation complete",
-        description: `Generated questions for ${selectedPersonas.length} personas`
+        title: "Success",
+        description: "Questions generated successfully"
       });
-
-      // Refresh stats after generation
-      const newStats = await fetchPersonaStats(companyId);
-      setStats(newStats);
+      onGenerateComplete?.();
     } catch (error) {
-      console.error('Error generating questions:', error);
+      console.error('Generation failed:', error);
       toast({
-        title: "Error generating questions",
-        description: error instanceof Error ? error.message : "An error occurred",
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
     } finally {
       setIsGenerating(false);
-      onGenerateComplete?.();
     }
   };
 

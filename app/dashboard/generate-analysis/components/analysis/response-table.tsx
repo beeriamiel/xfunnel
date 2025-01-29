@@ -60,6 +60,15 @@ export function ResponseTable({
   const [showAddICPDialog, setShowAddICPDialog] = React.useState(false)
   const [showAddPersonaDialog, setShowAddPersonaDialog] = React.useState(false)
   const [isGeneratingResponses, setIsGeneratingResponses] = React.useState<number | null>(null)
+  
+  // Get selected product from store
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
+  
+  // Filter ICPs based on selected product
+  const filteredICPs = React.useMemo(() => {
+    if (!selectedProductId) return icps
+    return icps.filter(icp => icp.product_id === Number(selectedProductId))
+  }, [icps, selectedProductId])
 
   React.useEffect(() => {
     async function loadStats() {
@@ -120,7 +129,12 @@ export function ResponseTable({
 
   const handleAddICP = async (values: any) => {
     try {
-      const newICP = await createICP(values, companyId, accountId)
+      const newICP = await createICP({
+        region: values.region,
+        vertical: values.vertical,
+        company_size: values.company_size,
+        product_id: Number(values.product_id)
+      }, companyId, accountId)
       toast.success("ICP created successfully")
       // Refresh the page to show new ICP
       window.location.reload()
@@ -216,7 +230,7 @@ export function ResponseTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {icps.map((icp) => (
+            {filteredICPs.map((icp) => (
               <React.Fragment key={icp.id}>
                 {icp.personas.map((persona) => {
                   const statsKey = `${icp.id}-${persona.id}`

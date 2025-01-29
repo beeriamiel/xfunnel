@@ -151,7 +151,7 @@ export function DashboardWrapper({
       <SidebarProvider>
         <div className="flex flex-col min-h-screen w-full">
           <Suspense fallback={<LoadingSkeleton />}>
-            <DashboardHeader />
+            <DashboardHeader accountId={accountId} />
           </Suspense>
           <div className="flex flex-1 h-[calc(100vh-4rem)]">
             <AppSidebar />

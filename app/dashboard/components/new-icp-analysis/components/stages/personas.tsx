@@ -98,15 +98,12 @@ export function Personas({
   const timePeriod = useDashboardStore(state => state.timePeriod)
   const setTimePeriod = useDashboardStore(state => state.setTimePeriod)
   const isSuperAdmin = useDashboardStore(state => state.isSuperAdmin)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
 
   // Fetch data using SWR
   const { data, error, isLoading } = useSWR(
-    companyId && selectedRegion && selectedVertical 
-      ? `persona-analysis-${companyId}-${selectedRegion}-${selectedVertical}-${timePeriod}` 
-      : null,
-    () => companyId && selectedRegion && selectedVertical 
-      ? getAnalysisByPersona(companyId, accountId, selectedRegion, selectedVertical, timePeriod, isSuperAdmin) 
-      : null
+    companyId && selectedRegion && selectedVertical ? `persona-analysis-${companyId}-${selectedRegion}-${selectedVertical}-${timePeriod}-${selectedProductId}` : null,
+    () => companyId && selectedRegion && selectedVertical ? getAnalysisByPersona(companyId, accountId, selectedRegion, selectedVertical, timePeriod, isSuperAdmin, selectedProductId) : null
   )
 
   // Prepare data for the timeline chart - moved before conditional returns

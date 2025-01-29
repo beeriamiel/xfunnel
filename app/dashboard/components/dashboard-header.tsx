@@ -16,15 +16,20 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { createClient } from '@/app/supabase/client'
 import { useEffect } from 'react'
 import { CompanySelector } from "./company-selector"
+import { ProductSelector } from "./product-selector"
 import type { Company } from '../generate-analysis/types/company'
+import { getCompanyProfile } from '../generate-analysis/utils/actions'
+import { useParams } from 'next/navigation'
 
 interface DashboardHeaderProps {
-  title?: string
+  title?: string;
+  accountId: string;
 }
 
-export function DashboardHeader({ title }: DashboardHeaderProps) {
-  const { activeView, isSuperAdmin, companies, selectedCompanyId } = useDashboardStore()
+export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
+  const { activeView, isSuperAdmin, companies, selectedCompanyId, companyProfile, selectedProductId, setCompanyProfile } = useDashboardStore()
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || null
+  const selectedProduct = companyProfile?.products?.find(p => p.id.toString() === selectedProductId) || null
   const supabase = createClient()
   
   // Add logging
@@ -39,7 +44,47 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
       })
     }
   }, [])
+
+  // Fetch company profile when selectedCompanyId changes
+  useEffect(() => {
+    async function fetchCompanyProfile() {
+      if (!selectedCompanyId || !accountId) return
+      
+      try {
+        console.log('Fetching company profile for:', { selectedCompanyId, accountId })
+        const profile = await getCompanyProfile(selectedCompanyId, accountId)
+        console.log('Received profile:', profile)
+        
+        if (profile) {
+          // Transform API response to match CompanyProfile interface
+          const transformedProfile = {
+            ...profile,
+            icps: profile.ideal_customer_profiles || [],
+            personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
+            products: profile.products || [],
+            competitors: (profile.competitors || []).map(c => ({
+              id: String(c.id),
+              name: c.competitor_name
+            }))
+          }
+          console.log('Transformed profile:', transformedProfile)
+          setCompanyProfile(transformedProfile)
+        } else {
+          console.log('No profile received, setting to null')
+          setCompanyProfile(null)
+        }
+      } catch (error) {
+        console.error('Error fetching company profile:', error)
+        setCompanyProfile(null)
+      }
+    }
+
+    fetchCompanyProfile()
+  }, [selectedCompanyId, accountId, setCompanyProfile])
   
+  // Add logging for products being passed to selector
+  console.log('Products being passed to selector:', companyProfile?.products || [])
+
   const viewTitle = title || (
     activeView === 'engine' 
       ? 'AI Engine Performance' 
@@ -108,7 +153,15 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
       </div>
       <div className="flex items-center gap-4">
         {isSuperAdmin && (
-          <CompanySelector selectedCompany={selectedCompany} companies={companies} />
+          <>
+            <CompanySelector selectedCompany={selectedCompany} companies={companies} />
+            {selectedCompany && (
+              <ProductSelector 
+                selectedProduct={selectedProduct} 
+                products={companyProfile?.products || []} 
+              />
+            )}
+          </>
         )}
         <AuthButton />
       </div>

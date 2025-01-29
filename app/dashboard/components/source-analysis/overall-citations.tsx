@@ -193,6 +193,7 @@ export function OverallCitations({ companyId, accountId }: Props) {
   const searchParams = useSearchParams()
   const urlCompanyId = searchParams.get('company') ? parseInt(searchParams.get('company')!) : undefined
   const companies = useDashboardStore(state => state.companies)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
   
   // Use URL company ID if available, fallback to prop
   const effectiveCompanyId = urlCompanyId ?? companyId
@@ -204,7 +205,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
     buyingJourneyPhase: null,
     sourceType: null,
     answerEngine: null,
-    buyerPersona: null
+    buyerPersona: null,
+    productId: null
   })
   const [sources, setSources] = useState<OverallSourceData[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -262,9 +264,20 @@ export function OverallCitations({ companyId, accountId }: Props) {
         })
       })
     }
+
+    if (filters.productId) {
+      const product = companies.find(c => c.id === filters.productId)
+      if (product) {
+        badges.push({
+          category: 'productId',
+          label: product.name,
+          value: product.id.toString()
+        })
+      }
+    }
     
     return badges
-  }, [filters])
+  }, [filters, companies])
 
   // Calculate pagination
   const totalPages = Math.ceil(sources.length / PAGE_SIZE)
@@ -292,6 +305,14 @@ export function OverallCitations({ companyId, accountId }: Props) {
         setIsLoading(true)
         setError(null)
 
+        console.log('Fetching citations with:', {
+          effectiveCompanyId,
+          accountId,
+          filters,
+          isSuperAdmin,
+          selectedProductId
+        })
+
         const supabase = createClient()
         
         // First verify company access
@@ -306,6 +327,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
         }
 
         const { data: companyData, error: companyError } = await companyQuery.single()
+
+        console.log('Company verification:', { companyData, companyError })
 
         if (companyError || !companyData) {
           throw new Error('Company not found or access denied')
@@ -337,7 +360,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
             external_links_to_root_domain,
             page_authority,
             created_at,
-            answer_engine
+            answer_engine,
+            product_id
           `)
           .not('answer_engine', 'in', '("google_search","google-search")') as any
 
@@ -354,10 +378,21 @@ export function OverallCitations({ companyId, accountId }: Props) {
         if (filters.buyerPersona) {
           query = query.in('buyer_persona', filters.buyerPersona)
         }
+        if (filters.productId || selectedProductId) {
+          const productIdToUse = filters.productId || parseInt(selectedProductId!)
+          console.log('Applying product filter:', { productIdToUse })
+          query = query.eq('product_id', productIdToUse)
+        }
 
         query = query.eq('company_id', effectiveCompanyId)
 
         const { data, error: fetchError } = await query
+
+        console.log('Citations query result:', {
+          success: !!data,
+          count: data?.length || 0,
+          error: fetchError
+        })
 
         if (fetchError) throw fetchError
 
@@ -378,140 +413,161 @@ export function OverallCitations({ companyId, accountId }: Props) {
         const buyerPersonasMap = new Map<string, Set<string>>()
         const citationOrdersMap = new Map<string, number[]>()
 
-        // First pass: collect all data
-        const citations = data as CitationRow[]
-        citations.forEach((citation) => {
-          const url = citation.citation_url
-          
-          // Initialize maps for this URL if needed
-          if (!companyMentionsMap.has(url)) {
-            companyMentionsMap.set(url, new Map())
-          }
-          if (!journeyPhasesMap.has(url)) {
-            journeyPhasesMap.set(url, new Set())
-          }
-          if (!answerEnginesMap.has(url)) {
-            answerEnginesMap.set(url, new Set())
-          }
-          if (!buyerPersonasMap.has(url)) {
-            buyerPersonasMap.set(url, new Set())
-          }
-          if (!citationOrdersMap.has(url)) {
-            citationOrdersMap.set(url, [])
-          }
+        try {
+          // First pass: collect all data
+          const citations = data as CitationRow[]
+          console.log('Processing citations:', {
+            totalCitations: citations.length,
+            sampleCitation: citations[0] ? {
+              url: citations[0].citation_url,
+              product_id: citations[0].product_id
+            } : null
+          })
 
-          // Collect citation orders
-          if (typeof citation.citation_order === 'number') {
-            citationOrdersMap.get(url)!.push(citation.citation_order)
-          }
+          citations.forEach((citation) => {
+            const url = citation.citation_url
+            
+            // Initialize maps for this URL if needed
+            if (!companyMentionsMap.has(url)) {
+              companyMentionsMap.set(url, new Map())
+            }
+            if (!journeyPhasesMap.has(url)) {
+              journeyPhasesMap.set(url, new Set())
+            }
+            if (!answerEnginesMap.has(url)) {
+              answerEnginesMap.set(url, new Set())
+            }
+            if (!buyerPersonasMap.has(url)) {
+              buyerPersonasMap.set(url, new Set())
+            }
+            if (!citationOrdersMap.has(url)) {
+              citationOrdersMap.set(url, [])
+            }
 
-          // Process company mentions
-          const mentionsForUrl = companyMentionsMap.get(url)!
-          if (Array.isArray(citation.mentioned_companies_count)) {
-            citation.mentioned_companies_count.forEach(mention => {
-              const [company, countStr] = mention.split(':')
-              const count = parseInt(countStr || '0')
-              const currentMax = mentionsForUrl.get(company) || 0
-              if (count > currentMax) {
-                mentionsForUrl.set(company, count)
-              }
-            })
-          }
+            // Collect citation orders
+            if (typeof citation.citation_order === 'number') {
+              citationOrdersMap.get(url)!.push(citation.citation_order)
+            }
 
-          // Collect journey phases
-          if (citation.buyer_journey_phase) {
-            journeyPhasesMap.get(url)!.add(citation.buyer_journey_phase)
-          }
-
-          // Collect answer engines
-          if (citation.answer_engine) {
-            answerEnginesMap.get(url)!.add(citation.answer_engine)
-          }
-
-          // Collect buyer personas
-          if (citation.buyer_persona) {
-            buyerPersonasMap.get(url)!.add(citation.buyer_persona)
-          }
-        })
-
-        // Second pass: create source data with standardized information
-        citations.forEach((citation) => {
-          const url = citation.citation_url
-          const domain = extractDomain(url)
-
-          if (!groupedCitations.has(url)) {
-            // Calculate average citation order
-            const citationOrders = citationOrdersMap.get(url) || []
-            const averageCitationOrder = citationOrders.length > 0
-              ? Number((citationOrders.reduce((sum, order) => sum + order, 0) / citationOrders.length).toFixed(1))
-              : null
-
-            // Convert company mentions map to array format
+            // Process company mentions
             const mentionsForUrl = companyMentionsMap.get(url)!
-            const standardizedMentions = Array.from(mentionsForUrl.entries())
-              .map(([company, count]) => `${company}:${count}`)
-              .sort((a, b) => {
-                const countA = parseInt(a.split(':')[1])
-                const countB = parseInt(b.split(':')[1])
-                return countB - countA // Sort by count descending
+            if (Array.isArray(citation.mentioned_companies_count)) {
+              citation.mentioned_companies_count.forEach(mention => {
+                const [company, countStr] = mention.split(':')
+                const count = parseInt(countStr || '0')
+                const currentMax = mentionsForUrl.get(company) || 0
+                if (count > currentMax) {
+                  mentionsForUrl.set(company, count)
+                }
               })
+            }
 
-            // Get journey phases and answer engines
-            const journeyPhases = Array.from(journeyPhasesMap.get(url)!).sort()
-            const answerEngines = Array.from(answerEnginesMap.get(url)!).sort()
-            const buyerPersonas = Array.from(buyerPersonasMap.get(url)!).sort()
+            // Collect journey phases
+            if (citation.buyer_journey_phase) {
+              journeyPhasesMap.get(url)!.add(citation.buyer_journey_phase)
+            }
 
-            groupedCitations.set(url, {
-              domain,
-              citation_url: url,
-              citation_count: 0,
-              domain_authority: citation.domain_authority ?? undefined,
-              source_type: citation.source_type?.toLowerCase() as 'owned' | 'ugc' | 'affiliate',
-              buyer_journey_phases: journeyPhases,
-              buyer_personas: buyerPersonas,
-              mentioned_companies_count: standardizedMentions,
-              rank_list: citation.rank_list || undefined,
-              content_analysis: citation.content_analysis ? JSON.parse(citation.content_analysis) : undefined,
-              queries: [],
-              external_links_to_root_domain: citation.external_links_to_root_domain ?? undefined,
-              page_authority: citation.page_authority ?? undefined,
-              content_analysis_details: citation.content_analysis ? 
-                JSON.parse(citation.content_analysis).analysis_details : undefined,
-              citation_orders: citationOrders,
-              average_citation_order: averageCitationOrder,
-              answer_engines: answerEngines
-            })
-          }
+            // Collect answer engines
+            if (citation.answer_engine) {
+              answerEnginesMap.get(url)!.add(citation.answer_engine)
+            }
 
-          const source = groupedCitations.get(url)!
-          source.citation_count++
+            // Collect buyer personas
+            if (citation.buyer_persona) {
+              buyerPersonasMap.get(url)!.add(citation.buyer_persona)
+            }
+          })
 
-          // Add query if it exists
-          if (citation.query_text) {
-            source.queries.push({
-              text: citation.query_text,
-              date: new Date(citation.created_at || '').toLocaleDateString(),
-              response: citation.response_text || '',
-              answer_engine: citation.answer_engine || null
-            })
-          }
-        })
+          // Second pass: create source data with standardized information
+          citations.forEach((citation) => {
+            const url = citation.citation_url
+            const domain = extractDomain(url)
 
-        // Convert to array and sort by citation count
-        const processedSources = Array.from(groupedCitations.values())
-          .sort((a, b) => b.citation_count - a.citation_count)
+            if (!groupedCitations.has(url)) {
+              // Calculate average citation order
+              const citationOrders = citationOrdersMap.get(url) || []
+              const averageCitationOrder = citationOrders.length > 0
+                ? Number((citationOrders.reduce((sum, order) => sum + order, 0) / citationOrders.length).toFixed(1))
+                : null
 
-        setSources(processedSources)
-        setIsLoading(false)
+              // Convert company mentions map to array format
+              const mentionsForUrl = companyMentionsMap.get(url)!
+              const standardizedMentions = Array.from(mentionsForUrl.entries())
+                .map(([company, count]) => `${company}:${count}`)
+                .sort((a, b) => {
+                  const countA = parseInt(a.split(':')[1])
+                  const countB = parseInt(b.split(':')[1])
+                  return countB - countA // Sort by count descending
+                })
+
+              // Get journey phases and answer engines
+              const journeyPhases = Array.from(journeyPhasesMap.get(url)!).sort()
+              const answerEngines = Array.from(answerEnginesMap.get(url)!).sort()
+              const buyerPersonas = Array.from(buyerPersonasMap.get(url)!).sort()
+
+              groupedCitations.set(url, {
+                domain,
+                citation_url: url,
+                citation_count: 0,
+                domain_authority: citation.domain_authority ?? undefined,
+                source_type: citation.source_type?.toLowerCase() as 'owned' | 'ugc' | 'affiliate',
+                buyer_journey_phases: journeyPhases,
+                buyer_personas: buyerPersonas,
+                mentioned_companies_count: standardizedMentions,
+                rank_list: citation.rank_list || undefined,
+                content_analysis: citation.content_analysis ? JSON.parse(citation.content_analysis) : undefined,
+                queries: [],
+                external_links_to_root_domain: citation.external_links_to_root_domain ?? undefined,
+                page_authority: citation.page_authority ?? undefined,
+                content_analysis_details: citation.content_analysis ? 
+                  JSON.parse(citation.content_analysis).analysis_details : undefined,
+                citation_orders: citationOrders,
+                average_citation_order: averageCitationOrder,
+                answer_engines: answerEngines
+              })
+            }
+
+            const source = groupedCitations.get(url)!
+            source.citation_count++
+
+            // Add query if it exists
+            if (citation.query_text) {
+              source.queries.push({
+                text: citation.query_text,
+                date: new Date(citation.created_at || '').toLocaleDateString(),
+                response: citation.response_text || '',
+                answer_engine: citation.answer_engine || null
+              })
+            }
+          })
+
+          // Convert to array and sort by citation count
+          const processedSources = Array.from(groupedCitations.values())
+            .sort((a, b) => b.citation_count - a.citation_count)
+
+          setSources(processedSources)
+          setIsLoading(false)
+        } catch (processingError) {
+          console.error('Error processing citations:', {
+            error: processingError,
+            stack: processingError instanceof Error ? processingError.stack : undefined
+          })
+          throw processingError
+        }
+
       } catch (err) {
-        console.error('Error fetching citations:', err)
+        console.error('Error fetching citations:', {
+          error: err,
+          stack: err instanceof Error ? err.stack : undefined,
+          message: err instanceof Error ? err.message : 'Unknown error'
+        })
         setError('Failed to load citations')
         setIsLoading(false)
       }
     }
 
     fetchData()
-  }, [effectiveCompanyId, accountId, filters, isSuperAdmin])
+  }, [effectiveCompanyId, accountId, filters, isSuperAdmin, selectedProductId])
 
   const handleSourceClick = (source: OverallSourceData) => {
     setSelectedSource(source)
@@ -528,7 +584,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
       buyingJourneyPhase: null,
       sourceType: null,
       answerEngine: null,
-      buyerPersona: null
+      buyerPersona: null,
+      productId: null
     }
     setStagedFilters(resetFilters)
     setFilters(resetFilters)
@@ -546,6 +603,8 @@ export function OverallCitations({ companyId, accountId }: Props) {
         updated.answerEngine = prev.answerEngine?.filter(v => v !== value) || null
       } else if (category === 'buyerPersona') {
         updated.buyerPersona = prev.buyerPersona?.filter(v => v !== value) || null
+      } else if (category === 'productId') {
+        updated.productId = null
       }
       return updated as LocalFilterOptions
     })
@@ -827,6 +886,20 @@ export function OverallCitations({ companyId, accountId }: Props) {
             onChange={(values: string[]) => setStagedFilters(prev => ({
               ...prev,
               buyerPersona: values.length > 0 ? values : null
+            }))}
+          />
+          <FilterSection
+            title="Product"
+            options={companies
+              .filter(company => company.id)
+              .map(company => ({
+                value: company.id.toString(),
+                label: company.name
+              }))}
+            values={stagedFilters.productId ? [stagedFilters.productId.toString()] : []}
+            onChange={(values: string[]) => setStagedFilters(prev => ({
+              ...prev,
+              productId: values.length > 0 ? parseInt(values[0]) : null
             }))}
           />
         </FilterSidebar>

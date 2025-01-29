@@ -102,10 +102,7 @@ export function GenerateAnalysis({
             ...profile,
             icps: profile.ideal_customer_profiles || [],
             personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
-            products: (profile.main_products || []).map((name, index) => ({
-              id: String(index),
-              name
-            })),
+            products: profile.products || [],
             competitors: (profile.competitors || []).map(c => ({
               id: String(c.id),
               name: c.competitor_name
@@ -151,10 +148,7 @@ export function GenerateAnalysis({
             ...profile,
             icps: profile.ideal_customer_profiles || [],
             personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
-            products: (profile.main_products || []).map((name, index) => ({
-              id: String(index),
-              name
-            })),
+            products: profile.products || [],
             competitors: (profile.competitors || []).map(c => ({
               id: String(c.id),
               name: c.competitor_name

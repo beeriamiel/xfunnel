@@ -389,6 +389,7 @@ export type Database = {
           id: number
           region: string
           vertical: string
+          product_id: number | null
         }
         Insert: {
           account_id?: string | null
@@ -400,6 +401,7 @@ export type Database = {
           id?: number
           region: string
           vertical: string
+          product_id?: number | null
         }
         Update: {
           account_id?: string | null
@@ -411,6 +413,7 @@ export type Database = {
           id?: number
           region?: string
           vertical?: string
+          product_id?: number | null
         }
         Relationships: [
           {
@@ -427,6 +430,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ideal_customer_profiles_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          }
         ]
       }
       personas: {
@@ -953,6 +963,45 @@ export type Database = {
           },
           {
             foreignKeyName: "ai_overview_tracking_test_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      products: {
+        Row: {
+          id: number
+          name: string
+          company_id: number
+          account_id: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          name: string
+          company_id: number
+          account_id: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          name?: string
+          company_id?: number
+          account_id?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"

@@ -35,6 +35,7 @@ import {
 interface ResponseAnalysis {
   id: number;
   response_id: number | null;
+  product_id: number | null;
   citations_parsed: any;
   recommended: boolean | null;
   cited: boolean | null;
@@ -102,6 +103,7 @@ interface ExtendedResponseAnalysis extends ResponseAnalysis {
   solution_analysis: string | { has_feature: 'YES' | 'NO' | 'N/A' };
   analysis_batch_id: string | null;
   created_by_batch: boolean | null;
+  product_id: number | null;
 }
 
 // Updated group types with discriminated union
@@ -474,7 +476,7 @@ interface MetricCardProps {
 }
 
 // Custom hook for research data
-function useResearchData(companyId: number | null | undefined) {
+function useResearchData(companyId: number | null | undefined, productId: string | null = null) {
   const [data, setData] = useState<ResearchSummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -490,7 +492,7 @@ function useResearchData(companyId: number | null | undefined) {
         setIsLoading(true);
         setError(null);
 
-        const { data: summaryData, error: supabaseError } = await createClient()
+        let query = createClient()
           .from('response_analysis')
           .select(`
             query_id,
@@ -503,6 +505,13 @@ function useResearchData(companyId: number | null | undefined) {
             citations_parsed
           `)
           .eq('company_id', companyId);
+
+        // Add product filter if a product is selected
+        if (productId) {
+          query = query.eq('product_id', parseInt(productId));
+        }
+
+        const { data: summaryData, error: supabaseError } = await query;
 
         if (supabaseError) throw supabaseError;
 
@@ -534,7 +543,7 @@ function useResearchData(companyId: number | null | undefined) {
     }
 
     fetchResearchSummary();
-  }, [companyId]);
+  }, [companyId, productId]);
 
   return { data, isLoading, error };
 }
@@ -1063,6 +1072,7 @@ export function EngineMetricsChart({
   accountId
 }: EngineMetricsChartProps) {
   const selectedCompanyId = useDashboardStore(state => state.selectedCompanyId)
+  const selectedProductId = useDashboardStore(state => state.selectedProductId)
   const effectiveCompanyId = companyId ?? selectedCompanyId
   const [activeMetric, setActiveMetric] = useState<MetricKey>('company_mentioned');
   const [visibleEngines, setVisibleEngines] = useState<string[]>(Object.keys(ENGINE_NAMES));
@@ -1085,7 +1095,7 @@ export function EngineMetricsChart({
   const [error, setError] = useState<string | null>(null);
 
   // Use the custom hook for research data
-  const researchData = useResearchData(effectiveCompanyId);
+  const researchData = useResearchData(effectiveCompanyId, selectedProductId);
 
   // Move processDataByMode inside the component as a memoized callback
   const processDataByMode = useCallback((data: ExtendedResponseAnalysis[]) => {
@@ -1206,7 +1216,7 @@ export function EngineMetricsChart({
         setIsLoading(true);
         setError(null);
 
-        const { data, error: supabaseError } = await createClient()
+        let query = createClient()
           .from('response_analysis')
           .select(`
             created_at,
@@ -1227,6 +1237,13 @@ export function EngineMetricsChart({
           .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: true });
 
+        // Add product filter if a product is selected
+        if (selectedProductId) {
+          query = query.eq('product_id', parseInt(selectedProductId));
+        }
+
+        const { data, error: supabaseError } = await query;
+
         if (supabaseError) throw supabaseError;
         setRawData(data as ExtendedResponseAnalysis[] || []);
         
@@ -1241,7 +1258,7 @@ export function EngineMetricsChart({
     }
 
     fetchData();
-  }, [effectiveCompanyId, processDataByMode]);
+  }, [effectiveCompanyId, selectedProductId, processDataByMode]);
 
   // Get current data for chart
   const currentData = useMemo(() => {

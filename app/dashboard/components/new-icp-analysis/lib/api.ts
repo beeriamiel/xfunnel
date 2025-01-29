@@ -71,7 +71,8 @@ export async function getAnalysisByCompany(
   companyId: number,
   accountId: string,
   timePeriod: TimePeriod,
-  isSuperAdmin?: boolean
+  isSuperAdmin?: boolean,
+  productId?: string | null
 ): Promise<CompanyAnalysis> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
@@ -89,6 +90,11 @@ export async function getAnalysisByCompany(
   // Add account filter for non-super admins
   if (!isSuperAdmin) {
     query = query.eq('account_id', accountId)
+  }
+
+  // Add product filter if productId is provided
+  if (productId) {
+    query = query.eq('product_id', parseInt(productId))
   }
 
   const { data: analysisData, error } = await query
@@ -141,7 +147,8 @@ export async function getAnalysisByRegion(
   companyId: number,
   accountId: string,
   timePeriod: TimePeriod,
-  isSuperAdmin?: boolean
+  isSuperAdmin?: boolean,
+  productId?: string | null
 ): Promise<RegionAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
@@ -159,6 +166,11 @@ export async function getAnalysisByRegion(
   // Add account filter for non-super admins
   if (!isSuperAdmin) {
     query = query.eq('account_id', accountId)
+  }
+
+  // Add product filter if productId is provided
+  if (productId) {
+    query = query.eq('product_id', parseInt(productId))
   }
 
   const { data: analysisData, error } = await query
@@ -210,7 +222,8 @@ export async function getAnalysisByVertical(
   accountId: string,
   region: string,
   timePeriod: TimePeriod,
-  isSuperAdmin?: boolean
+  isSuperAdmin?: boolean,
+  productId?: string | null
 ): Promise<VerticalAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
@@ -229,6 +242,11 @@ export async function getAnalysisByVertical(
   // Add account filter for non-super admins
   if (!isSuperAdmin) {
     query = query.eq('account_id', accountId)
+  }
+
+  // Add product filter if productId is provided
+  if (productId) {
+    query = query.eq('product_id', parseInt(productId))
   }
 
   const { data: analysisData, error } = await query
@@ -275,88 +293,6 @@ export async function getAnalysisByVertical(
   })
 }
 
-// Helper function to aggregate metrics from child items
-function aggregateMetrics(items: AnalysisMetrics[]): AnalysisMetrics {
-  if (!items.length) return {
-    sentimentScore: 0,
-    rankingPosition: 0,
-    companyMentioned: 0,
-    featureScore: 0,
-    totalResponses: 0
-  }
-
-  const totalResponses = items.reduce((sum, item) => sum + item.totalResponses, 0);
-  
-  // Initialize weighted sums and weights for each metric
-  const weightedSums = {
-    sentiment: 0,
-    position: 0,
-    mentioned: 0,
-    feature: 0
-  };
-
-  const weights = {
-    sentiment: 0,
-    position: 0,
-    mentioned: 0,
-    feature: 0
-  };
-
-  // Process each item with appropriate weights
-  items.forEach(item => {
-    // Skip items with no responses
-    if (item.totalResponses === 0) return;
-
-    // Base weight is the number of responses
-    const baseWeight = item.totalResponses;
-
-    // Sentiment Score: Weight by response count and value presence
-    if (item.sentimentScore !== null && item.sentimentScore !== undefined) {
-      const weight = baseWeight;
-      weightedSums.sentiment += item.sentimentScore * weight;
-      weights.sentiment += weight;
-    }
-
-    // Ranking Position: Weight by response count and valid position
-    if (item.rankingPosition !== null && item.rankingPosition !== undefined && item.rankingPosition > 0) {
-      const weight = baseWeight;
-      weightedSums.position += item.rankingPosition * weight;
-      weights.position += weight;
-    }
-
-    // Company Mentioned: Weight by response count and mention presence
-    if (item.companyMentioned !== null && item.companyMentioned !== undefined) {
-      const weight = baseWeight;
-      weightedSums.mentioned += item.companyMentioned * weight;
-      weights.mentioned += weight;
-    }
-
-    // Feature Score: Weight by response count and score presence
-    if (item.featureScore !== null && item.featureScore !== undefined) {
-      const weight = baseWeight;
-      weightedSums.feature += item.featureScore * weight;
-      weights.feature += weight;
-    }
-  });
-
-  // Calculate final weighted averages with fallbacks
-  return {
-    sentimentScore: weights.sentiment > 0 
-      ? Math.round(weightedSums.sentiment / weights.sentiment) 
-      : 0,
-    rankingPosition: weights.position > 0 
-      ? Math.round((weightedSums.position / weights.position) * 100) / 100 
-      : 0,
-    companyMentioned: weights.mentioned > 0 
-      ? Math.round(weightedSums.mentioned / weights.mentioned) 
-      : 0,
-    featureScore: weights.feature > 0 
-      ? Math.round(weightedSums.feature / weights.feature) 
-      : 0,
-    totalResponses
-  };
-}
-
 export async function getAnalysisByQueries(
   companyId: number,
   accountId: string,
@@ -367,7 +303,8 @@ export async function getAnalysisByQueries(
   isSuperAdmin?: boolean,
   filters?: {
     batchId?: string
-  }
+  },
+  productId?: string | null
 ): Promise<QueryAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
@@ -392,6 +329,11 @@ export async function getAnalysisByQueries(
   // Apply optional filters
   if (filters?.batchId) {
     query = query.eq('analysis_batch_id', filters.batchId)
+  }
+
+  // Add product filter if productId is provided
+  if (productId) {
+    query = query.eq('product_id', parseInt(productId))
   }
 
   // Execute query
@@ -497,7 +439,8 @@ export async function getAnalysisByPersona(
   region: string,
   vertical: string,
   timePeriod: TimePeriod,
-  isSuperAdmin?: boolean
+  isSuperAdmin?: boolean,
+  productId?: string | null
 ): Promise<PersonaAnalysis[]> {
   const supabase = createClient()
   const { start, end } = getDateRangeForPeriod(timePeriod)
@@ -517,6 +460,11 @@ export async function getAnalysisByPersona(
   // Add account filter for non-super admins
   if (!isSuperAdmin) {
     query = query.eq('account_id', accountId)
+  }
+
+  // Add product filter if productId is provided
+  if (productId) {
+    query = query.eq('product_id', parseInt(productId))
   }
 
   const { data: analysisData, error } = await query
@@ -706,4 +654,86 @@ function groupByDate(
       totalResponses: items.length
     }
   }))
+}
+
+// Helper function to aggregate metrics from child items
+function aggregateMetrics(items: AnalysisMetrics[]): AnalysisMetrics {
+  if (!items.length) return {
+    sentimentScore: 0,
+    rankingPosition: 0,
+    companyMentioned: 0,
+    featureScore: 0,
+    totalResponses: 0
+  }
+
+  const totalResponses = items.reduce((sum, item) => sum + item.totalResponses, 0);
+  
+  // Initialize weighted sums and weights for each metric
+  const weightedSums = {
+    sentiment: 0,
+    position: 0,
+    mentioned: 0,
+    feature: 0
+  };
+
+  const weights = {
+    sentiment: 0,
+    position: 0,
+    mentioned: 0,
+    feature: 0
+  };
+
+  // Process each item with appropriate weights
+  items.forEach(item => {
+    // Skip items with no responses
+    if (item.totalResponses === 0) return;
+
+    // Base weight is the number of responses
+    const baseWeight = item.totalResponses;
+
+    // Sentiment Score: Weight by response count and value presence
+    if (item.sentimentScore !== null && item.sentimentScore !== undefined) {
+      const weight = baseWeight;
+      weightedSums.sentiment += item.sentimentScore * weight;
+      weights.sentiment += weight;
+    }
+
+    // Ranking Position: Weight by response count and valid position
+    if (item.rankingPosition !== null && item.rankingPosition !== undefined && item.rankingPosition > 0) {
+      const weight = baseWeight;
+      weightedSums.position += item.rankingPosition * weight;
+      weights.position += weight;
+    }
+
+    // Company Mentioned: Weight by response count and mention presence
+    if (item.companyMentioned !== null && item.companyMentioned !== undefined) {
+      const weight = baseWeight;
+      weightedSums.mentioned += item.companyMentioned * weight;
+      weights.mentioned += weight;
+    }
+
+    // Feature Score: Weight by response count and score presence
+    if (item.featureScore !== null && item.featureScore !== undefined) {
+      const weight = baseWeight;
+      weightedSums.feature += item.featureScore * weight;
+      weights.feature += weight;
+    }
+  });
+
+  // Calculate final weighted averages with fallbacks
+  return {
+    sentimentScore: weights.sentiment > 0 
+      ? Math.round(weightedSums.sentiment / weights.sentiment) 
+      : 0,
+    rankingPosition: weights.position > 0 
+      ? Math.round((weightedSums.position / weights.position) * 100) / 100 
+      : 0,
+    companyMentioned: weights.mentioned > 0 
+      ? Math.round(weightedSums.mentioned / weights.mentioned) 
+      : 0,
+    featureScore: weights.feature > 0 
+      ? Math.round(weightedSums.feature / weights.feature) 
+      : 0,
+    totalResponses
+  };
 } 

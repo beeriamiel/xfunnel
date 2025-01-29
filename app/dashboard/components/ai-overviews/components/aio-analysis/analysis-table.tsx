@@ -44,9 +44,27 @@ interface AnalysisTableProps {
 }
 
 function ExpandableContent({ content }: { content: string }) {
+  console.log('Content received in ExpandableContent:', {
+    type: typeof content,
+    value: content,
+    length: content?.length
+  });
+  
+  // Try to parse if it's a stringified JSON
+  let displayContent = content;
+  try {
+    if (typeof content === 'string' && (content.startsWith('{') || content.startsWith('['))) {
+      const parsed = JSON.parse(content);
+      console.log('Parsed content:', parsed);
+      displayContent = JSON.stringify(parsed, null, 2);
+    }
+  } catch (e) {
+    console.log('Not a JSON string');
+  }
+
   return (
     <div className="px-4 py-3 bg-muted/50 rounded-md my-2 mx-4">
-      <p className="text-sm whitespace-pre-wrap">{content}</p>
+      <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
     </div>
   )
 }

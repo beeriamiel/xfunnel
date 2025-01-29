@@ -5,7 +5,7 @@ type ICP = Database['public']['Tables']['ideal_customer_profiles']['Insert']
 type Persona = Database['public']['Tables']['personas']['Insert']
 
 export async function createICP(
-  icp: Pick<ICP, 'vertical' | 'company_size' | 'region'>,
+  icp: Pick<ICP, 'vertical' | 'company_size' | 'region' | 'product_id'>,
   companyId: number,
   accountId: string
 ) {

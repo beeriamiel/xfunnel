@@ -22,9 +22,11 @@ interface Persona {
 }
 
 interface Product {
-  id: string
+  id: number
   name: string
-  description?: string
+  company_id: number
+  account_id: string
+  created_at: string | null
 }
 
 interface Competitor {
@@ -68,6 +70,8 @@ interface DashboardStore {
   setActiveView: (view: DashboardView) => void
   selectedCompanyId: number | null
   setSelectedCompanyId: (id: number | null) => void
+  selectedProductId: string | null
+  setSelectedProductId: (id: string | null) => void
   companyProfile: CompanyProfile | null
   setCompanyProfile: (profile: CompanyProfile | null) => void
   timePeriod: TimePeriod
@@ -99,6 +103,8 @@ export const useDashboardStore = create(
       setActiveView: (view) => set({ activeView: view }),
       selectedCompanyId: null,
       setSelectedCompanyId: (id) => set({ selectedCompanyId: id }),
+      selectedProductId: null,
+      setSelectedProductId: (id) => set({ selectedProductId: id }),
       companyProfile: null,
       setCompanyProfile: (profile) => set({ companyProfile: profile }),
       timePeriod: 'weekly',

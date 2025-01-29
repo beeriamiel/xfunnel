@@ -26,6 +26,7 @@ export interface CitationRow {
   created_at: string | null
   updated_at: string | null
   answer_engine: string | null
+  product_id: number | null
 }
 
 export type CitationSourceType = 'OWNED' | 'EARNED' | 'COMPETITOR' | 'UGC'
@@ -113,6 +114,8 @@ export interface OverallSourceData {
   citation_orders: number[];
   average_citation_order: number | null;
   answer_engines: string[];
+  product_id?: number | null;
+  product_name?: string;
 }
 
 export interface OverallSourceCardProps {
@@ -125,4 +128,5 @@ export interface LocalFilterOptions {
   sourceType: CitationSourceType | null;
   answerEngine: string[] | null;
   buyerPersona: string[] | null;
+  productId: number | null;
 } 

@@ -139,8 +139,14 @@ export function KeywordManagement({ companyId, accountId, isSuperAdmin, selected
         })
       })
 
-      if (!response.ok) throw new Error('Failed to generate terms')
+      const data = await response.json()
       
+      if (!response.ok) {
+        console.error('Error response:', data)
+        throw new Error(data.message || 'Failed to generate terms')
+      }
+      
+      console.log('Terms generated:', data)
       await fetchTerms() // Refresh the terms list after generation
     } catch (error) {
       console.error('Error generating terms:', error)
