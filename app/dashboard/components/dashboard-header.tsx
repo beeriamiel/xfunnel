@@ -27,7 +27,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
-  const { activeView, isSuperAdmin, companies, selectedCompanyId, companyProfile, selectedProductId, setCompanyProfile } = useDashboardStore()
+  const { activeView, isSuperAdmin, companies, selectedCompanyId, companyProfile, selectedProductId, setCompanyProfile, setSelectedProductId } = useDashboardStore()
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || null
   const selectedProduct = companyProfile?.products?.find(p => p.id.toString() === selectedProductId) || null
   const supabase = createClient()
@@ -68,19 +68,23 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
             }))
           }
           console.log('Transformed profile:', transformedProfile)
+          // Reset product selection when setting new company profile
+          setSelectedProductId(null)
           setCompanyProfile(transformedProfile)
         } else {
           console.log('No profile received, setting to null')
+          setSelectedProductId(null)
           setCompanyProfile(null)
         }
       } catch (error) {
         console.error('Error fetching company profile:', error)
+        setSelectedProductId(null)
         setCompanyProfile(null)
       }
     }
 
     fetchCompanyProfile()
-  }, [selectedCompanyId, accountId, setCompanyProfile])
+  }, [selectedCompanyId, accountId, setCompanyProfile, setSelectedProductId])
   
   // Add logging for products being passed to selector
   console.log('Products being passed to selector:', companyProfile?.products || [])
