@@ -73,6 +73,7 @@ export function CompanySetup({
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupProgress, setSetupProgress] = useState<string>('')
 
   const urlCompanyId = searchParams.get('companyId')
   const [companyId, setCompanyId] = useState<number | null>(() => 
@@ -157,7 +158,6 @@ export function CompanySetup({
       const company = await onCompanyCreate(companyName)
       console.log('🟢 Company created:', company)
       
-      // Add ICP Generation
       console.log('🟡 Generating initial ICPs...')
       await generateInitialICPsAction(companyName, accountId)
       console.log('🟢 Initial ICPs generated')
@@ -443,6 +443,7 @@ export function CompanySetup({
         <InitialStep
           accountId={accountId}
           onNext={handleInitialSubmit}
+          onProgress={setSetupProgress}
         />
       ) : (
         <>

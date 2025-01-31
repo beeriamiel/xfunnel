@@ -52,12 +52,14 @@ export function GenerateAnalysis({
     addCompany
   } = useDashboardStore()
 
+  const [isGlobalLoading, setIsGlobalLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
   const [showNewContent, setShowNewContent] = useState(false)
   const [currentStep, setCurrentStep] = useState<Step | undefined>(initialStep)
+  const [hasCompleteAnalysis, setHasCompleteAnalysis] = useState(false)
 
   // Only show dev mode toggle in development
   const isDevelopment = process.env.NODE_ENV === 'development'
@@ -80,17 +82,35 @@ export function GenerateAnalysis({
       console.log('🔵 fetchCompanyProfile START:', { 
         selectedCompanyId,
         isLoading,
-        showNewContent
+        showNewContent,
+        hasExistingProfile: !!companyProfile?.name
       })
       
       if (!selectedCompanyId) {
         console.log('🟡 No selectedCompanyId, resetting state')
         setShowNewContent(false)
         setIsLoading(false)
+        setIsGlobalLoading(false)
+        setHasCompleteAnalysis(false)
+        return
+      }
+
+      // Skip fetching if we already have the profile data for this company
+      if (companyProfile?.name && !isTransitioning) {
+        console.log('🟢 Using existing profile data:', { 
+          companyName: companyProfile.name,
+          icpsCount: companyProfile.icps?.length,
+          personasCount: companyProfile.personas?.length
+        })
+        setShowNewContent(true)
+        setIsLoading(false)
+        setIsGlobalLoading(false)
+        setHasCompleteAnalysis(true)
         return
       }
       
       setIsLoading(true)
+      setHasCompleteAnalysis(false)
       try {
         console.log('🟡 Fetching profile for company:', selectedCompanyId)
         const profile = await getCompanyProfile(selectedCompanyId, accountId)
@@ -108,26 +128,82 @@ export function GenerateAnalysis({
               name: c.competitor_name
             }))
           }
+
+          // Check if we have complete analysis data
+          const hasFullData = transformedProfile.icps && 
+            transformedProfile.icps.length > 0 && 
+            transformedProfile.personas && 
+            transformedProfile.personas.length > 0
+
+          setHasCompleteAnalysis(hasFullData)
           setCompanyProfile(transformedProfile)
-          setShowNewContent(true)
+          setShowNewContent(hasFullData)
           setError(null)
         } else {
           setShowNewContent(false)
           setCompanyProfile(null)
           setError(null)
+          setHasCompleteAnalysis(false)
         }
       } catch (error) {
         console.error('🔴 Error fetching profile:', error)
         setError(error instanceof Error ? error.message : 'Failed to fetch company profile')
         setShowNewContent(false)
         setCompanyProfile(null)
+        setHasCompleteAnalysis(false)
       } finally {
         setIsLoading(false)
+        // Only turn off global loading if we have complete analysis or there's an error
+        setIsGlobalLoading(!hasCompleteAnalysis && !error)
       }
     }
 
     fetchCompanyProfile()
   }, [selectedCompanyId, setCompanyProfile])
+
+  const handleCompanyCreate = async (companyName: string) => {
+    console.log('🔵 handleCompanyCreate START:', { companyName })
+    setIsGlobalLoading(true)
+    setIsLoading(true)
+    
+    try {
+      console.log('🟡 Creating company via API...')
+      const response = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: companyName, accountId })
+      })
+
+      if (!response.ok) {
+        console.error('🔴 API Error:', await response.text())
+        throw new Error('Failed to create company')
+      }
+      
+      const company = await response.json()
+      console.log('🟢 Company created:', company)
+
+      // Additional company data fetching
+      const profileResponse = await fetch(`/api/companies/${company.id}/profile`)
+      if (!profileResponse.ok) {
+        console.warn('⚠️ Could not fetch company profile:', await profileResponse.text())
+      } else {
+        const profile = await profileResponse.json()
+        console.log('🟢 Company profile fetched:', profile)
+      }
+      
+      setSelectedCompanyId(company.id)
+      addCompany(company)
+      
+      console.log('🟢 handleCompanyCreate END:', {
+        newCompanyId: company.id,
+        storeState: useDashboardStore.getState()
+      })
+      return company
+    } catch (error) {
+      console.error('🔴 handleCompanyCreate ERROR:', error)
+      throw error
+    }
+  }
 
   const handleSetupComplete = async () => {
     console.log('🔵 handleSetupComplete START:', {
@@ -137,6 +213,7 @@ export function GenerateAnalysis({
     })
     
     setIsTransitioning(true)
+    setIsGlobalLoading(true)
     
     if (selectedCompanyId) {
       try {
@@ -154,11 +231,23 @@ export function GenerateAnalysis({
               name: c.competitor_name
             }))
           }
+
+          // Check if we have complete data
+          const hasFullData = transformedProfile.icps && 
+            transformedProfile.icps.length > 0 && 
+            transformedProfile.personas && 
+            transformedProfile.personas.length > 0
+
           console.log('🟢 Setting transformed profile:', transformedProfile)
           setCompanyProfile(transformedProfile)
+          setHasCompleteAnalysis(hasFullData)
+          setError(null)
         }
       } catch (error) {
         console.error('🔴 Error fetching final profile:', error)
+        setError(error instanceof Error ? error.message : 'Failed to fetch company profile')
+        // Even if there's an error, we want to complete the transition
+        setHasCompleteAnalysis(true) // Force complete to avoid stuck loading state
       }
     }
     
@@ -169,6 +258,7 @@ export function GenerateAnalysis({
 
   const handleTransitionStart = () => {
     setIsTransitioning(true)
+    setIsGlobalLoading(true)
     setShowSuccessAnimation(true)
   }
 
@@ -177,6 +267,8 @@ export function GenerateAnalysis({
     setShowSuccessAnimation(false)
     setShowNewContent(true)
     setIsTransitioning(false)
+    setIsGlobalLoading(false)
+    setHasCompleteAnalysis(true) // Ensure loading state is cleared
     
     // Redirect with companyId
     if (selectedCompanyId) {
@@ -184,44 +276,28 @@ export function GenerateAnalysis({
     }
   }
 
-  const handleCompanyCreate = async (companyName: string) => {
-    console.log('🔵 handleCompanyCreate START:', { companyName })
-    setIsLoading(true)
-    try {
-      console.log('🟡 Creating company via API...')
-      const response = await fetch('/api/companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: companyName, accountId })
-      })
-
-      if (!response.ok) {
-        console.error('🔴 API Error:', await response.text())
-        throw new Error('Failed to create company')
-      }
-      
-      const company = await response.json()
-      console.log('🟢 Company created:', company)
-      
-      setSelectedCompanyId(company.id)
-      addCompany(company)
-      
-      console.log('🟢 handleCompanyCreate END:', {
-        newCompanyId: company.id,
-        storeState: useDashboardStore.getState()
-      })
-      return company
-    } catch (error) {
-      console.error('🔴 handleCompanyCreate ERROR:', error)
-      throw error
-    }
-  }
+  // Simple loading card with just a spinner and message
+  const LoadingCard = () => (
+    <Card className="p-6">
+      <div className="flex flex-col items-center justify-center min-h-[200px] space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-700" />
+        <p className="text-sm text-muted-foreground">Collecting company information...</p>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="h-full py-6">
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin" />
+      {isOnboarding ? (
+        <CompanySetup
+          accountId={accountId}
+          onCompanyCreate={handleCompanyCreate}
+          onComplete={handleSetupComplete}
+          onTransitionStart={handleTransitionStart}
+        />
+      ) : selectedCompanyId && (isGlobalLoading || isLoading) && !showSuccessAnimation ? (
+        <div className="space-y-6">
+          <LoadingCard />
         </div>
       ) : error ? (
         <div className="flex items-center justify-center min-h-[400px]">
@@ -249,44 +325,31 @@ export function GenerateAnalysis({
             </Alert>
           )}
 
-          {isOnboarding ? (
-            <CompanySetup
-              accountId={accountId}
-              onCompanyCreate={handleCompanyCreate}
-              onComplete={handleSetupComplete}
-              onTransitionStart={handleTransitionStart}
-            />
-          ) : (
-            <div className="w-full">
-              {showSuccessAnimation && (
-                <SuccessAnimation onComplete={handleAnimationComplete} />
+          <div className="w-full">
+            {showSuccessAnimation && (
+              <SuccessAnimation onComplete={handleAnimationComplete} />
+            )}
+            <div className="space-y-6">
+              {!isTransitioning && hasCompleteAnalysis && companyProfile?.name ? (
+                <>
+                  <CompanyProfileHeader companyId={selectedCompanyId!} />
+                  <ResponseTable 
+                    icps={companyProfile?.icps || []}
+                    companyId={selectedCompanyId!}
+                    accountId={accountId}
+                    companyName={companyProfile?.name || ''}
+                  />
+                </>
+              ) : !selectedCompanyId && (
+                <CompanySetup 
+                  accountId={accountId}
+                  onCompanyCreate={handleCompanyCreate}
+                  onComplete={handleSetupComplete}
+                  onTransitionStart={handleTransitionStart}
+                />
               )}
-              <div className="space-y-6">
-                {!isOnboarding && !isTransitioning && (
-                  <>
-                    {companyProfile?.name ? (
-                      <>
-                        <CompanyProfileHeader companyId={selectedCompanyId!} />
-                        <ResponseTable 
-                          icps={companyProfile?.icps || []}
-                          companyId={selectedCompanyId!}
-                          accountId={accountId}
-                          companyName={companyProfile?.name || ''}
-                        />
-                      </>
-                    ) : (
-                      <CompanySetup 
-                        accountId={accountId}
-                        onCompanyCreate={handleCompanyCreate}
-                        onComplete={handleSetupComplete}
-                        onTransitionStart={handleTransitionStart}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

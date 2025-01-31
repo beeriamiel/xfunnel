@@ -120,7 +120,15 @@ export function DashboardWrapper({
       step: searchParams.get('step'),
       pathname: window?.location?.pathname
     })
-    mainContent = <div className="w-full h-full">{children}</div>
+    mainContent = (
+      <div className="w-full h-full flex items-start justify-center pt-8">
+        <div className="w-full max-w-[560px] px-6">
+          <div className="bg-card rounded-xl shadow-lg p-6 relative">
+            {children}
+          </div>
+        </div>
+      </div>
+    )
   } else if (!selectedCompany && !searchParams.get('companyId') && !searchParams.get('company')) {
     // Only show NoCompanySelected if we don't have a company ID in URL
     console.log('🟡 Rendering NoCompanySelected:', {
@@ -153,10 +161,20 @@ export function DashboardWrapper({
           <Suspense fallback={<LoadingSkeleton />}>
             <DashboardHeader accountId={accountId} />
           </Suspense>
-          <div className="flex flex-1 h-[calc(100vh-4rem)]">
+          <div className="flex flex-1 h-[calc(100vh-4rem)] relative">
+            {isOnboarding && (
+              // Global overlay that covers everything except wizard content
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm pointer-events-none z-30 transition-all duration-200" />
+            )}
             <AppSidebar />
             <main className="flex-1 w-full overflow-auto">
-              {mainContent}
+              {isOnboarding ? (
+                <div className="relative z-40">
+                  {mainContent}
+                </div>
+              ) : (
+                mainContent
+              )}
             </main>
           </div>
         </div>

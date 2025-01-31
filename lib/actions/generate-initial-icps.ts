@@ -197,7 +197,7 @@ export async function generateInitialICPs(
       throw new Error('Missing required prompts for ICP generation');
     }
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 10);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 20, 'Analyzing company data...');
 
     // Create context and generate ICPs
     const context = {
@@ -210,13 +210,16 @@ export async function generateInitialICPs(
     const parsedUserPrompt = parsePrompt(userPrompt, context);
 
     const aiService = AIServiceFactory.getInstance().getService(DEFAULT_CONFIG.model);
+    
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 40, 'Generating ICPs...');
+    
     const response = await aiService.generateICPs(
       parsedSystemPrompt,
       parsedUserPrompt,
       context
     );
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 30);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 60, 'Processing company information...');
 
     // Validate and process response
     const parsedResponse = validateICPResponse(response);
@@ -239,7 +242,7 @@ export async function generateInitialICPs(
       console.error('Company metadata update error:', updateError);
     }
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 50);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 80, 'Setting up competitors...');
 
     // Handle competitors
     await adminClient
@@ -261,7 +264,7 @@ export async function generateInitialICPs(
       console.error('Competitors insertion error:', competitorsError);
     }
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 75);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 90, 'Finalizing setup...');
 
     // Store ICPs and Personas
     for (const icp of parsedResponse.ideal_customer_profiles) {
@@ -302,7 +305,7 @@ export async function generateInitialICPs(
       }
     }
 
-    await updateGenerationProgress(companyId, accountId, 'generating_icps', 100);
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 100, 'Setup complete');
     await batchTracker.completeBatch(batchId);
 
     return {
