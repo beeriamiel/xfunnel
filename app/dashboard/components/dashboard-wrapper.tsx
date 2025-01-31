@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Skeleton } from "@/components/ui/skeleton"
 import { CompanySelector } from './company-selector'
 import { DashboardContent } from './dashboard-content'
@@ -35,12 +35,29 @@ function LoadingSkeleton() {
 }
 
 function NoCompanySelected() {
+  const { isSuperAdmin, companies } = useDashboardStore()
+  
+  // For super admins or users with multiple companies
+  if (isSuperAdmin || companies.length > 1) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900">Please Select a Company</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Choose a company from the dropdown above to view the dashboard
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // For regular users during loading
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-gray-900">No Company Selected</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Loading Dashboard</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Please select a company to view the dashboard
+          Please wait while we load your company data
         </p>
       </div>
     </div>
@@ -68,9 +85,11 @@ export function DashboardWrapper({
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setSelectedCompanyId, setCompanies, setWizardStep, setIsSuperAdmin } = useDashboardStore()
+  const { setSelectedCompanyId, setCompanies, setWizardStep, setIsSuperAdmin, companyProfile, setSelectedProductId } = useDashboardStore()
   const hasRedirected = useRef(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
+  // Handle company auto-selection
   useEffect(() => {
     console.log('🟡 DashboardWrapper setting companies:', {
       initialCompanies,
@@ -80,38 +99,68 @@ export function DashboardWrapper({
     setCompanies(initialCompanies)
     setIsSuperAdmin(isSuperAdmin ?? false)
     
-    // Only check onboarding for single company
-    if (initialCompanies.length === 1 && !hasRedirected.current) {
+    // Only auto-select if no company is selected in URL
+    const urlCompanyId = searchParams.get('company')
+    
+    // Auto-select for regular users with single company
+    if (!isSuperAdmin && initialCompanies.length === 1 && !hasRedirected.current) {
       const company = initialCompanies[0]
-      console.log('🟡 Setting selectedCompanyId for single company:', {
+      console.log('🟡 Auto-selecting company for regular user:', {
         companyId: company.id,
-        hasRedirected: hasRedirected.current,
-        pathname: window?.location?.pathname
+        hasRedirected: hasRedirected.current
       })
+      
+      // Update store
       setSelectedCompanyId(company.id)
       
-      // Prevent multiple redirects
-      hasRedirected.current = true
+      // Update URL if needed
+      if (!urlCompanyId || urlCompanyId !== company.id.toString()) {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('company', company.id.toString())
+        
+        // Prevent multiple redirects
+        hasRedirected.current = true
+        
+        // Replace URL to include company ID
+        router.replace(`/dashboard?${params.toString()}`)
+      }
       
-      // Check onboarding status and redirect if needed
+      // Check onboarding status
       checkOnboardingStatus(company.id).then(incompleteStep => {
         console.log('🟡 Onboarding check result:', { 
           incompleteStep,
-          currentStep: searchParams.get('step'),
-          pathname: window?.location?.pathname
+          currentStep: searchParams.get('step')
         })
         if (incompleteStep) {
-          // Only redirect if we're not already on the correct step
           const currentStep = searchParams.get('step')
           if (currentStep !== incompleteStep) {
             console.log('🟡 Redirecting to step:', incompleteStep)
-            router.replace(`/dashboard/generate-analysis?step=${incompleteStep}`)
+            const params = new URLSearchParams()
+            params.set('step', incompleteStep)
+            params.set('company', company.id.toString())
+            router.replace(`/dashboard/generate-analysis?${params.toString()}`)
           }
           setWizardStep(incompleteStep)
         }
+        setIsInitialLoad(false)
       })
+    } else {
+      setIsInitialLoad(false)
     }
-  }, [initialCompanies, setCompanies, setSelectedCompanyId, router, searchParams, setWizardStep, isSuperAdmin, setIsSuperAdmin])
+  }, [initialCompanies, searchParams, router, setCompanies, setSelectedCompanyId, setWizardStep, setIsSuperAdmin, isSuperAdmin])
+
+  // Handle product auto-selection
+  useEffect(() => {
+    // Only proceed if we have a company profile and no product is selected in URL
+    if (companyProfile && !searchParams.get('product')) {
+      const products = companyProfile.products || []
+      // Auto-select if there's only one product
+      if (products.length === 1 && !isSuperAdmin) {
+        console.log('🟡 Auto-selecting single product:', products[0])
+        setSelectedProductId(products[0].id.toString())
+      }
+    }
+  }, [companyProfile, searchParams, setSelectedProductId, isSuperAdmin])
 
   let mainContent
   if (isOnboarding || searchParams.get('step')) {
@@ -129,16 +178,17 @@ export function DashboardWrapper({
         </div>
       </div>
     )
-  } else if (!selectedCompany && !searchParams.get('companyId') && !searchParams.get('company')) {
-    // Only show NoCompanySelected if we don't have a company ID in URL
-    console.log('🟡 Rendering NoCompanySelected:', {
-      initialCompaniesCount: initialCompanies.length,
-      selectedCompany,
-      hasCompanyId: !!searchParams.get('companyId'),
-      hasCompany: !!searchParams.get('company'),
-      pathname: window?.location?.pathname
-    })
-    mainContent = <NoCompanySelected />
+  } else if (!selectedCompany) {
+    // Show loading state during initial load
+    if (isInitialLoad) {
+      mainContent = <LoadingSkeleton />
+    } else if (isSuperAdmin || initialCompanies.length > 1) {
+      // Only show NoCompanySelected for super admins or users with multiple companies
+      mainContent = <NoCompanySelected />
+    } else {
+      // Show loading for regular users
+      mainContent = <LoadingSkeleton />
+    }
   } else {
     console.log('🟡 Rendering main content:', {
       selectedCompany,

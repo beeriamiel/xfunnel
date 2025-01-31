@@ -1,7 +1,17 @@
 'use server'
 
 import { createClient } from '@/app/supabase/server'
-import type { Step } from '../store'
+import type { Step } from '../generate-analysis/types/setup'
+
+interface CompanyData {
+  setup_completed_at: string | null
+  main_products: string[] | null
+  competitors: { count: number }[] | null
+  ideal_customer_profiles: {
+    id: number
+    personas: { count: number }[] | null
+  }[] | null
+}
 
 export async function checkOnboardingStatus(companyId: number) {
   const supabase = await createClient()
@@ -10,6 +20,7 @@ export async function checkOnboardingStatus(companyId: number) {
   const { data: company } = await supabase
     .from('companies')
     .select(`
+      setup_completed_at,
       main_products,
       competitors(count),
       ideal_customer_profiles(
@@ -24,23 +35,30 @@ export async function checkOnboardingStatus(companyId: number) {
     throw new Error('Company not found')
   }
 
+  const typedCompany = company as CompanyData
+
+  // If setup is completed, don't force any steps
+  if (typedCompany.setup_completed_at) {
+    return null
+  }
+
   // Check products
-  if (!company.main_products?.length) {
+  if (!typedCompany.main_products?.length) {
     return 'product' as Step
   }
 
   // Check competitors
-  if (!company.competitors?.[0]?.count) {
+  if (!typedCompany.competitors?.[0]?.count) {
     return 'competitors' as Step
   }
 
   // Check ICPs
-  if (!company.ideal_customer_profiles?.length) {
+  if (!typedCompany.ideal_customer_profiles?.length) {
     return 'icps' as Step
   }
 
   // Check personas - at least one ICP should have personas
-  const hasPersonas = company.ideal_customer_profiles.some(
+  const hasPersonas = typedCompany.ideal_customer_profiles.some(
     icp => icp.personas?.length > 0
   )
   if (!hasPersonas) {

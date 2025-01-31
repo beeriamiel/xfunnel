@@ -17,6 +17,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle, Loader2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useRouter } from 'next/navigation'
+import { updateCompanySetupCompletion } from '@/lib/services/company'
 
 interface GenerateAnalysisProps {
   accountId: string;
@@ -217,6 +218,9 @@ export function GenerateAnalysis({
     
     if (selectedCompanyId) {
       try {
+        // Update setup completion status
+        await updateCompanySetupCompletion(selectedCompanyId);
+        
         console.log('🟡 Fetching final company profile...')
         const profile = await getCompanyProfile(selectedCompanyId, accountId)
         if (profile) {

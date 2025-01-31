@@ -23,11 +23,16 @@ interface ICP {
   personas: Persona[];
 }
 
+interface Product {
+  name: string;
+  product_category: string;
+  description: string;
+}
+
 interface CompanyInformation {
   name: string;
   industry: string;
-  main_products: string[];
-  product_category: string;
+  products: Product[];
   number_of_employees: number;
   annual_revenue: string;
   markets_operating_in: string[];
@@ -43,7 +48,7 @@ export interface ICPResponse {
 const VALID_SENIORITY_LEVELS = ["c_level", "vp_level", "director_level", "manager_level"] as const;
 const VALID_COMPANY_SIZES = ["smb_under_500", "mid_market_500_1000", "enterprise_1000_5000", "large_enterprise_5000_plus"] as const;
 const VALID_REGIONS = ["north_america", "europe", "asia_pacific", "middle_east", "latin_america"] as const;
-const VALID_MARKETS = ["north_america", "europe", "asia_pacific", "middle_east", "latin_america"] as const;
+const VALID_MARKETS = VALID_REGIONS;
 
 // Keep validation function
 function validateICPResponse(response: any): ICPResponse {
@@ -58,12 +63,23 @@ function validateICPResponse(response: any): ICPResponse {
   if (!companyInfo.industry || typeof companyInfo.industry !== 'string') {
     throw new Error('Invalid or missing industry');
   }
-  if (!Array.isArray(companyInfo.main_products) || companyInfo.main_products.length === 0) {
-    throw new Error('Invalid or empty main_products array');
+  if (!Array.isArray(companyInfo.products) || companyInfo.products.length === 0) {
+    throw new Error('Invalid or empty products array');
   }
-  if (!companyInfo.product_category || typeof companyInfo.product_category !== 'string') {
-    throw new Error('Invalid or missing product_category');
-  }
+
+  // Validate each product
+  companyInfo.products.forEach((product: any, index: number) => {
+    if (!product.name || typeof product.name !== 'string') {
+      throw new Error(`Invalid or missing name for product at index ${index}`);
+    }
+    if (!product.product_category || typeof product.product_category !== 'string') {
+      throw new Error(`Invalid or missing product_category for product at index ${index}`);
+    }
+    if (!product.description || typeof product.description !== 'string') {
+      throw new Error(`Invalid or missing description for product at index ${index}`);
+    }
+  });
+
   if (typeof companyInfo.number_of_employees !== 'number' || companyInfo.number_of_employees <= 0) {
     throw new Error('Invalid number_of_employees');
   }
@@ -74,7 +90,7 @@ function validateICPResponse(response: any): ICPResponse {
     throw new Error('Invalid or empty markets_operating_in array');
   }
   companyInfo.markets_operating_in.forEach((market: string) => {
-    if (!VALID_REGIONS.includes(market.toLowerCase() as typeof VALID_REGIONS[number])) {
+    if (!VALID_MARKETS.includes(market.toLowerCase() as typeof VALID_MARKETS[number])) {
       throw new Error(`Invalid market: ${market}`);
     }
   });
@@ -129,8 +145,8 @@ function validateICPResponse(response: any): ICPResponse {
 // Default configuration
 const DEFAULT_CONFIG = {
   model: 'claude-3.5-sonnet' as AIModelType,
-  systemPrompt: 'ICPs v1.03 - system (NA only)',
-  userPrompt: 'ICPs v1.03 - user (NA only)'
+  systemPrompt: 'ICP gen - v.4 - system',
+  userPrompt: 'ICP gen - v4 - user'
 }
 
 export async function generateInitialICPs(
@@ -221,26 +237,61 @@ export async function generateInitialICPs(
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 60, 'Processing company information...');
 
-    // Validate and process response
+    // Parse and validate the response
     const parsedResponse = validateICPResponse(response);
 
-    // Update company information
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 40);
+
+    // Update company with metadata from the response
     const { error: updateError } = await adminClient
       .from('companies')
       .update({
         industry: parsedResponse.company_information.industry,
-        main_products: parsedResponse.company_information.main_products,
-        product_category: parsedResponse.company_information.product_category,
         number_of_employees: parsedResponse.company_information.number_of_employees,
         annual_revenue: parsedResponse.company_information.annual_revenue,
-        markets_operating_in: parsedResponse.company_information.markets_operating_in.map(m => m.toLowerCase()),
-        account_id: accountId
+        markets_operating_in: parsedResponse.company_information.markets_operating_in.map(m => m.toLowerCase())
       })
       .eq('id', companyId);
 
     if (updateError) {
       console.error('Company metadata update error:', updateError);
     }
+
+    // Insert products
+    console.log('Inserting products:', parsedResponse.company_information.products);
+    
+    if (typeof companyId === 'undefined') {
+      throw new Error('Company ID is undefined');
+    }
+
+    // First delete existing products
+    const { error: deleteProductsError } = await adminClient
+      .from('products')
+      .delete()
+      .eq('company_id', companyId);
+
+    if (deleteProductsError) {
+      console.error('Error deleting existing products:', deleteProductsError);
+    }
+
+    // Insert new products
+    const { error: productsError } = await adminClient
+      .from('products')
+      .insert(
+        parsedResponse.company_information.products.map(product => ({
+          company_id: companyId as number,
+          name: product.name,
+          product_category: product.product_category,
+          account_id: accountId
+        }))
+      );
+
+    if (productsError) {
+      console.error('Products insertion error:', productsError);
+      // Continue despite product insertion error - we'll handle this in error monitoring
+    }
+
+    await updateGenerationProgress(companyId, accountId, 'generating_icps', 50);
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 80, 'Setting up competitors...');
 

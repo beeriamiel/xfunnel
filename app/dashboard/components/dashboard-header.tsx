@@ -17,6 +17,7 @@ import { createClient } from '@/app/supabase/client'
 import { useEffect } from 'react'
 import { CompanySelector } from "./company-selector"
 import { ProductSelector } from "./product-selector"
+import { StaticCompanyDisplay } from "./static-company-display"
 import type { Company } from '../generate-analysis/types/company'
 import { getCompanyProfile } from '../generate-analysis/utils/actions'
 import { useParams } from 'next/navigation'
@@ -124,6 +125,12 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
   // Determine if we should show the section link
   const showSectionLink = section !== 'Dashboard' || activeView !== 'engine'
 
+  // Determine if we should show company selector
+  const shouldShowCompanySelector = isSuperAdmin || companies.length > 1
+
+  // Determine if we should show product selector
+  const shouldShowProductSelector = selectedCompany && (isSuperAdmin || (companyProfile?.products?.length ?? 0) > 1)
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
       <div className="flex items-center gap-2">
@@ -156,16 +163,16 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
         </Breadcrumb>
       </div>
       <div className="flex items-center gap-4">
-        {isSuperAdmin && (
-          <>
-            <CompanySelector selectedCompany={selectedCompany} companies={companies} />
-            {selectedCompany && (
-              <ProductSelector 
-                selectedProduct={selectedProduct} 
-                products={companyProfile?.products || []} 
-              />
-            )}
-          </>
+        {shouldShowCompanySelector ? (
+          <CompanySelector selectedCompany={selectedCompany} companies={companies} />
+        ) : selectedCompany && (
+          <StaticCompanyDisplay companyName={selectedCompany.name} />
+        )}
+        {shouldShowProductSelector && (
+          <ProductSelector 
+            selectedProduct={selectedProduct} 
+            products={companyProfile?.products || []} 
+          />
         )}
         <AuthButton />
       </div>

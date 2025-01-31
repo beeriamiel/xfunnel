@@ -657,3 +657,26 @@ USING (
     )
   )
 );
+
+-- Add setup_completed_at column to companies table
+ALTER TABLE public.companies 
+ADD COLUMN setup_completed_at timestamp with time zone;
+
+-- Create index for setup_completed_at
+CREATE INDEX idx_companies_setup_completed ON public.companies(setup_completed_at);
+
+-- Update existing companies that have completed setup (have ICPs with personas)
+UPDATE public.companies c
+SET setup_completed_at = (
+  SELECT MIN(icp.created_at)
+  FROM public.ideal_customer_profiles icp
+  INNER JOIN public.personas p ON p.icp_id = icp.id
+  WHERE icp.company_id = c.id
+  GROUP BY icp.company_id
+)
+WHERE EXISTS (
+  SELECT 1
+  FROM public.ideal_customer_profiles icp
+  INNER JOIN public.personas p ON p.icp_id = icp.id
+  WHERE icp.company_id = c.id
+);
