@@ -234,16 +234,44 @@
     buyer_journey_phase text,
     buyer_persona text,
     citation_url text NOT NULL                                                                                                                                                                                                                                                                                                                                                                   |
-| public       | companies                 | name text NOT NULL,
-    number_of_employees integer,
-    created_at timestamp with time zone DEFAULT now(),
-    id bigint NOT NULL,
-    product_category text,
-    markets_operating_in ARRAY DEFAULT '{}'::text[],
-    account_id uuid,
-    main_products ARRAY DEFAULT '{}'::text[],
-    industry text,
-    annual_revenue text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+create table public.companies (
+  id bigint generated always as identity not null,
+  name text not null,
+  industry text null,
+  created_at timestamp with time zone null default now(),
+  main_products text[] null,
+  product_category text null,
+  number_of_employees integer null,
+  annual_revenue text null,
+  markets_operating_in text[] null default '{}'::text[],
+  account_id uuid null,
+  setup_completed_at timestamp with time zone null,
+  constraint companies_pkey primary key (id),
+  constraint companies_account_id_fkey foreign KEY (account_id) references accounts (id),
+  constraint valid_markets check (
+    (
+      markets_operating_in <@ array[
+        'north_america'::text,
+        'europe'::text,
+        'asia_pacific'::text,
+        'middle_east'::text,
+        'latin_america'::text
+      ]
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_companies_account_id on public.companies using btree (account_id) TABLESPACE pg_default;
+
+create index IF not exists idx_companies_product_category on public.companies using btree (product_category) TABLESPACE pg_default;
+
+create index IF not exists idx_companies_setup_completed on public.companies using btree (setup_completed_at) TABLESPACE pg_default;
+
+create index IF not exists idx_companies_number_of_employees on public.companies using btree (number_of_employees) TABLESPACE pg_default;
+
+create index IF not exists idx_companies_main_products on public.companies using gin (main_products) TABLESPACE pg_default;
+
+create index IF not exists idx_companies_markets on public.companies using gin (markets_operating_in) TABLESPACE pg_default;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | public       | competitors               | competitor_name text NOT NULL,
     account_id uuid,
     company_id bigint NOT NULL,

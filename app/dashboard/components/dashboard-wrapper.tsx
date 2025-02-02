@@ -68,7 +68,7 @@ export function DashboardWrapper({
   selectedCompany,
   accountId,
   initialCompanies,
-  isOnboarding,
+  isOnboarding: initialIsOnboarding,
   currentStep,
   children,
   isSuperAdmin
@@ -77,7 +77,7 @@ export function DashboardWrapper({
     selectedCompany,
     accountId,
     initialCompaniesCount: initialCompanies.length,
-    isOnboarding,
+    isOnboarding: initialIsOnboarding,
     storeState: useDashboardStore.getState(),
     pathname: window?.location?.pathname,
     search: window?.location?.search
@@ -85,9 +85,39 @@ export function DashboardWrapper({
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setSelectedCompanyId, setCompanies, setWizardStep, setIsSuperAdmin, companyProfile, setSelectedProductId } = useDashboardStore()
+  const { 
+    setSelectedCompanyId, 
+    setCompanies, 
+    setWizardStep, 
+    setIsSuperAdmin, 
+    companyProfile,
+    setSelectedProductId,
+    syncOnboardingState,
+    onboarding: { isOnboarding, serverCompleted }
+  } = useDashboardStore()
+  
   const hasRedirected = useRef(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+  // Sync onboarding state with server
+  useEffect(() => {
+    if (selectedCompany) {
+      const isServerCompleted = !!selectedCompany.setup_completed_at
+      console.log('🔵 Syncing onboarding state:', {
+        companyId: selectedCompany.id,
+        setup_completed_at: selectedCompany.setup_completed_at,
+        isServerCompleted,
+        selectedCompany
+      })
+
+      // Only sync if we have valid setup_completed_at data
+      if (selectedCompany.setup_completed_at !== undefined) {
+        syncOnboardingState(selectedCompany.id, isServerCompleted)
+      } else {
+        console.warn('Missing setup_completed_at for company:', selectedCompany.id)
+      }
+    }
+  }, [selectedCompany, syncOnboardingState])
 
   // Handle company auto-selection
   useEffect(() => {
@@ -125,29 +155,11 @@ export function DashboardWrapper({
         router.replace(`/dashboard?${params.toString()}`)
       }
       
-      // Check onboarding status
-      checkOnboardingStatus(company.id).then(incompleteStep => {
-        console.log('🟡 Onboarding check result:', { 
-          incompleteStep,
-          currentStep: searchParams.get('step')
-        })
-        if (incompleteStep) {
-          const currentStep = searchParams.get('step')
-          if (currentStep !== incompleteStep) {
-            console.log('🟡 Redirecting to step:', incompleteStep)
-            const params = new URLSearchParams()
-            params.set('step', incompleteStep)
-            params.set('company', company.id.toString())
-            router.replace(`/dashboard/generate-analysis?${params.toString()}`)
-          }
-          setWizardStep(incompleteStep)
-        }
-        setIsInitialLoad(false)
-      })
+      setIsInitialLoad(false)
     } else {
       setIsInitialLoad(false)
     }
-  }, [initialCompanies, searchParams, router, setCompanies, setSelectedCompanyId, setWizardStep, setIsSuperAdmin, isSuperAdmin])
+  }, [initialCompanies, searchParams, router, setCompanies, setSelectedCompanyId, setIsSuperAdmin, isSuperAdmin])
 
   // Handle product auto-selection
   useEffect(() => {
@@ -163,9 +175,19 @@ export function DashboardWrapper({
   }, [companyProfile, searchParams, setSelectedProductId, isSuperAdmin])
 
   let mainContent
-  if (isOnboarding || searchParams.get('step')) {
-    console.log('🟡 Rendering onboarding content:', {
+  const shouldShowSetup = isOnboarding && !serverCompleted
+  
+  console.log('🟡 Content render decision:', {
+    isOnboarding,
+    serverCompleted,
+    shouldShowSetup,
+    selectedCompany: !!selectedCompany
+  })
+
+  if (shouldShowSetup) {
+    console.log('🟢 Rendering onboarding content:', {
       isOnboarding,
+      serverCompleted,
       step: searchParams.get('step'),
       pathname: window?.location?.pathname
     })
@@ -212,13 +234,12 @@ export function DashboardWrapper({
             <DashboardHeader accountId={accountId} />
           </Suspense>
           <div className="flex flex-1 h-[calc(100vh-4rem)] relative">
-            {isOnboarding && (
-              // Global overlay that covers everything except wizard content
+            {shouldShowSetup && (
               <div className="absolute inset-0 bg-background/80 backdrop-blur-sm pointer-events-none z-30 transition-all duration-200" />
             )}
             <AppSidebar />
             <main className="flex-1 w-full overflow-auto">
-              {isOnboarding ? (
+              {shouldShowSetup ? (
                 <div className="relative z-40">
                   {mainContent}
                 </div>

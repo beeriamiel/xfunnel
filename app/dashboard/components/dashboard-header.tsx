@@ -49,43 +49,69 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
   // Fetch company profile when selectedCompanyId changes
   useEffect(() => {
     async function fetchCompanyProfile() {
-      if (!selectedCompanyId || !accountId) return
+      if (!selectedCompanyId || !accountId) {
+        console.log('Missing required IDs:', { selectedCompanyId, accountId })
+        return
+      }
       
       try {
         console.log('Fetching company profile for:', { selectedCompanyId, accountId })
         const profile = await getCompanyProfile(selectedCompanyId, accountId)
         console.log('Received profile:', profile)
         
-        if (profile) {
-          // Transform API response to match CompanyProfile interface
-          const transformedProfile = {
-            ...profile,
-            icps: profile.ideal_customer_profiles || [],
-            personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
-            products: profile.products || [],
-            competitors: (profile.competitors || []).map(c => ({
-              id: String(c.id),
-              name: c.competitor_name
-            }))
-          }
-          console.log('Transformed profile:', transformedProfile)
-          // Reset product selection when setting new company profile
+        if (!profile) {
+          console.log('No profile received, resetting state')
+          setCompanyProfile(null)
           setSelectedProductId(null)
+          return
+        }
+
+        // Transform API response to match CompanyProfile interface
+        const transformedProfile = {
+          ...profile,
+          icps: profile.ideal_customer_profiles || [],
+          personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
+          products: profile.products || [],
+          competitors: (profile.competitors || []).map(c => ({
+            id: String(c.id),
+            name: c.competitor_name
+          }))
+        }
+
+        // Deep compare relevant fields to check for changes
+        const hasRelevantChanges = !companyProfile || 
+          transformedProfile.name !== companyProfile.name ||
+          JSON.stringify(transformedProfile.products) !== JSON.stringify(companyProfile.products) ||
+          JSON.stringify(transformedProfile.competitors) !== JSON.stringify(companyProfile.competitors)
+
+        if (hasRelevantChanges) {
+          console.log('Profile has relevant changes, updating state')
+          
+          // Check if current product still exists and is valid
+          const currentProduct = selectedProductId && transformedProfile.products?.find(
+            p => p.id.toString() === selectedProductId
+          )
+          
+          if (!currentProduct) {
+            console.log('Selected product no longer valid, resetting selection')
+            setSelectedProductId(null)
+          } else {
+            console.log('Keeping current product selection:', currentProduct.name)
+          }
+          
           setCompanyProfile(transformedProfile)
         } else {
-          console.log('No profile received, setting to null')
-          setSelectedProductId(null)
-          setCompanyProfile(null)
+          console.log('No relevant changes detected, skipping update')
         }
       } catch (error) {
         console.error('Error fetching company profile:', error)
-        setSelectedProductId(null)
-        setCompanyProfile(null)
+        // Don't reset everything on error, just log it
+        console.warn('Keeping existing state due to fetch error')
       }
     }
 
     fetchCompanyProfile()
-  }, [selectedCompanyId, accountId, setCompanyProfile, setSelectedProductId])
+  }, [selectedCompanyId, accountId, setCompanyProfile, setSelectedProductId, companyProfile, selectedProductId])
   
   // Add logging for products being passed to selector
   console.log('Products being passed to selector:', companyProfile?.products || [])

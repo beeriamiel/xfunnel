@@ -26,6 +26,7 @@ async function getCompanyData(companyId: string | undefined, accountId: string) 
       name, 
       industry,
       created_at,
+      setup_completed_at,
       main_products,
       product_category,
       number_of_employees,
@@ -76,12 +77,39 @@ export default async function GenerateAnalysisPage({
   
   // Process searchParams on server side - await them first
   const params = await searchParams
-  const rawCompanyId = params.companyId
+  const rawCompanyId = params.company
+  const rawProductId = params.product
   const rawStep = params.step
+  
+  console.log('🔵 URL Parameters:', {
+    raw: {
+      company: rawCompanyId,
+      product: rawProductId,
+      step: rawStep
+    },
+    types: {
+      companyType: typeof rawCompanyId,
+      productType: typeof rawProductId,
+      stepType: typeof rawStep
+    }
+  });
   
   // Type guard and validation
   const companyId = typeof rawCompanyId === 'string' ? rawCompanyId : undefined
+  const productId = typeof rawProductId === 'string' ? rawProductId : undefined
   const step = typeof rawStep === 'string' ? rawStep as Step : undefined
+
+  console.log('🔵 Processed Parameters:', {
+    processed: {
+      companyId,
+      productId,
+      step
+    },
+    asNumber: {
+      productId: productId ? Number(productId) : undefined,
+      isValid: productId ? !isNaN(Number(productId)) : false
+    }
+  });
 
   console.log('🔵 GenerateAnalysisPage:', {
     hasCompanies,
@@ -89,6 +117,7 @@ export default async function GenerateAnalysisPage({
     companies,
     accountId: accountUser.account_id,
     companyId,
+    productId,
     step,
     searchParams: params
   })
@@ -108,10 +137,20 @@ export default async function GenerateAnalysisPage({
     redirect('/dashboard/generate-analysis')
   }
 
+  // Never show setup if company setup is completed
+  const isOnboarding = !!step && (!selectedCompany?.setup_completed_at)
+
+  // If setup is complete but we're on a setup step, redirect to main page
+  if (selectedCompany?.setup_completed_at && step) {
+    console.log('🟡 Company setup already complete, redirecting to main page')
+    redirect(`/dashboard/generate-analysis?company=${selectedCompany.id}`)
+  }
+
   console.log('🟢 Rendering page:', {
     selectedCompany,
-    isOnboarding: !!step,
-    step
+    isOnboarding,
+    step,
+    setup_completed_at: selectedCompany?.setup_completed_at
   })
 
   return (
@@ -120,13 +159,14 @@ export default async function GenerateAnalysisPage({
         selectedCompany={selectedCompany}
         accountId={accountUser.account_id}
         initialCompanies={companies || []}
-        isOnboarding={!!step}
-        currentStep={step}
+        isOnboarding={isOnboarding}
+        currentStep={isOnboarding ? step : undefined}
       >
         <GenerateAnalysis 
           accountId={accountUser.account_id}
-          isOnboarding={!!step}
-          step={step}
+          isOnboarding={isOnboarding}
+          step={isOnboarding ? step : undefined}
+          initialProductId={productId}
         />
       </DashboardWrapper>
     </ClientWrapper>

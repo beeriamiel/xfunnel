@@ -63,6 +63,8 @@ interface OnboardingState {
     hasPersonas: boolean
   }
   isOnboarding: boolean
+  serverCompleted: boolean
+  lastSyncedCompanyId: number | null
 }
 
 interface DashboardStore {
@@ -94,6 +96,7 @@ interface DashboardStore {
   completeOnboarding: () => void
   isSuperAdmin: boolean
   setIsSuperAdmin: (isSuperAdmin: boolean) => void
+  syncOnboardingState: (companyId: number | null, serverCompleted: boolean) => void
 }
 
 export const useDashboardStore = create(
@@ -132,7 +135,9 @@ export const useDashboardStore = create(
           hasICPs: false,
           hasPersonas: false
         },
-        isOnboarding: false
+        isOnboarding: false,
+        serverCompleted: false,
+        lastSyncedCompanyId: null
       },
       currentWizardStep: 'initial',
       completedSteps: [],
@@ -158,10 +163,63 @@ export const useDashboardStore = create(
           stepData: { ...state.onboarding.stepData, ...data }
         }
       })),
+      syncOnboardingState: (companyId, serverCompleted) => set((state) => {
+        console.log('🔵 syncOnboardingState called:', {
+          companyId,
+          serverCompleted,
+          previousState: {
+            isOnboarding: state.onboarding.isOnboarding,
+            serverCompleted: state.onboarding.serverCompleted,
+            lastSyncedCompanyId: state.onboarding.lastSyncedCompanyId
+          }
+        })
+
+        if (serverCompleted) {
+          console.log('🟢 Company setup is completed, disabling onboarding')
+          return {
+            onboarding: {
+              ...state.onboarding,
+              isOnboarding: false,
+              serverCompleted: true,
+              lastSyncedCompanyId: companyId
+            }
+          }
+        }
+
+        if (companyId !== state.onboarding.lastSyncedCompanyId) {
+          console.log('🟡 Different company, resetting onboarding state')
+          return {
+            onboarding: {
+              ...state.onboarding,
+              currentStep: 'initial',
+              completedSteps: [],
+              stepData: {
+                hasProducts: false,
+                hasCompetitors: false,
+                hasICPs: false,
+                hasPersonas: false
+              },
+              isOnboarding: !serverCompleted,
+              serverCompleted,
+              lastSyncedCompanyId: companyId
+            }
+          }
+        }
+        
+        console.log('🟢 Same company, updating completion state')
+        return {
+          onboarding: {
+            ...state.onboarding,
+            serverCompleted,
+            isOnboarding: !serverCompleted
+          }
+        }
+      }),
       startOnboarding: () => set((state) => ({
         currentWizardStep: 'initial',
         completedSteps: [],
         onboarding: {
+          ...state.onboarding,
           currentStep: 'initial',
           completedSteps: [],
           stepData: {
@@ -170,13 +228,15 @@ export const useDashboardStore = create(
             hasICPs: false,
             hasPersonas: false
           },
-          isOnboarding: true
+          isOnboarding: true,
+          serverCompleted: false
         }
       })),
       completeOnboarding: () => set((state) => ({
         onboarding: {
           ...state.onboarding,
-          isOnboarding: false
+          isOnboarding: false,
+          serverCompleted: true
         }
       })),
       isSuperAdmin: false,

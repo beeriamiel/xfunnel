@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, ChevronDown, ChevronRight } from "lucide-react"
 import type { Query, QueryState, QueryAction } from '../../types/analysis'
 import { useQueryStore } from '../../store/query-store'
 import { useToast } from '@/components/hooks/use-toast'
 import { generateQuestionsAction } from '../../actions/generate'
 import type { EngineSelection } from '@/app/company-actions'
+import { ExpandedQueryRow } from './expanded-query-row'
 
 interface RowQuery {
   id: string;
@@ -18,6 +19,7 @@ interface RowQuery {
     id: string;
     text: string;
   }[];
+  productId: number;
 }
 
 interface QueryRowProps {
@@ -25,6 +27,7 @@ interface QueryRowProps {
   isExpanded: boolean;
   onToggle: () => void;
   onGenerateResponse?: (queryId: string) => Promise<void>;
+  hasExistingQueries: boolean;
 }
 
 interface ExtendedQueryState {
@@ -39,6 +42,7 @@ async function handleGenerateQueries(
   companyName: string,
   personaId: number,
   accountId: string,
+  productId: number,
   setQueryState: (queryId: string, state: Partial<ExtendedQueryState>) => void,
   toast: ReturnType<typeof useToast>['toast']
 ) {
@@ -48,7 +52,8 @@ async function handleGenerateQueries(
     const result = await generateQuestionsAction(
       companyName,
       personaId,
-      accountId
+      accountId,
+      productId
     );
 
     setQueryState(queryId, { 
@@ -106,22 +111,56 @@ function ActionButton({
           Generate Queries (Free)
         </Button>
       )
+    case 'generate_response':
+      return (
+        <Button 
+          variant="default" 
+          className="bg-purple-800 hover:bg-purple-700"
+          onClick={onClick}
+          disabled={disabled || isLoading}
+        >
+          {isLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-4 w-4" />
+          )}
+          Generate Analysis
+        </Button>
+      )
     default:
       return null
   }
 }
 
-export function QueryRow({ query, onGenerateResponse }: QueryRowProps) {
+export function QueryRow({ query, isExpanded, onToggle, onGenerateResponse, hasExistingQueries }: QueryRowProps) {
   const { toast } = useToast()
   const queryState = useQueryStore(state => state.queries[query.id])
   const setQueryState = useQueryStore(state => state.setQueryState)
   const initializeQuery = useQueryStore(state => state.initializeQuery)
 
+  console.log('🔵 QueryRow Render:', {
+    queryId: query.id,
+    hasExistingQueries,
+    queryState,
+    queries: query.queries
+  })
+
   useEffect(() => {
-    if (query.id) {
-      initializeQuery(query.id)
+    // Only initialize if not already initialized
+    if (query.id && !queryState) {
+      console.log('🟡 QueryRow initializing query:', {
+        queryId: query.id,
+        hasExistingQueries,
+        queries: query.queries
+      });
+      initializeQuery(query.id, hasExistingQueries, {
+        status: 'idle',
+        isLoading: false,
+        error: null,
+        queryList: query.queries
+      });
     }
-  }, [query.id, initializeQuery])
+  }, [query.id, hasExistingQueries, initializeQuery, queryState, query.queries]);
 
   const handleAction = async (action: QueryAction) => {
     if (action === 'generate_queries' && query.companyName && query.personaId && query.accountId) {
@@ -130,25 +169,66 @@ export function QueryRow({ query, onGenerateResponse }: QueryRowProps) {
         query.companyName,
         query.personaId,
         query.accountId,
+        query.productId,
         setQueryState,
         toast
       )
+    } else if (action === 'generate_response' && onGenerateResponse) {
+      await onGenerateResponse(query.id)
     }
   }
 
   return (
-    <div className="flex items-center justify-end gap-2">
-      {queryState?.availableActions?.map((action) => (
-        action === 'generate_queries' && (
-          <ActionButton 
-            key={action}
-            action={action}
-            onClick={() => handleAction(action)}
-            disabled={queryState.isLoading}
-            isLoading={queryState.isLoading}
-          />
-        )
-      ))}
+    <div className="w-full">
+      <div className="flex items-center justify-between gap-2 py-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2"
+          onClick={onToggle}
+          disabled={!hasExistingQueries}
+        >
+          {hasExistingQueries ? (
+            <>
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+              <span className="text-sm text-muted-foreground">
+                {query.queries?.length || 0} {query.queries?.length === 1 ? 'Query' : 'Queries'}
+              </span>
+            </>
+          ) : null}
+        </Button>
+        <div className="flex items-center gap-2">
+          {queryState?.availableActions?.map((action) => (
+            <ActionButton 
+              key={action}
+              action={action}
+              onClick={() => handleAction(action)}
+              disabled={queryState.isLoading}
+              isLoading={queryState.isLoading}
+            />
+          ))}
+        </div>
+      </div>
+
+      {isExpanded && query.queries && query.personaId && (
+        <ExpandedQueryRow
+          queries={query.queries.map(q => ({
+            id: parseInt(q.id),
+            query_text: q.text,
+            responses: [],
+            buyer_journey_phase: ['unknown'],
+            created_at: new Date().toISOString()
+          }))}
+          companyId={parseInt(query.id)}
+          personaId={query.personaId}
+          accountId={query.accountId || ''}
+          onGenerateResponse={() => onGenerateResponse?.(query.id)}
+        />
+      )}
     </div>
   )
 } 

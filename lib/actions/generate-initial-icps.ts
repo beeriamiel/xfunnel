@@ -8,6 +8,7 @@ import { parsePrompt } from "@/lib/prompts/prompt-parser";
 import { AIModelType } from "@/lib/services/ai/types";
 import { AIServiceFactory } from "@/lib/services/ai/factory";
 import { SupabaseBatchTrackingService } from "@/lib/services/batch-tracking";
+import { updateCompanySetupCompletion } from "@/lib/services/company";
 
 // Keep existing interfaces
 interface Persona {
@@ -358,6 +359,7 @@ export async function generateInitialICPs(
 
     await updateGenerationProgress(companyId, accountId, 'generating_icps', 100, 'Setup complete');
     await batchTracker.completeBatch(batchId);
+    await updateCompanySetupCompletion(companyId);
 
     return {
       ...parsedResponse,

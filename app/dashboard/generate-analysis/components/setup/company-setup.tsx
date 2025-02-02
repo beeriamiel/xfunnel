@@ -16,6 +16,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { type Step } from '../../types/setup'
 import { useDashboardStore } from '@/app/dashboard/store'
 import { generateInitialICPsAction } from "@/app/company-actions"
+import { updateCompanySetupCompletion } from '@/lib/services/company'
 
 // Add type definitions at the top
 type ProductChip = {
@@ -207,10 +208,18 @@ export function CompanySetup({
     console.log('🟢 CompanySetup step completed:', { completedStep, nextStep })
   }
 
-  const handleComplete = () => {
-    completeStep('personas', 'personas')
-    onTransitionStart()
-    onComplete()
+  const handleComplete = async () => {
+    if (!companyId) return;
+    
+    try {
+      await updateCompanySetupCompletion(Number(companyId));
+      completeStep('personas', 'personas');
+      onTransitionStart();
+      onComplete();
+    } catch (error) {
+      console.error('Failed to complete setup:', error);
+      setError(error instanceof Error ? error.message : 'Failed to complete setup');
+    }
   }
 
   const handleAddProduct = async (product: Product) => {

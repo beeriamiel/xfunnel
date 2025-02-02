@@ -46,22 +46,21 @@ export interface Response {
 }
 
 export interface Query {
-  id: string
-  query_text: string
-  buyer_journey_phase: string[] | null
-  created_at: string | null
-  prompt_id: number | null
-  persona_id: number | null
-  company_id: number | null
-  user_id: string | null
-  query_batch_id: string | null
-  created_by_batch: boolean | null
-  responses?: Response[]
-  lastResponseDate?: string | null
-  queries?: Array<{
-    id: string
-    text: string
-  }>
+  id: number;
+  query_text: string;
+  responses: {
+    id: number;
+    response_batch_id: string | null;
+  }[];
+  buyer_journey_phase?: string[] | null;
+  created_at?: string | null;
+  prompt_id?: number | null;
+  persona_id?: number | null;
+  company_id?: number | null;
+  user_id?: string | null;
+  query_batch_id?: string | null;
+  created_by_batch?: boolean | null;
+  lastResponseDate?: string | null;
 }
 
 export interface ICP {
