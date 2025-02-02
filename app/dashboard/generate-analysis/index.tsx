@@ -12,6 +12,8 @@ import { AlertCircle } from 'lucide-react'
 import { getCompanyProfile } from './utils/actions'
 import type { ICP, Persona } from './types/analysis'
 import { createClient } from '@/app/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/supabase'
 import { type Step } from './types/setup'
 import { motion } from 'framer-motion'
 import { CheckCircle, Loader2 } from 'lucide-react'
@@ -29,14 +31,10 @@ interface GenerateAnalysisProps {
 
 export function GenerateAnalysis({ 
   accountId, 
-  isOnboarding: initialIsOnboarding,
-  step: initialStep,
   initialProductId
-}: GenerateAnalysisProps) {
+}: Omit<GenerateAnalysisProps, 'isOnboarding' | 'step'>) {
   console.log('🔵 GenerateAnalysis Render:', {
     accountId,
-    initialIsOnboarding,
-    initialStep,
     initialProductId,
     selectedCompanyId: useDashboardStore.getState().selectedCompanyId,
     companyProfile: useDashboardStore.getState().companyProfile,
@@ -47,16 +45,12 @@ export function GenerateAnalysis({
     selectedCompanyId,
     companyProfile,
     isDevMode,
-    onboarding: { isOnboarding, serverCompleted },
-    startOnboarding,
-    completeOnboarding,
     setCompanyProfile,
     setIsDevMode,
     resetCompanyProfile,
     setSelectedCompanyId,
     setSelectedProductId,
-    addCompany,
-    syncOnboardingState
+    addCompany
   } = useDashboardStore()
 
   const [isGlobalLoading, setIsGlobalLoading] = useState(false)
@@ -70,15 +64,13 @@ export function GenerateAnalysis({
   // Only show dev mode toggle in development
   const isDevelopment = process.env.NODE_ENV === 'development'
 
-  const supabase = createClient()
   const router = useRouter()
 
-  // Sync with initial onboarding state
+  // Add Supabase client effect with proper typing
+  const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null)
   useEffect(() => {
-    if (initialIsOnboarding) {
-      startOnboarding()
-    }
-  }, [initialIsOnboarding, startOnboarding])
+    setSupabase(createClient())
+  }, [])
 
   // Add logging for product ID
   useEffect(() => {
@@ -97,15 +89,16 @@ export function GenerateAnalysis({
 
   // Profile fetching and state management
   useEffect(() => {
+    // Skip if no Supabase client yet
+    if (!supabase) return
+
     async function fetchCompanyProfile() {
       console.log('🔵 fetchCompanyProfile START:', { 
         selectedCompanyId,
         isLoading,
         showNewContent,
         hasExistingProfile: !!companyProfile?.name,
-        isTransitioning,
-        isOnboarding,
-        serverCompleted
+        isTransitioning
       })
       
       if (!selectedCompanyId) {
@@ -117,18 +110,15 @@ export function GenerateAnalysis({
         return
       }
 
-      // Check if we have valid profile data and not transitioning
-      const hasValidProfile = companyProfile?.name && 
-        companyProfile.icps?.length > 0 && 
-        companyProfile.personas?.length > 0
-
-      if (hasValidProfile && !isTransitioning) {
+      // Check if we already have valid profile data and not transitioning
+      if (companyProfile?.name && 
+          companyProfile.icps?.length > 0 && 
+          companyProfile.personas?.length > 0 && 
+          !isTransitioning) {
         console.log('🟢 Using existing valid profile:', { 
           companyName: companyProfile.name,
           icpsCount: companyProfile.icps?.length,
-          personasCount: companyProfile.personas?.length,
-          isOnboarding,
-          serverCompleted
+          personasCount: companyProfile.personas?.length
         })
         setShowNewContent(true)
         setIsLoading(false)
@@ -136,83 +126,80 @@ export function GenerateAnalysis({
         setHasCompleteAnalysis(true)
         return
       }
-      
-      setIsLoading(true)
-      setHasCompleteAnalysis(false)
-      try {
-        console.log('🟡 Fetching profile for company:', selectedCompanyId)
-        const profile = await getCompanyProfile(selectedCompanyId, accountId)
-        
-        if (!profile) {
-          console.log('🔴 No profile received')
-          setShowNewContent(false)
-          setCompanyProfile(null)
-          setError(null)
-          setHasCompleteAnalysis(false)
-          return
-        }
 
-        console.log('🟢 Profile fetched:', { profile })
-        
-        // Transform API response to match CompanyProfile interface
-        const transformedProfile: CompanyProfile = {
-          ...profile,
-          icps: profile.ideal_customer_profiles || [],
-          personas: profile.ideal_customer_profiles?.flatMap(icp => 
-            (icp.personas || []).map(persona => ({
-              ...persona,
-              queries: persona.queries || [],
-              icp_id: icp.id
+      // Only proceed with fetch if we don't have data or are transitioning
+      if (!companyProfile?.name || isTransitioning) {
+        setIsLoading(true)
+        setHasCompleteAnalysis(false)
+        try {
+          console.log('🟡 Fetching profile for company:', selectedCompanyId)
+          const profile = await getCompanyProfile(selectedCompanyId, accountId)
+          
+          if (!profile) {
+            console.log('🔴 No profile received')
+            setShowNewContent(false)
+            setCompanyProfile(null)
+            setError(null)
+            setHasCompleteAnalysis(false)
+            return
+          }
+
+          console.log('🟢 Profile fetched:', { profile })
+          
+          // Transform API response to match CompanyProfile interface
+          const transformedProfile: CompanyProfile = {
+            ...profile,
+            icps: profile.ideal_customer_profiles || [],
+            personas: profile.ideal_customer_profiles?.flatMap(icp => 
+              (icp.personas || []).map(persona => ({
+                ...persona,
+                queries: persona.queries || [],
+                icp_id: icp.id
+              }))
+            ) || [],
+            products: profile.products || [],
+            competitors: (profile.competitors || []).map(c => ({
+              id: String(c.id),
+              name: c.competitor_name
             }))
-          ) || [],
-          products: profile.products || [],
-          competitors: (profile.competitors || []).map(c => ({
-            id: String(c.id),
-            name: c.competitor_name
-          }))
+          }
+
+          // Check if we have complete analysis data
+          const hasFullData = transformedProfile.icps && 
+            transformedProfile.icps.length > 0 && 
+            transformedProfile.personas && 
+            transformedProfile.personas.length > 0
+
+          console.log('🟢 Setting transformed profile:', {
+            hasFullData,
+            icpsCount: transformedProfile.icps.length,
+            personasCount: transformedProfile.personas.length
+          })
+
+          setHasCompleteAnalysis(hasFullData)
+          setCompanyProfile(transformedProfile)
+          setShowNewContent(hasFullData)
+          setError(null)
+        } catch (error) {
+          console.error('🔴 Error fetching profile:', error)
+          setError(error instanceof Error ? error.message : 'Failed to fetch company profile')
+          // Don't reset profile on error if we have existing data
+          if (!companyProfile) {
+            setShowNewContent(false)
+            setCompanyProfile(null)
+            setHasCompleteAnalysis(false)
+          } else {
+            console.warn('Keeping existing profile data after fetch error')
+          }
+        } finally {
+          setIsLoading(false)
+          setIsGlobalLoading(false)
         }
-
-        // Check if we have complete analysis data
-        const hasFullData = transformedProfile.icps && 
-          transformedProfile.icps.length > 0 && 
-          transformedProfile.personas && 
-          transformedProfile.personas.length > 0
-
-        console.log('🟢 Setting transformed profile:', {
-          hasFullData,
-          icpsCount: transformedProfile.icps.length,
-          personasCount: transformedProfile.personas.length,
-          isOnboarding,
-          serverCompleted
-        })
-
-        // Sync onboarding state with server
-        const isSetupCompleted = 'setup_completed_at' in profile && !!profile.setup_completed_at
-        syncOnboardingState(selectedCompanyId, isSetupCompleted)
-
-        setHasCompleteAnalysis(hasFullData)
-        setCompanyProfile(transformedProfile)
-        setShowNewContent(hasFullData)
-        setError(null)
-      } catch (error) {
-        console.error('🔴 Error fetching profile:', error)
-        setError(error instanceof Error ? error.message : 'Failed to fetch company profile')
-        // Don't reset profile on error if we have existing data
-        if (!companyProfile) {
-          setShowNewContent(false)
-          setCompanyProfile(null)
-          setHasCompleteAnalysis(false)
-        } else {
-          console.warn('Keeping existing profile data after fetch error')
-        }
-      } finally {
-        setIsLoading(false)
-        setIsGlobalLoading(false)
       }
     }
 
     fetchCompanyProfile()
-  }, [selectedCompanyId, accountId, setCompanyProfile, companyProfile, isTransitioning, isOnboarding, serverCompleted, syncOnboardingState])
+  }, [selectedCompanyId, accountId, setCompanyProfile, isTransitioning, supabase])
 
   const handleCompanyCreate = async (companyName: string) => {
     console.log('🔵 handleCompanyCreate START:', { companyName })
@@ -273,7 +260,6 @@ export function GenerateAnalysis({
         setTimeout(() => setSelectedCompanyId(currentId), 0)
         
         setShowSuccessAnimation(true)
-        completeOnboarding()
       } catch (error) {
         console.error('🔴 Error completing setup:', error)
         setError(error instanceof Error ? error.message : 'Failed to complete setup')
@@ -326,14 +312,7 @@ export function GenerateAnalysis({
 
   return (
     <div className="h-full space-y-4 p-4 md:p-8 pt-6">
-      {isOnboarding && !serverCompleted ? (
-        <CompanySetup
-          accountId={accountId}
-          onCompanyCreate={handleCompanyCreate}
-          onComplete={handleSetupComplete}
-          onTransitionStart={handleTransitionStart}
-        />
-      ) : selectedCompanyId && (isGlobalLoading || isLoading) && !showSuccessAnimation ? (
+      {selectedCompanyId && (isGlobalLoading || isLoading) && !showSuccessAnimation ? (
         <div className="space-y-6">
           <LoadingCard />
         </div>
