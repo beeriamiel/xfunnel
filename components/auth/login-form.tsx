@@ -140,6 +140,15 @@ export function LoginForm() {
                   />
                 </FormControl>
                 <FormMessage />
+                <Button 
+                  variant="link" 
+                  className="px-0 text-sm"
+                  type="button"
+                  onClick={() => router.push('/auth/reset-password')}
+                  disabled={isLoading}
+                >
+                  Forgot password?
+                </Button>
               </FormItem>
             )}
           />
