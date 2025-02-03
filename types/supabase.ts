@@ -16,6 +16,7 @@ export type Database = {
           id: string
           role: string
           user_id: string
+          user_name: string | null
         }
         Insert: {
           account_id: string
@@ -23,6 +24,7 @@ export type Database = {
           id?: string
           role: string
           user_id: string
+          user_name?: string | null
         }
         Update: {
           account_id?: string
@@ -30,6 +32,7 @@ export type Database = {
           id?: string
           role?: string
           user_id?: string
+          user_name?: string | null
         }
         Relationships: [
           {

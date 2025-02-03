@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Company } from './generate-analysis/types/company'
-import { type Step } from './generate-analysis/types/setup'
 
 export type DashboardView = 'engine' | 'citation' | 'takeaways' | 'response' | 'personal' | 'faqs' | 'icp' | 'journey' | 'new-journey' | 'ai-overviews'
 export type TimePeriod = 'weekly' | 'monthly'
@@ -53,18 +52,6 @@ export interface CompanyProfile {
   competitors: Competitor[]
 }
 
-interface OnboardingState {
-  currentStep: Step
-  completedSteps: Step[]
-  stepData: {
-    hasProducts: boolean
-    hasCompetitors: boolean
-    hasICPs: boolean
-    hasPersonas: boolean
-  }
-  isOnboarding: boolean
-}
-
 interface DashboardStore {
   activeView: DashboardView
   setActiveView: (view: DashboardView) => void
@@ -84,14 +71,6 @@ interface DashboardStore {
   addCompany: (company: Company) => void
   hasCompanies: boolean
   setHasCompanies: (hasCompanies: boolean) => void
-  onboarding: OnboardingState
-  currentWizardStep: Step
-  completedSteps: Step[]
-  setWizardStep: (step: Step) => void
-  completeStep: (step: Step, nextStep: Step) => void
-  setStepData: (data: Partial<OnboardingState['stepData']>) => void
-  startOnboarding: () => void
-  completeOnboarding: () => void
   isSuperAdmin: boolean
   setIsSuperAdmin: (isSuperAdmin: boolean) => void
 }
@@ -123,62 +102,6 @@ export const useDashboardStore = create(
       })),
       hasCompanies: false,
       setHasCompanies: (hasCompanies) => set({ hasCompanies }),
-      onboarding: {
-        currentStep: 'initial',
-        completedSteps: [],
-        stepData: {
-          hasProducts: false,
-          hasCompetitors: false,
-          hasICPs: false,
-          hasPersonas: false
-        },
-        isOnboarding: false
-      },
-      currentWizardStep: 'initial',
-      completedSteps: [],
-      setWizardStep: (step) => set((state) => ({
-        currentWizardStep: step,
-        onboarding: {
-          ...state.onboarding,
-          currentStep: step
-        }
-      })),
-      completeStep: (step, nextStep) => set((state) => ({
-        currentWizardStep: nextStep,
-        completedSteps: [...state.completedSteps, step],
-        onboarding: {
-          ...state.onboarding,
-          currentStep: nextStep,
-          completedSteps: [...state.onboarding.completedSteps, step]
-        }
-      })),
-      setStepData: (data) => set((state) => ({
-        onboarding: {
-          ...state.onboarding,
-          stepData: { ...state.onboarding.stepData, ...data }
-        }
-      })),
-      startOnboarding: () => set((state) => ({
-        currentWizardStep: 'initial',
-        completedSteps: [],
-        onboarding: {
-          currentStep: 'initial',
-          completedSteps: [],
-          stepData: {
-            hasProducts: false,
-            hasCompetitors: false,
-            hasICPs: false,
-            hasPersonas: false
-          },
-          isOnboarding: true
-        }
-      })),
-      completeOnboarding: () => set((state) => ({
-        onboarding: {
-          ...state.onboarding,
-          isOnboarding: false
-        }
-      })),
       isSuperAdmin: false,
       setIsSuperAdmin: (isSuperAdmin) => set({ isSuperAdmin })
     }),

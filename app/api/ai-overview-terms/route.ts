@@ -350,12 +350,15 @@ export async function DELETE(request: NextRequest) {
 
     if (termsDeleteError) {
       console.error('Error deleting terms:', termsDeleteError)
-      throw termsDeleteError
+      return new NextResponse('Error deleting terms', { status: 500 })
     }
 
-    return new NextResponse(null, { status: 204 }) // 204 No Content for successful deletion
+    return new NextResponse(JSON.stringify(termsData), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
   } catch (error) {
-    console.error('Error deleting terms:', error)
-    return new NextResponse('Error deleting terms', { status: 500 })
+    console.error('Error in DELETE handler:', error)
+    return new NextResponse('Internal server error', { status: 500 })
   }
 } 

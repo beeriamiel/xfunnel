@@ -35,7 +35,7 @@ export class ClaudeService implements AIService {
       });
 
       const message = await this.messages.create({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: systemPrompt,
         messages: [
@@ -64,7 +64,7 @@ export class ClaudeService implements AIService {
   ): Promise<QuestionGenerationResponse> {
     try {
       const message = await this.messages.create({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: systemPrompt,
         messages: [

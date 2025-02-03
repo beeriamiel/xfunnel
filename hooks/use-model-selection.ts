@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AIModelType } from '@/lib/services/ai/types';
 import { ModelSelection } from '@/app/company-actions';
 
-const DEFAULT_MODEL: AIModelType = 'claude-3.5-sonnet';
+const DEFAULT_MODEL: AIModelType = 'claude-3-5-sonnet-20241022';
 
 interface ModelSelectionConfig {
   icpModel?: AIModelType;

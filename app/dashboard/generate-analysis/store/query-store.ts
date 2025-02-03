@@ -7,10 +7,15 @@ interface QueryState {
     status: 'idle' | 'running' | 'completed' | 'failed'
     isLoading: boolean
     error: string | null
+    queryList?: Array<{ id: string; text: string }>
   }>
   setQueryState: (queryId: string, state: Partial<QueryState['queries'][string]>) => void
   resetQueryState: (queryId: string) => void
-  initializeQuery: (queryId: string, initialState?: Partial<QueryState['queries'][string]>) => void
+  initializeQuery: (
+    queryId: string, 
+    hasExistingQueries: boolean,
+    initialState?: Partial<QueryState['queries'][string]>
+  ) => void
 }
 
 export const useQueryStore = create<QueryState>((set) => ({
@@ -27,23 +32,35 @@ export const useQueryStore = create<QueryState>((set) => ({
       }
     }))
   },
-  initializeQuery: (queryId, initialState = {
-    availableActions: ['generate_queries', 'view_queries'],
+  initializeQuery: (queryId, hasExistingQueries, initialState = {
     status: 'idle',
     isLoading: false,
     error: null
   }) => {
     console.log('🔵 QueryStore initializeQuery:', { 
       queryId, 
+      hasExistingQueries,
       initialState,
       existingState: useQueryStore.getState().queries[queryId]
     })
+
+    // Set correct actions based on whether queries exist
+    const availableActions: QueryAction[] = hasExistingQueries 
+      ? ['generate_response', 'view_queries']
+      : ['generate_queries', 'view_queries']
+
+    // Ensure we preserve any existing queryList if present
+    const existingState = useQueryStore.getState().queries[queryId]
+    const queryList = initialState.queryList || existingState?.queryList
+
     set((prev) => ({
       queries: {
         ...prev.queries,
         [queryId]: {
           ...initialState,
-          ...prev.queries[queryId]
+          ...prev.queries[queryId],
+          availableActions,
+          queryList
         }
       }
     }))

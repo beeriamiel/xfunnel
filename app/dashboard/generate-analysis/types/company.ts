@@ -5,6 +5,7 @@ export interface Company {
   name: string;
   industry: string | null;
   created_at: string | null;
+  setup_completed_at: string | null;
   main_products: string[] | null;
   product_category: string | null;
   number_of_employees: number | null;

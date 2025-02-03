@@ -48,19 +48,56 @@ export async function generateQuestionsAction(
   userPromptName: string,
   model: AIModelType = 'gpt-4-turbo-preview',
   accountId: string,
-  personaId?: string
+  personaId?: string,
+  productId: number = 0
 ) {
+  console.log('🔵 generateQuestionsAction called with:', {
+    inputs: {
+      personaId: {
+        value: personaId,
+        type: typeof personaId,
+        asNumber: personaId ? parseInt(personaId) : undefined,
+        isValidNumber: personaId ? !isNaN(parseInt(personaId)) : false
+      },
+      productId: {
+        value: productId,
+        type: typeof productId,
+        isZero: productId === 0,
+        isDefaultValue: productId === 0
+      }
+    },
+    context: {
+      companyName,
+      accountId,
+      model
+    }
+  });
+
   try {
     if (personaId) {
-      return await generateQuestions(
+      if (productId === 0) {
+        console.warn('⚠️ Warning: Using default product ID (0). This may indicate a missing product ID.', {
+          stack: new Error().stack
+        });
+      }
+      
+      const result = await generateQuestions(
         companyName,
         engines,
         parseInt(personaId),
         systemPromptName,
         userPromptName,
         model,
-        accountId
+        accountId,
+        productId
       );
+      
+      console.log('🟢 Generated questions with product ID:', {
+        productId,
+        queryCount: result.queries.length
+      });
+      
+      return result;
     } else {
       await generateQuestionsForAllPersonas(
         companyName,

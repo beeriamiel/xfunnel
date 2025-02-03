@@ -202,7 +202,11 @@ export function GenerateICPsButton() {
 
       if (productsError) {
         console.error('Error fetching products:', productsError);
-        toast.error('Failed to load products');
+        toast({
+          title: "Error",
+          description: "Failed to load products",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -701,29 +705,32 @@ export function GenerateICPsButton() {
                 company={selectedCompany}
                 competitors={competitors}
               />
-              {products.length > 0 && (
-                <div className="space-y-4">
-                  <Label>Select Product</Label>
-                  <Select
-                    value={selectedProduct?.id.toString()}
-                    onValueChange={(value) => {
-                      const product = products.find(p => p.id.toString() === value);
-                      handleProductSelect(product || null);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id.toString()}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-4">
+                <Label>Select Product</Label>
+                <Select
+                  value={selectedProduct?.id.toString() || "all"}
+                  onValueChange={(value) => {
+                    if (value === "all") {
+                      handleProductSelect(null);
+                      return;
+                    }
+                    const product = products.find(p => p.id.toString() === value);
+                    handleProductSelect(product || null);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Products</SelectItem>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id.toString()}>
+                        {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {selectedProduct && icps.length > 0 && (
                 <CompanyICPsTable
                   icps={icps}
@@ -742,9 +749,27 @@ export function GenerateICPsButton() {
                   productId={selectedProduct.id}
                 />
               )}
-              {selectedProduct && icps.length === 0 && (
+              {!selectedProduct && icps.length > 0 && (
+                <CompanyICPsTable
+                  icps={icps}
+                  companyId={selectedCompany.id}
+                  companyName={selectedCompany.name}
+                  companyIndustry={selectedCompany.industry}
+                  companyProductCategory={selectedCompany.product_category}
+                  competitors={competitors}
+                  selectedEngines={engines}
+                  selectedModel={modelSelection.questionModel}
+                  accountId={accountId || ''}
+                  selectedPrompts={{
+                    systemPromptName: selectedQuestionSystemPrompt || '',
+                    userPromptName: selectedQuestionUserPrompt || ''
+                  }}
+                  productId={undefined}
+                />
+              )}
+              {icps.length === 0 && (
                 <div className="text-sm text-muted-foreground">
-                  No ICPs found for this company and product combination.
+                  No ICPs found for this company{selectedProduct ? " and product" : ""}.
                 </div>
               )}
             </>

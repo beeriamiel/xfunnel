@@ -16,6 +16,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { type Step } from '../../types/setup'
 import { useDashboardStore } from '@/app/dashboard/store'
 import { generateInitialICPsAction } from "@/app/company-actions"
+import { updateCompanySetupCompletion } from '@/lib/services/company'
 
 // Add type definitions at the top
 type ProductChip = {
@@ -51,18 +52,10 @@ export function CompanySetup({
 
   console.log('🔵 CompanySetup Render:', {
     accountId,
-    currentWizardStep: useDashboardStore.getState().currentWizardStep,
-    completedSteps: useDashboardStore.getState().completedSteps,
     searchParams: Object.fromEntries(searchParams?.entries() || [])
   })
 
-  const { 
-    currentWizardStep,
-    completedSteps,
-    setWizardStep,
-    completeStep,
-    setSelectedCompanyId
-  } = useDashboardStore()
+  const { setSelectedCompanyId } = useDashboardStore()
 
   const [companyName, setCompanyName] = useState('')
   const [industry, setIndustry] = useState('')
@@ -73,6 +66,8 @@ export function CompanySetup({
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupProgress, setSetupProgress] = useState<string>('')
+  const [currentStep, setCurrentStep] = useState<Step>('initial')
 
   const urlCompanyId = searchParams.get('companyId')
   const [companyId, setCompanyId] = useState<number | null>(() => 
@@ -88,14 +83,6 @@ export function CompanySetup({
       personaChips
     })
   }, [productChips, competitorChips, icpChips, personaChips])
-
-  // Log step changes
-  useEffect(() => {
-    console.log('🟡 CompanySetup step changed:', {
-      currentWizardStep,
-      completedSteps
-    })
-  }, [currentWizardStep, completedSteps])
 
   useEffect(() => {
     const stepFromUrl = searchParams.get('step') as Step
@@ -113,20 +100,20 @@ export function CompanySetup({
         if (company) {
           setCompanyId(parseInt(urlCompanyId, 10))
           setCompanyName(company.name)
-          setWizardStep(stepFromUrl || 'initial')
+          setCurrentStep(stepFromUrl || 'initial')
         }
       }
       fetchCompany()
     }
     // Only update step if we have companyId and a step in URL
     else if (stepFromUrl && companyId) {
-      setWizardStep(stepFromUrl)
+      setCurrentStep(stepFromUrl)
     }
     // Force initial step if no company
     else if (!companyId) {
-      setWizardStep('initial')
+      setCurrentStep('initial')
     }
-  }, [searchParams, companyId, setWizardStep])
+  }, [searchParams, companyId])
 
   useEffect(() => {
     async function fetchExistingCompany() {
@@ -157,7 +144,6 @@ export function CompanySetup({
       const company = await onCompanyCreate(companyName)
       console.log('🟢 Company created:', company)
       
-      // Add ICP Generation
       console.log('🟡 Generating initial ICPs...')
       await generateInitialICPsAction(companyName, accountId)
       console.log('🟢 Initial ICPs generated')
@@ -166,21 +152,17 @@ export function CompanySetup({
       setCompanyName(companyName)
       setCompanyId(company.id)
       setSelectedCompanyId(company.id)
-      setWizardStep('product')
+      setCurrentStep('product')
       
       // Then update URL
       const params = new URLSearchParams()
       params.set('step', 'product')
       params.set('companyId', company.id.toString())
       await router.push(`/dashboard/generate-analysis?${params.toString()}`)
-      
-      // Finally complete the step
-      completeStep('initial', 'product')
 
       console.log('🟢 All state updated:', {
         companyId: company.id,
         step: 'product',
-        storeState: useDashboardStore.getState()
       })
     } catch (error) {
       console.error('🔴 handleInitialSubmit ERROR:', error)
@@ -197,7 +179,7 @@ export function CompanySetup({
       return
     }
     
-    completeStep(completedStep, nextStep)
+    setCurrentStep(nextStep)
     const params = new URLSearchParams(searchParams.toString())
     params.set('step', nextStep)
     params.set('companyId', companyId!.toString())
@@ -207,10 +189,18 @@ export function CompanySetup({
     console.log('🟢 CompanySetup step completed:', { completedStep, nextStep })
   }
 
-  const handleComplete = () => {
-    completeStep('personas', 'personas')
-    onTransitionStart()
-    onComplete()
+  const handleComplete = async () => {
+    if (!companyId) return;
+    
+    try {
+      await updateCompanySetupCompletion(Number(companyId));
+      setCurrentStep('personas');
+      onTransitionStart();
+      onComplete();
+    } catch (error) {
+      console.error('Failed to complete setup:', error);
+      setError(error instanceof Error ? error.message : 'Failed to complete setup');
+    }
   }
 
   const handleAddProduct = async (product: Product) => {
@@ -404,19 +394,19 @@ export function CompanySetup({
               title: companyName,
               summary: 'Company details'
             }}
-            onEdit={() => setWizardStep('initial')}
+            onEdit={() => setCurrentStep('initial')}
           />
-          {currentWizardStep !== 'initial' && (
+          {currentStep !== 'initial' && (
             <CompletedStepChip
               step={{
                 type: 'product',
                 title: `${productChips.length} Products`,
                 summary: productChips.map(p => p.name).join(', ')
               }}
-              onEdit={() => setWizardStep('product')}
+              onEdit={() => setCurrentStep('product')}
             />
           )}
-          {currentWizardStep === 'personas' && (
+          {currentStep === 'personas' && (
             <>
               <CompletedStepChip
                 step={{
@@ -424,7 +414,7 @@ export function CompanySetup({
                   title: `${competitorChips.length} Competitors`,
                   summary: competitorChips.map(c => c.name).join(', ')
                 }}
-                onEdit={() => setWizardStep('competitors')}
+                onEdit={() => setCurrentStep('competitors')}
               />
               <CompletedStepChip
                 step={{
@@ -432,7 +422,7 @@ export function CompanySetup({
                   title: `${icpChips.length} ICPs`,
                   summary: icpChips.map(icp => icp.vertical).join(', ')
                 }}
-                onEdit={() => setWizardStep('icps')}
+                onEdit={() => setCurrentStep('icps')}
               />
             </>
           )}
@@ -443,10 +433,11 @@ export function CompanySetup({
         <InitialStep
           accountId={accountId}
           onNext={handleInitialSubmit}
+          onProgress={setSetupProgress}
         />
       ) : (
         <>
-          {currentWizardStep === 'product' && (
+          {currentStep === 'product' && (
             <ProductStep
               products={productChips}
               onAddProduct={handleAddProduct}
@@ -456,7 +447,7 @@ export function CompanySetup({
             />
           )}
 
-          {currentWizardStep === 'competitors' && (
+          {currentStep === 'competitors' && (
             <CompetitorStep
               companyName={companyName}
               products={productChips}
@@ -469,7 +460,7 @@ export function CompanySetup({
             />
           )}
 
-          {currentWizardStep === 'icps' && (
+          {currentStep === 'icps' && (
             <ICPStep
               industry={industry}
               products={productChips}
@@ -482,7 +473,7 @@ export function CompanySetup({
             />
           )}
 
-          {currentWizardStep === 'personas' && (
+          {currentStep === 'personas' && (
             <PersonaStep
               onAddPersona={handleAddPersona}
               onEditPersona={handleEditPersona}

@@ -6,6 +6,12 @@ export interface AIOverviewResult {
   competitorMentions: string[]
   url?: string
   contentSnapshot?: string
+  relevantLinks?: Array<{
+    url: string
+    title?: string
+    snippet?: string
+    source?: string
+  }>
 }
 
 export interface AnalysisProgress {

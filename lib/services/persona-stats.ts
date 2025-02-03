@@ -66,6 +66,7 @@ export async function fetchPersonaStats(companyId: number, productId?: number): 
       icp_id,
       queries!left (
         id,
+        query_text,
         responses!left (
           id,
           response_batch_id
@@ -88,7 +89,16 @@ export async function fetchPersonaStats(companyId: number, productId?: number): 
   }
 
   // Debug log to see what we're getting
-  console.log('Raw query result:', JSON.stringify(data, null, 2));
+  console.log('🔵 Raw query result:', JSON.stringify(data, null, 2));
+  console.log('🔍 Query structure:', {
+    personasCount: data?.length,
+    firstPersona: data?.[0] ? {
+      id: data[0].id,
+      icp_id: data[0].icp_id,
+      queriesCount: data[0].queries?.length,
+      firstQuery: data[0].queries?.[0]
+    } : null
+  });
 
   // Get all batch IDs
   const batchIds = (data || []).flatMap(persona => 

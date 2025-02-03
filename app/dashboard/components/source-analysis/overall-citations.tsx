@@ -93,6 +93,24 @@ const Spinner = () => {
   )
 }
 
+const MetricSkeleton = () => {
+  return (
+    <div className="space-y-2">
+      <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+      <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+    </div>
+  )
+}
+
+const ChartSkeleton = () => {
+  return (
+    <div className="flex flex-col items-center justify-center h-[300px] space-y-4">
+      <Spinner />
+      <p className="text-sm text-muted-foreground">Analyzing data...</p>
+    </div>
+  )
+}
+
 function PaginationControls({ 
   currentPage, 
   totalPages, 
@@ -362,8 +380,23 @@ export function OverallCitations({ companyId, accountId }: Props) {
             created_at,
             answer_engine,
             product_id
-          `)
-          .not('answer_engine', 'in', '("google_search","google-search")') as any
+          `, { count: 'exact', head: false })
+          .not('answer_engine', 'in', '("google_search","google-search")')
+          .limit(10000)
+
+        // Log the query configuration
+        console.log('Query configuration:', {
+          hasLimit: true,
+          limitValue: 10000,
+          effectiveCompanyId,
+          filters: {
+            buyingJourneyPhase: filters.buyingJourneyPhase,
+            sourceType: filters.sourceType,
+            answerEngine: filters.answerEngine,
+            buyerPersona: filters.buyerPersona,
+            productId: filters.productId || selectedProductId
+          }
+        })
 
         // Apply filters
         if (filters.buyingJourneyPhase) {
@@ -386,20 +419,56 @@ export function OverallCitations({ companyId, accountId }: Props) {
 
         query = query.eq('company_id', effectiveCompanyId)
 
-        const { data, error: fetchError } = await query
+        // Fetch all pages
+        let allData: CitationRow[] = []
+        let hasMore = true
+        let currentPage = 0
+        const pageSize = 1000
 
-        console.log('Citations query result:', {
-          success: !!data,
-          count: data?.length || 0,
-          error: fetchError
+        while (hasMore) {
+          console.log(`Fetching page ${currentPage + 1}`)
+          
+          const { data: pageData, error: pageError } = await query
+            .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
+            .order('id', { ascending: true }) as {
+              data: CitationRow[] | null;
+              error: Error | null;
+            }
+
+          if (pageError) {
+            console.error(`Error fetching page ${currentPage + 1}:`, pageError)
+            throw pageError
+          }
+
+          if (pageData && pageData.length > 0) {
+            allData = [...allData, ...pageData]
+            currentPage++
+            hasMore = pageData.length === pageSize
+          } else {
+            hasMore = false
+          }
+
+          console.log('Progress:', {
+            currentPage,
+            newRecords: pageData?.length || 0,
+            totalSoFar: allData.length
+          })
+        }
+
+        console.log('Raw citations query result:', {
+          success: true,
+          count: allData.length,
+          error: null,
+          firstFewUrls: allData.slice(0, 3).map((c: CitationRow) => ({
+            url: c.citation_url,
+            engine: c.answer_engine,
+            product_id: c.product_id
+          }))
         })
-
-        if (fetchError) throw fetchError
 
         // Extract unique buyer personas
         const uniquePersonas = Array.from(new Set(
-          (data as CitationRow[])
-            .map(citation => citation.buyer_persona)
+          allData.map(citation => citation.buyer_persona)
             .filter((persona): persona is string => Boolean(persona))
         )).sort()
         
@@ -415,13 +484,21 @@ export function OverallCitations({ companyId, accountId }: Props) {
 
         try {
           // First pass: collect all data
-          const citations = data as CitationRow[]
+          const citations = allData
           console.log('Processing citations:', {
             totalCitations: citations.length,
             sampleCitation: citations[0] ? {
               url: citations[0].citation_url,
-              product_id: citations[0].product_id
-            } : null
+              product_id: citations[0].product_id,
+              answer_engine: citations[0].answer_engine
+            } : null,
+            uniqueEngines: Array.from(new Set(citations.map(c => c.answer_engine))),
+            citationsPerEngine: citations.reduce((acc: Record<string, number>, c: CitationRow) => {
+              if (c.answer_engine) {
+                acc[c.answer_engine] = (acc[c.answer_engine] || 0) + 1;
+              }
+              return acc;
+            }, {} as Record<string, number>)
           })
 
           citations.forEach((citation) => {
@@ -545,6 +622,23 @@ export function OverallCitations({ companyId, accountId }: Props) {
           const processedSources = Array.from(groupedCitations.values())
             .sort((a, b) => b.citation_count - a.citation_count)
 
+          console.log('Citation counts per source:', 
+            processedSources.slice(0, 10).map(source => ({
+              url: source.citation_url,
+              count: source.citation_count,
+              domain: source.domain
+            }))
+          )
+
+          console.log('Processed sources:', {
+            totalSources: processedSources.length,
+            totalCitations: processedSources.reduce((sum, source) => sum + source.citation_count, 0),
+            sampleCounts: processedSources.slice(0, 3).map(s => ({
+              url: s.citation_url,
+              count: s.citation_count
+            }))
+          })
+
           setSources(processedSources)
           setIsLoading(false)
         } catch (processingError) {
@@ -639,9 +733,20 @@ export function OverallCitations({ companyId, accountId }: Props) {
                       <p className="text-sm font-medium text-muted-foreground">Total Citations</p>
                       <span className="text-sm text-emerald-600">+12% from last month</span>
                     </div>
-                    <p className="text-3xl font-bold">
-                      {sources.reduce((sum, source) => sum + source.citation_count, 0).toLocaleString()}
-                    </p>
+                    {isLoading ? (
+                      <MetricSkeleton />
+                    ) : (
+                      <p className="text-3xl font-bold">
+                        {(() => {
+                          const total = sources.reduce((sum, source) => sum + source.citation_count, 0)
+                          console.log('Render calculation:', {
+                            sourcesLength: sources.length,
+                            totalCitations: total
+                          })
+                          return total.toLocaleString()
+                        })()}
+                      </p>
+                    )}
                   </div>
 
                   <div className="h-[1px] bg-border" />
@@ -651,9 +756,13 @@ export function OverallCitations({ companyId, accountId }: Props) {
                       <p className="text-sm font-medium text-muted-foreground">Unique Sources</p>
                       <span className="text-sm text-emerald-600">+5% from last month</span>
                     </div>
-                    <p className="text-3xl font-bold">
-                      {sources.length.toLocaleString()}
-                    </p>
+                    {isLoading ? (
+                      <MetricSkeleton />
+                    ) : (
+                      <p className="text-3xl font-bold">
+                        {sources.length.toLocaleString()}
+                      </p>
+                    )}
                   </div>
 
                   <div className="h-[1px] bg-border" />
@@ -663,13 +772,17 @@ export function OverallCitations({ companyId, accountId }: Props) {
                       <p className="text-sm font-medium text-muted-foreground">Companies Mentioned</p>
                       <span className="text-sm text-emerald-600">8 new this month</span>
                     </div>
-                    <p className="text-3xl font-bold">
-                      {Array.from(new Set(
-                        sources.flatMap(source => 
-                          source.mentioned_companies_count.map(mention => mention.split(':')[0])
-                        )
-                      )).length.toLocaleString()}
-                    </p>
+                    {isLoading ? (
+                      <MetricSkeleton />
+                    ) : (
+                      <p className="text-3xl font-bold">
+                        {Array.from(new Set(
+                          sources.flatMap(source => 
+                            source.mentioned_companies_count.map(mention => mention.split(':')[0])
+                          )
+                        )).length.toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -681,41 +794,45 @@ export function OverallCitations({ companyId, accountId }: Props) {
                 <CardTitle className="text-base">Buyer Journey Phases</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 pb-0">
-                <ChartContainer 
-                  config={journeyPhaseConfig}
-                  className="mx-auto aspect-square max-h-[300px]"
-                >
-                  <PieChart>
-                    <Pie
-                      data={sources.reduce((acc, source) => {
-                        source.buyer_journey_phases.forEach(phase => {
-                          const existing = acc.find(item => item.name === phase)
-                          if (existing) {
-                            existing.value += source.citation_count
-                          } else {
-                            acc.push({ 
-                              name: phase,
-                              label: JOURNEY_PHASES.find(p => p.value === phase)?.label || phase,
-                              value: source.citation_count,
-                              fill: getChartColor(phase)
-                            })
-                          }
-                        })
-                        return acc
-                      }, [] as { name: string; label: string; value: number; fill: string }[])}
-                      dataKey="value"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                    />
-                    <ChartLegend
-                      content={<ChartLegendContent />}
-                      className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                    />
-                  </PieChart>
-                </ChartContainer>
+                {isLoading ? (
+                  <ChartSkeleton />
+                ) : (
+                  <ChartContainer 
+                    config={journeyPhaseConfig}
+                    className="mx-auto aspect-square max-h-[300px]"
+                  >
+                    <PieChart>
+                      <Pie
+                        data={sources.reduce((acc, source) => {
+                          source.buyer_journey_phases.forEach(phase => {
+                            const existing = acc.find(item => item.name === phase)
+                            if (existing) {
+                              existing.value += source.citation_count
+                            } else {
+                              acc.push({ 
+                                name: phase,
+                                label: JOURNEY_PHASES.find(p => p.value === phase)?.label || phase,
+                                value: source.citation_count,
+                                fill: getChartColor(phase)
+                              })
+                            }
+                          })
+                          return acc
+                        }, [] as { name: string; label: string; value: number; fill: string }[])}
+                        dataKey="value"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                      />
+                      <ChartLegend
+                        content={<ChartLegendContent />}
+                        className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -725,39 +842,43 @@ export function OverallCitations({ companyId, accountId }: Props) {
                 <CardTitle className="text-base">Citation Sources</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 pb-0">
-                <ChartContainer 
-                  config={sourceTypeConfig}
-                  className="mx-auto aspect-square max-h-[300px]"
-                >
-                  <PieChart>
-                    <Pie
-                      data={sources.reduce((acc, source) => {
-                        const type = source.source_type?.toUpperCase() || 'UNKNOWN'
-                        const existing = acc.find(item => item.name === type)
-                        if (existing) {
-                          existing.value += source.citation_count
-                        } else {
-                          acc.push({ 
-                            name: type, 
-                            value: source.citation_count,
-                            fill: getChartColor(type)
-                          })
-                        }
-                        return acc
-                      }, [] as { name: string; value: number; fill: string }[])}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                    />
-                    <ChartLegend
-                      content={<ChartLegendContent />}
-                      className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                    />
-                  </PieChart>
-                </ChartContainer>
+                {isLoading ? (
+                  <ChartSkeleton />
+                ) : (
+                  <ChartContainer 
+                    config={sourceTypeConfig}
+                    className="mx-auto aspect-square max-h-[300px]"
+                  >
+                    <PieChart>
+                      <Pie
+                        data={sources.reduce((acc, source) => {
+                          const type = source.source_type?.toUpperCase() || 'UNKNOWN'
+                          const existing = acc.find(item => item.name === type)
+                          if (existing) {
+                            existing.value += source.citation_count
+                          } else {
+                            acc.push({ 
+                              name: type, 
+                              value: source.citation_count,
+                              fill: getChartColor(type)
+                            })
+                          }
+                          return acc
+                        }, [] as { name: string; value: number; fill: string }[])}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                      />
+                      <ChartLegend
+                        content={<ChartLegendContent />}
+                        className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -767,41 +888,45 @@ export function OverallCitations({ companyId, accountId }: Props) {
                 <CardTitle className="text-base">Answer Engines</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 pb-0">
-                <ChartContainer 
-                  config={answerEngineConfig}
-                  className="mx-auto aspect-square max-h-[300px]"
-                >
-                  <PieChart>
-                    <Pie
-                      data={sources.reduce((acc, source) => {
-                        source.answer_engines.forEach(engine => {
-                          const existing = acc.find(item => item.name === engine)
-                          if (existing) {
-                            existing.value += source.citation_count
-                          } else {
-                            acc.push({ 
-                              name: engine,
-                              label: ANSWER_ENGINES.find(e => e.value === engine)?.label || engine,
-                              value: source.citation_count,
-                              fill: getChartColor(engine)
-                            })
-                          }
-                        })
-                        return acc
-                      }, [] as { name: string; label: string; value: number; fill: string }[])}
-                      dataKey="value"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                    />
-                    <ChartLegend
-                      content={<ChartLegendContent />}
-                      className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                    />
-                  </PieChart>
-                </ChartContainer>
+                {isLoading ? (
+                  <ChartSkeleton />
+                ) : (
+                  <ChartContainer 
+                    config={answerEngineConfig}
+                    className="mx-auto aspect-square max-h-[300px]"
+                  >
+                    <PieChart>
+                      <Pie
+                        data={sources.reduce((acc, source) => {
+                          source.answer_engines.forEach(engine => {
+                            const existing = acc.find(item => item.name === engine)
+                            if (existing) {
+                              existing.value += source.citation_count
+                            } else {
+                              acc.push({ 
+                                name: engine,
+                                label: ANSWER_ENGINES.find(e => e.value === engine)?.label || engine,
+                                value: source.citation_count,
+                                fill: getChartColor(engine)
+                              })
+                            }
+                          })
+                          return acc
+                        }, [] as { name: string; label: string; value: number; fill: string }[])}
+                        dataKey="value"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                      />
+                      <ChartLegend
+                        content={<ChartLegendContent />}
+                        className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                )}
               </CardContent>
             </Card>
           </div>

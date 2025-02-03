@@ -26,6 +26,7 @@ import { design } from '../../../lib/design-system'
 import type { Product } from '../../../types/setup'
 import { useDashboardStore } from '@/app/dashboard/store'
 import { createClient } from '@/app/supabase/client'
+import type { Database } from '@/types/supabase'
 
 interface ProductStepProps {
   products: Product[];
@@ -33,6 +34,23 @@ interface ProductStepProps {
   onEditProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
   onNext: () => void;
+}
+
+interface DbProduct {
+  id: number;
+  name: string;
+  company_id: number;
+}
+
+type MainProduct = string | { id: string; name: string; businessModel?: 'B2B' | 'B2C'; description?: string };
+
+function mapMainProductToProduct(p: MainProduct, generateId: () => string): Product {
+  return {
+    id: typeof p === 'string' ? generateId() : p.id,
+    name: typeof p === 'string' ? p : p.name,
+    businessModel: typeof p === 'string' ? 'B2B' : (p.businessModel || 'B2B'),
+    description: typeof p === 'string' ? '' : (p.description || '')
+  }
 }
 
 export function ProductStep({ 
@@ -112,24 +130,24 @@ export function ProductStep({
       }
 
       try {
-        const { data: company } = await supabase
-          .from('companies')
-          .select('main_products')
-          .eq('id', selectedCompanyId)
-          .single()
+        // First try to get products from the products table
+        const { data: dbProducts } = await supabase
+          .from('products')
+          .select('id, name, company_id')
+          .eq('company_id', selectedCompanyId)
 
-        console.log('🟡 ProductStep: DB products fetched:', company?.main_products)
+        console.log('🟡 ProductStep: DB products fetched:', dbProducts)
 
-        if (company?.main_products?.length && isMounted) {
+        if (dbProducts?.length && isMounted) {
           // Map the products from the database
-          const dbProducts = company.main_products.map((p: any) => ({
-            id: typeof p === 'string' ? p : p.id,
-            name: typeof p === 'string' ? p : p.name,
-            businessModel: typeof p === 'string' ? 'B2B' : (p.businessModel || 'B2B'),
-            description: typeof p === 'string' ? '' : (p.description || '')
+          const mappedProducts: Product[] = (dbProducts as DbProduct[]).map(p => ({
+            id: p.id.toString(),
+            name: p.name,
+            businessModel: 'B2B' as const,
+            description: ''
           }))
 
-          console.log('🟢 ProductStep: Adding mapped products:', dbProducts)
+          console.log('🟢 ProductStep: Adding mapped products:', mappedProducts)
 
           // Update the store
           if (isMounted) {
@@ -141,12 +159,51 @@ export function ProductStep({
           
           // Add each new product that doesn't already exist
           const existingIds = new Set(products.map(p => p.id))
-          for (const dbProduct of dbProducts) {
+          for (const dbProduct of mappedProducts) {
             if (isMounted && !existingIds.has(dbProduct.id)) {
               console.log('🟢 ProductStep: Adding new product:', dbProduct)
               onAddProduct(dbProduct)
             } else {
               console.log('🟡 ProductStep: Skipping existing product:', dbProduct)
+            }
+          }
+        } else {
+          // Fallback to checking main_products if no products found in products table
+          console.log('🟡 ProductStep: No products in products table, checking main_products')
+          
+          const { data: company } = await supabase
+            .from('companies')
+            .select('main_products')
+            .eq('id', selectedCompanyId)
+            .single()
+
+          console.log('🟡 ProductStep: DB main_products fetched:', company?.main_products)
+
+          if (company?.main_products?.length && isMounted) {
+            // Map the products from the database
+            const mainProductsList = (company.main_products as MainProduct[]).map(p => 
+              mapMainProductToProduct(p, generateUniqueId)
+            )
+
+            console.log('🟢 ProductStep: Adding mapped main_products:', mainProductsList)
+
+            // Update the store
+            if (isMounted) {
+              setStepData({
+                ...stepData,
+                hasProducts: true
+              })
+            }
+            
+            // Add each new product that doesn't already exist
+            const existingIds = new Set(products.map(p => p.id))
+            for (const dbProduct of mainProductsList) {
+              if (isMounted && !existingIds.has(dbProduct.id)) {
+                console.log('🟢 ProductStep: Adding new product:', dbProduct)
+                onAddProduct(dbProduct)
+              } else {
+                console.log('🟡 ProductStep: Skipping existing product:', dbProduct)
+              }
             }
           }
         }

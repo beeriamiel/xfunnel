@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card } from '@/components/ui/card'
 import { EngineMetricsChart as SearchEngineOverview } from './engine-metrics-chart'
@@ -20,6 +20,8 @@ import { OverallCitations } from './source-analysis/overall-citations'
 import { AIOverviews } from './ai-overviews'
 import { useSession } from '@/app/providers/session-provider'
 import { useSearchParams } from 'next/navigation'
+import { getPersonalSettingsData } from '../actions/personal-settings-actions'
+import { useCallback } from 'react'
 
 interface Company {
   id: number
@@ -51,6 +53,49 @@ function ErrorState({ error }: { error: string }) {
     <Alert variant="destructive" className="m-4">
       <AlertDescription>{error}</AlertDescription>
     </Alert>
+  )
+}
+
+function PersonalSettingsWrapper({ accountId }: { accountId: string }) {
+  const [data, setData] = useState<any>(null)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const settingsData = await getPersonalSettingsData(accountId)
+        setData(settingsData)
+      } catch (err) {
+        console.error('Error fetching personal settings:', err)
+        setError(err as Error)
+      }
+    }
+    fetchData()
+  }, [accountId])
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          Failed to load personal settings. Please try again later.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (!data) {
+    return <MetricsSkeleton />
+  }
+
+  return (
+    <PersonalSettings 
+      accountId={accountId}
+      accountData={data.accountData}
+      userData={data.userData}
+      companyData={data.companyData}
+      responseStats={data.responseStats}
+      analysisCoverage={data.analysisCoverage}
+    />
   )
 }
 
@@ -102,7 +147,7 @@ function DashboardView({
               accountId={accountId}
             />
           ) : activeView === 'personal' ? (
-            <PersonalSettings accountId={accountId} />
+            <PersonalSettingsWrapper accountId={accountId} />
           ) : activeView === 'ai-overviews' ? (
             <AIOverviews
               companyId={selectedCompany.id}

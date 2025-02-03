@@ -17,6 +17,7 @@ import { createClient } from '@/app/supabase/client'
 import { useEffect } from 'react'
 import { CompanySelector } from "./company-selector"
 import { ProductSelector } from "./product-selector"
+import { StaticCompanyDisplay } from "./static-company-display"
 import type { Company } from '../generate-analysis/types/company'
 import { getCompanyProfile } from '../generate-analysis/utils/actions'
 import { useParams } from 'next/navigation'
@@ -27,7 +28,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
-  const { activeView, isSuperAdmin, companies, selectedCompanyId, companyProfile, selectedProductId, setCompanyProfile } = useDashboardStore()
+  const { activeView, isSuperAdmin, companies, selectedCompanyId, companyProfile, selectedProductId, setCompanyProfile, setSelectedProductId } = useDashboardStore()
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || null
   const selectedProduct = companyProfile?.products?.find(p => p.id.toString() === selectedProductId) || null
   const supabase = createClient()
@@ -48,39 +49,69 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
   // Fetch company profile when selectedCompanyId changes
   useEffect(() => {
     async function fetchCompanyProfile() {
-      if (!selectedCompanyId || !accountId) return
+      if (!selectedCompanyId || !accountId) {
+        console.log('Missing required IDs:', { selectedCompanyId, accountId })
+        return
+      }
       
       try {
         console.log('Fetching company profile for:', { selectedCompanyId, accountId })
         const profile = await getCompanyProfile(selectedCompanyId, accountId)
         console.log('Received profile:', profile)
         
-        if (profile) {
-          // Transform API response to match CompanyProfile interface
-          const transformedProfile = {
-            ...profile,
-            icps: profile.ideal_customer_profiles || [],
-            personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
-            products: profile.products || [],
-            competitors: (profile.competitors || []).map(c => ({
-              id: String(c.id),
-              name: c.competitor_name
-            }))
+        if (!profile) {
+          console.log('No profile received, resetting state')
+          setCompanyProfile(null)
+          setSelectedProductId(null)
+          return
+        }
+
+        // Transform API response to match CompanyProfile interface
+        const transformedProfile = {
+          ...profile,
+          icps: profile.ideal_customer_profiles || [],
+          personas: profile.ideal_customer_profiles?.flatMap(icp => icp.personas || []) || [],
+          products: profile.products || [],
+          competitors: (profile.competitors || []).map(c => ({
+            id: String(c.id),
+            name: c.competitor_name
+          }))
+        }
+
+        // Deep compare relevant fields to check for changes
+        const hasRelevantChanges = !companyProfile || 
+          transformedProfile.name !== companyProfile.name ||
+          JSON.stringify(transformedProfile.products) !== JSON.stringify(companyProfile.products) ||
+          JSON.stringify(transformedProfile.competitors) !== JSON.stringify(companyProfile.competitors)
+
+        if (hasRelevantChanges) {
+          console.log('Profile has relevant changes, updating state')
+          
+          // Check if current product still exists and is valid
+          const currentProduct = selectedProductId && transformedProfile.products?.find(
+            p => p.id.toString() === selectedProductId
+          )
+          
+          if (!currentProduct) {
+            console.log('Selected product no longer valid, resetting selection')
+            setSelectedProductId(null)
+          } else {
+            console.log('Keeping current product selection:', currentProduct.name)
           }
-          console.log('Transformed profile:', transformedProfile)
+          
           setCompanyProfile(transformedProfile)
         } else {
-          console.log('No profile received, setting to null')
-          setCompanyProfile(null)
+          console.log('No relevant changes detected, skipping update')
         }
       } catch (error) {
         console.error('Error fetching company profile:', error)
-        setCompanyProfile(null)
+        // Don't reset everything on error, just log it
+        console.warn('Keeping existing state due to fetch error')
       }
     }
 
     fetchCompanyProfile()
-  }, [selectedCompanyId, accountId, setCompanyProfile])
+  }, [selectedCompanyId, accountId, setCompanyProfile, setSelectedProductId, companyProfile, selectedProductId])
   
   // Add logging for products being passed to selector
   console.log('Products being passed to selector:', companyProfile?.products || [])
@@ -120,6 +151,12 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
   // Determine if we should show the section link
   const showSectionLink = section !== 'Dashboard' || activeView !== 'engine'
 
+  // Determine if we should show company selector
+  const shouldShowCompanySelector = isSuperAdmin || companies.length > 1
+
+  // Determine if we should show product selector
+  const shouldShowProductSelector = selectedCompany && (isSuperAdmin || (companyProfile?.products?.length ?? 0) > 1)
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
       <div className="flex items-center gap-2">
@@ -152,16 +189,16 @@ export function DashboardHeader({ title, accountId }: DashboardHeaderProps) {
         </Breadcrumb>
       </div>
       <div className="flex items-center gap-4">
-        {isSuperAdmin && (
-          <>
-            <CompanySelector selectedCompany={selectedCompany} companies={companies} />
-            {selectedCompany && (
-              <ProductSelector 
-                selectedProduct={selectedProduct} 
-                products={companyProfile?.products || []} 
-              />
-            )}
-          </>
+        {shouldShowCompanySelector ? (
+          <CompanySelector selectedCompany={selectedCompany} companies={companies} />
+        ) : selectedCompany && (
+          <StaticCompanyDisplay companyName={selectedCompany.name} />
+        )}
+        {shouldShowProductSelector && (
+          <ProductSelector 
+            selectedProduct={selectedProduct} 
+            products={companyProfile?.products || []} 
+          />
         )}
         <AuthButton />
       </div>

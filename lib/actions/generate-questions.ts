@@ -100,7 +100,8 @@ export async function generateQuestions(
   systemPromptName: string,
   userPromptName: string,
   model: AIModelType = 'chatgpt-4o-latest',
-  accountId: string
+  accountId: string,
+  productId: number
 ): Promise<{ queries: QueryWithId[], batchId: string }> {
   const supabase = await createClient();
   const adminClient = await createAdminClient();
@@ -354,6 +355,18 @@ export async function generateQuestions(
     // Insert questions with batch information
     const queries: QueryWithId[] = [];
     for (const question of generatedQuestions.questions) {
+      console.log('🔵 Inserting query with data:', {
+        query_text: question.query_text,
+        buyer_journey_phase: question.buyer_journey_phase,
+        company_id: companyId,
+        persona_id: personaId,
+        user_id: user.id,
+        query_batch_id: batchId,
+        created_by_batch: true,
+        account_id: accountId,
+        product_id: productId
+      });
+
       const { data: query, error: queryError } = await adminClient
         .from('queries')
         .insert({
@@ -364,7 +377,8 @@ export async function generateQuestions(
           user_id: user.id,
           query_batch_id: batchId,
           created_by_batch: true,
-          account_id: accountId
+          account_id: accountId,
+          product_id: productId
         })
         .select('id, query_text, buyer_journey_phase')
         .single();
