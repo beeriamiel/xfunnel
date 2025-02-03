@@ -11,18 +11,13 @@ import { DashboardHeader } from './dashboard-header'
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import type { Company } from '../generate-analysis/types/company'
-import type { Database } from '@/types/supabase'
-import type { Step } from '../generate-analysis/types/setup'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { checkOnboardingStatus } from '../actions/check-onboarding'
 
 interface DashboardWrapperProps {
   children: React.ReactNode;
   selectedCompany: Company | null;
   accountId: string;
   initialCompanies: Company[];
-  isOnboarding: boolean;
-  currentStep?: Step;
   isSuperAdmin?: boolean;
 }
 
@@ -68,8 +63,6 @@ export function DashboardWrapper({
   selectedCompany,
   accountId,
   initialCompanies,
-  isOnboarding: initialIsOnboarding,
-  currentStep,
   children,
   isSuperAdmin
 }: DashboardWrapperProps) {
@@ -77,7 +70,6 @@ export function DashboardWrapper({
     selectedCompany,
     accountId,
     initialCompaniesCount: initialCompanies.length,
-    isOnboarding: initialIsOnboarding,
     storeState: useDashboardStore.getState(),
     pathname: window?.location?.pathname,
     search: window?.location?.search
@@ -87,37 +79,14 @@ export function DashboardWrapper({
   const searchParams = useSearchParams()
   const { 
     setSelectedCompanyId, 
-    setCompanies, 
-    setWizardStep, 
-    setIsSuperAdmin, 
+    setCompanies,
+    setIsSuperAdmin,
     companyProfile,
-    setSelectedProductId,
-    syncOnboardingState,
-    onboarding: { isOnboarding, serverCompleted }
+    setSelectedProductId
   } = useDashboardStore()
   
   const hasRedirected = useRef(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
-
-  // Sync onboarding state with server
-  useEffect(() => {
-    if (selectedCompany) {
-      const isServerCompleted = !!selectedCompany.setup_completed_at
-      console.log('🔵 Syncing onboarding state:', {
-        companyId: selectedCompany.id,
-        setup_completed_at: selectedCompany.setup_completed_at,
-        isServerCompleted,
-        selectedCompany
-      })
-
-      // Only sync if we have valid setup_completed_at data
-      if (selectedCompany.setup_completed_at !== undefined) {
-        syncOnboardingState(selectedCompany.id, isServerCompleted)
-      } else {
-        console.warn('Missing setup_completed_at for company:', selectedCompany.id)
-      }
-    }
-  }, [selectedCompany, syncOnboardingState])
 
   // Handle company auto-selection
   useEffect(() => {
@@ -175,32 +144,8 @@ export function DashboardWrapper({
   }, [companyProfile, searchParams, setSelectedProductId, isSuperAdmin])
 
   let mainContent
-  const shouldShowSetup = isOnboarding && !serverCompleted
   
-  console.log('🟡 Content render decision:', {
-    isOnboarding,
-    serverCompleted,
-    shouldShowSetup,
-    selectedCompany: !!selectedCompany
-  })
-
-  if (shouldShowSetup) {
-    console.log('🟢 Rendering onboarding content:', {
-      isOnboarding,
-      serverCompleted,
-      step: searchParams.get('step'),
-      pathname: window?.location?.pathname
-    })
-    mainContent = (
-      <div className="w-full h-full flex items-start justify-center pt-8">
-        <div className="w-full max-w-[560px] px-6">
-          <div className="bg-card rounded-xl shadow-lg p-6 relative">
-            {children}
-          </div>
-        </div>
-      </div>
-    )
-  } else if (!selectedCompany) {
+  if (!selectedCompany) {
     // Show loading state during initial load
     if (isInitialLoad) {
       mainContent = <LoadingSkeleton />
@@ -234,18 +179,9 @@ export function DashboardWrapper({
             <DashboardHeader accountId={accountId} />
           </Suspense>
           <div className="flex flex-1 h-[calc(100vh-4rem)] relative">
-            {shouldShowSetup && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm pointer-events-none z-30 transition-all duration-200" />
-            )}
             <AppSidebar />
             <main className="flex-1 w-full overflow-auto">
-              {shouldShowSetup ? (
-                <div className="relative z-40">
-                  {mainContent}
-                </div>
-              ) : (
-                mainContent
-              )}
+              {mainContent}
             </main>
           </div>
         </div>

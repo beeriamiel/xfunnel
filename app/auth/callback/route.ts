@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    const redirectTo = requestUrl.searchParams.get('redirect_to') || '/dashboard'
+    const redirectTo = requestUrl.searchParams.get('redirect_to') || '/auth/setup'
 
     if (!code) {
       return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))
