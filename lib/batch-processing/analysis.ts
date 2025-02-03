@@ -76,7 +76,7 @@ ${text}`;
     });
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
@@ -209,7 +209,7 @@ async function findRankingWithPrompts(text: string, ourCompanyName: string, comp
 
     console.log('Calling Claude API...');
     const message = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [

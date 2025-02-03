@@ -6,18 +6,90 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { 
   Camera, Building2, Mail, BarChart2, Users, 
-  MessageSquare, Folders, PlusCircle, CreditCard 
+  MessageSquare, Folders, PlusCircle, CreditCard, Pencil, Check, X 
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
+import { useState } from "react"
+import { createClient } from "@/app/supabase/client"
 
 interface PersonalSettingsProps {
   accountId: string;
+  accountData: {
+    name: string;
+    plan_type: string;
+    monthly_credits_available: number;
+    monthly_credits_used: number;
+    credits_renewal_date: string;
+  };
+  companyData: {
+    name: string;
+  };
+  userData: {
+    user_name: string | null;
+  };
+  analysisCoverage: {
+    icp_count: number;
+    persona_count: number;
+    region_count: number;
+  };
+  responseStats: {
+    total_responses: number;
+    responses_this_month: number;
+    last_activity: string | null;
+  };
 }
 
-export function PersonalSettings({ accountId }: PersonalSettingsProps) {
+export function PersonalSettings({ 
+  accountId, 
+  accountData,
+  companyData,
+  userData,
+  analysisCoverage,
+  responseStats
+}: PersonalSettingsProps) {
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(userData.user_name || '');
+  const supabase = createClient();
+
+  // Calculate credits percentage
+  const totalCredits = accountData.monthly_credits_available;
+  const usedCredits = accountData.monthly_credits_used;
+  const creditsPercentage = (usedCredits / totalCredits) * 100;
+
+  // Calculate days until renewal
+  const daysUntilRenewal = accountData.credits_renewal_date ? 
+    Math.ceil((new Date(accountData.credits_renewal_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : 
+    0;
+
+  // Format email from account name (remove "'s Account" suffix)
+  const email = accountData.name.replace(/'s Account$/, '');
+
+  async function handleUpdateName() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('No user found');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('account_users')
+        .update({ user_name: editedName || null })
+        .eq('account_id', accountId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setIsEditingName(false);
+    } catch (error) {
+      console.error('Error updating name:', error);
+    }
+  }
+
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-6 px-6">
       {/* Top Section: Profile and Credits */}
       <div className="grid grid-cols-12 gap-6">
         {/* Profile Card */}
@@ -33,7 +105,7 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
                   <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
                     <AvatarImage src="" />
                     <AvatarFallback className="bg-gradient-to-br from-purple-50 to-purple-100 text-purple-900 text-xl">
-                      JD
+                      {userData.user_name ? userData.user_name.substring(0, 2).toUpperCase() : 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </motion.div>
@@ -49,9 +121,54 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
               </div>
               
               <div className="mt-4 space-y-1">
-                <h2 className="font-semibold text-lg">John Doe</h2>
+                <div className="relative group">
+                  {isEditingName ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        className="h-7 text-center"
+                        placeholder="Enter your name"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleUpdateName();
+                          if (e.key === 'Escape') setIsEditingName(false);
+                        }}
+                      />
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={handleUpdateName}
+                        >
+                          <Check className="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => setIsEditingName(false)}
+                        >
+                          <X className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <h2 className="font-semibold text-lg flex items-center justify-center gap-2">
+                      {userData.user_name || 'Update your name'}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 h-7 w-7 p-0"
+                        onClick={() => setIsEditingName(true)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </h2>
+                  )}
+                </div>
                 <Badge variant="secondary" className="bg-purple-50 text-purple-900">
-                  Pro Plan
+                  {accountData.plan_type}
                 </Badge>
               </div>
             </div>
@@ -66,14 +183,14 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
                 whileHover={{ x: 2 }}
               >
                 <Mail className="h-4 w-4 mr-2" />
-                john@acme.com
+                {email}
               </motion.div>
               <motion.div 
                 className="flex items-center text-muted-foreground"
                 whileHover={{ x: 2 }}
               >
                 <Building2 className="h-4 w-4 mr-2" />
-                Acme Corp
+                {companyData.name}
               </motion.div>
             </motion.div>
 
@@ -116,19 +233,19 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
                     animate={{ opacity: 1 }}
                     className="text-3xl font-bold text-purple-900"
                   >
-                    1,250
+                    {usedCredits}
                   </motion.div>
-                  <div className="text-sm text-muted-foreground">of 2,000 credits</div>
+                  <div className="text-sm text-muted-foreground">of {totalCredits} credits</div>
                 </div>
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  <Progress value={62.5} className="h-2" />
+                  <Progress value={creditsPercentage} className="h-2" />
                 </motion.div>
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>62.5% used</span>
-                  <span>Refreshes in 15 days</span>
+                  <span>{creditsPercentage.toFixed(1)}% used</span>
+                  <span>Refreshes in {daysUntilRenewal} days</span>
                 </div>
               </div>
 
@@ -141,7 +258,7 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
                 >
                   <div className="flex justify-between text-sm">
                     <span>This Month</span>
-                    <span className="font-medium">750 credits</span>
+                    <span className="font-medium">{usedCredits} credits</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Last Month</span>
@@ -182,11 +299,11 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
                 animate={{ opacity: 1 }}
                 className="text-3xl font-semibold"
               >
-                12,458
+                {responseStats.total_responses.toLocaleString()}
               </motion.div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="bg-green-50 text-green-700">
-                  +1,432
+                  +{responseStats.responses_this_month.toLocaleString()}
                 </Badge>
                 <span className="text-sm text-muted-foreground">This Month</span>
               </div>
@@ -212,15 +329,15 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="text-2xl font-semibold">245</div>
+                <div className="text-2xl font-semibold">{analysisCoverage.persona_count}</div>
                 <div className="text-sm text-muted-foreground">Personas</div>
               </motion.div>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="text-2xl font-semibold">156</div>
+                <div className="text-2xl font-semibold">{analysisCoverage.icp_count}</div>
                 <div className="text-sm text-muted-foreground">ICPs</div>
               </motion.div>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="text-2xl font-semibold">89</div>
+                <div className="text-2xl font-semibold">{analysisCoverage.region_count}</div>
                 <div className="text-sm text-muted-foreground">Regions</div>
               </motion.div>
             </div>
@@ -241,18 +358,15 @@ export function PersonalSettings({ accountId }: PersonalSettingsProps) {
               >
                 <Folders className="h-4 w-4" />
               </motion.div>
-              Active Projects
+              Last Activity
             </div>
             <div className="space-y-2">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-3xl font-semibold"
-              >
-                24
-              </motion.div>
               <div className="text-sm text-muted-foreground">
-                Last updated 2h ago
+                {responseStats.last_activity ? (
+                  <>Last active: {new Date(responseStats.last_activity).toLocaleString()}</>
+                ) : (
+                  'No activity yet'
+                )}
               </div>
             </div>
           </motion.div>
